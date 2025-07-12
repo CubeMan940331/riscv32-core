@@ -1,0 +1,166 @@
+`include "riscv_defs.v"
+module Control (
+    input [31:0] inst,
+
+    output reg reg_wr_en,
+    output reg [1:0] reg_w_sel, // 0: pc_p4, 1: ALU, 2: mem
+    output reg mem_wr_en,
+    output reg mem_rd_en,
+    output reg [3:0] mem_ctrl,
+    output reg is_j,
+    output reg is_br,
+    output reg ALU_sel1, // 0: PC, 1: rs1
+    output reg ALU_sel2, // 0: rs2, 1: imm
+    output reg [3:0] ALU_ctrl,
+    output reg [2:0] cmp_op
+);
+
+// decode
+wire [6:0] opcode = inst[6:0];
+wire [2:0] funct3 = inst[14:12];
+wire [6:0] funct7 = inst[31:25];
+
+always @(*) begin
+    reg_wr_en = 1'b0;
+    reg_w_sel = 2'b00;
+    mem_wr_en = 1'b0;
+    mem_rd_en = 1'b0;
+    mem_ctrl = 4'b0000;
+    is_j = 1'b0;
+    is_br = 1'b0;
+    ALU_sel1 = 1'b0;
+    ALU_sel2 = 1'b0;
+    ALU_ctrl = `ALU_NONE;
+    cmp_op = 3'b000;
+
+    case (opcode)
+        // R-Type (ADD SUB SLL SLT SLTU XOR SRL SRA OR AND)
+        7'b0110011: begin
+            case(funct3)
+                3'b000:  ALU_ctrl = (funct7[5]) ? `ALU_SUB : `ALU_ADD; // SUB : ADD
+                3'b001:  ALU_ctrl = `ALU_SHIFTL; // SLL
+                3'b010:  ALU_ctrl = `ALU_LESS_THAN_SIGNED; // SLT
+                3'b011:  ALU_ctrl = `ALU_LESS_THAN; // SLTU
+                3'b100:  ALU_ctrl = `ALU_XOR; // XOR
+                3'b101:  ALU_ctrl = (funct7[5]) ? `ALU_SHIFTR_ARITH : `ALU_SHIFTR; // SRA : SRL
+                3'b110:  ALU_ctrl = `ALU_OR; // OR
+                3'b111:  ALU_ctrl = `ALU_AND; // AND
+                default: ALU_ctrl = `ALU_NONE; // PASS
+            endcase
+            reg_wr_en = 1'b1;
+            ALU_sel1   = 1'b1;  // R1
+            ALU_sel2  = 1'b0;  // R2
+            reg_w_sel  = 2'b01; // ALUout
+        end
+
+        // I-Type (ADDI SLLI SLTI SLTIU XORI SRLI SRAI ORI ANDI)
+        7'b0010011: begin
+            case(funct3)
+                3'b000:  ALU_ctrl = `ALU_ADD; // ADDI
+                3'b001:  ALU_ctrl = `ALU_SHIFTL; // SLLI
+                3'b010:  ALU_ctrl = `ALU_LESS_THAN_SIGNED; // SLTI
+                3'b011:  ALU_ctrl = `ALU_LESS_THAN; // SLTIU
+                3'b100:  ALU_ctrl = `ALU_XOR; // XORI
+                3'b101:  ALU_ctrl = (funct7[5]) ? `ALU_SHIFTR_ARITH : `ALU_SHIFTR; // SRAI : SRLI
+                3'b110:  ALU_ctrl = `ALU_OR; // ORI
+                3'b111:  ALU_ctrl = `ALU_AND; // ANDI
+                default: ALU_ctrl = `ALU_NONE; // PASS
+            endcase
+            reg_wr_en = 1'b1;
+            ALU_sel1   = 1'b1;  // R1
+            ALU_sel2  = 1'b1; // immediate
+            reg_w_sel  = 2'b01; // ALUout
+        end
+
+        // Load-Type (LB LH LW LBU LHU)
+        7'b0000011: begin
+            case(funct3)
+                3'b000:  mem_ctrl = 4'b1001; // LB
+                3'b001:  mem_ctrl = 4'b1010; // LH
+                3'b010:  mem_ctrl = 4'b0100; // LW
+                3'b100:  mem_ctrl = 4'b0001; // LBU
+                3'b101:  mem_ctrl = 4'b0010; // LHU
+                default: mem_ctrl = 4'b0000; // undefined
+            endcase
+            ALU_ctrl  = `ALU_ADD; // ADD
+            reg_wr_en = 1'b1;
+            ALU_sel1   = 1'b1;  // R1
+            ALU_sel2  = 1'b1;  // immediate
+            mem_rd_en  = 1'b1;
+            reg_w_sel  = 2'b10; // memory
+        end
+
+        // S-Type (SB SH SW)
+        7'b0100011: begin
+            case(funct3)
+                3'b000:  mem_ctrl = 4'b0001; // SB
+                3'b001:  mem_ctrl = 4'b0010; // SH
+                3'b010:  mem_ctrl = 4'b0100; // SW
+                default: mem_ctrl = 4'b0000; // undefined
+            endcase
+            ALU_ctrl  = `ALU_ADD; // ADD
+            ALU_sel1   = 1'b1;     // R1
+            ALU_sel2   = 1'b1;    // immediate
+            mem_wr_en  = 1'b1;
+        end
+
+        // B-Type (BEQ BNE BLT BGE BLTU BGEU)
+        7'b1100011: begin
+            case(funct3)
+                3'b000:  cmp_op = 3'b000; // BEQ
+                3'b001:  cmp_op = 3'b001; // BNE
+                3'b100:  cmp_op = 3'b010; // BLT
+                3'b101:  cmp_op = 3'b011; // BGE
+                3'b110:  cmp_op = 3'b100; // BLTU
+                3'b111:  cmp_op = 3'b101; // BGEU
+                default: cmp_op = 3'b111; // undefined
+            endcase
+            ALU_ctrl  = `ALU_ADD; // ADD
+            ALU_sel1   = 1'b0;     // PC
+            ALU_sel2  = 1'b1;     // immediate
+            is_br = 1'b1;
+        end
+
+        // JAL
+        7'b1101111: begin
+            ALU_ctrl  = `ALU_ADD; // ADD
+            reg_wr_en = 1'b1;
+            reg_w_sel  = 2'b00;    // PC+4
+            ALU_sel1   = 1'b0;     // PC
+            ALU_sel2  = 1'b1;     // immediate
+            is_j   = 1'b1;
+        end
+
+        // JALR
+        7'b1100111: begin
+            ALU_ctrl  = `ALU_ADD; // ADD
+            reg_wr_en = 1'b1;
+            reg_w_sel  = 2'b00;    // PC+4
+            is_j   = 1'b1;
+            ALU_sel1   = 1'b1;     // R1
+            ALU_sel2  = 1'b1;     // immediate
+        end
+
+        // AUIPC
+        7'b0010111: begin
+            ALU_ctrl  = `ALU_ADD; // ADD
+            reg_wr_en = 1'b1;
+            reg_w_sel  = 2'b01;    // ALUout
+            ALU_sel1   = 1'b0;     // PC
+            ALU_sel2  = 1'b1;     // immediate
+        end
+
+        // LUI
+        7'b0110111: begin
+            ALU_ctrl  = `ALU_NONE; // PASS B
+            reg_wr_en = 1'b1;
+            reg_w_sel  = 2'b01;      // ALUout
+            ALU_sel2  = 1'b1;       // imm
+        end
+
+        default: begin
+        end
+    endcase
+end
+
+endmodule
