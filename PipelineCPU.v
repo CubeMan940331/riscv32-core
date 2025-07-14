@@ -1,7 +1,16 @@
 module PipelineCPU (
     input clk,
     input rst_n,
-    output signed [31:0] r [0:31]
+
+    output [31:0] i_mem_addr,
+    input  [31:0] inst,
+
+    output [3:0] d_mem_ctrl,
+    output d_mem_wr_en,
+    output d_mem_rd_en,
+    output [31:0] d_mem_addr,
+    output [31:0] d_mem_wr_data,
+    input  [31:0] d_mem_rd_data
 );
 //wires
 //================================================================
@@ -13,8 +22,7 @@ wire [31:0]pc_in;
 wire [31:0]pc_out;
 wire [31:0]pc_p4;
 
-// inst mem ===================
-wire [31:0]inst;
+assign i_mem_addr = pc_out;
 
 // ID_Reg =====================
 wire ID_clear;
@@ -108,8 +116,11 @@ wire        MEM_mem_wr_en_out;
 wire        MEM_mem_rd_en_out;
 wire [3:0]  MEM_mem_ctrl_out;
 
-// memory =====================
-wire [31:0] mem_data_out;
+assign d_mem_ctrl = MEM_mem_ctrl_out;
+assign d_mem_wr_en = MEM_mem_wr_en_out;
+assign d_mem_rd_en = MEM_mem_rd_en_out;
+assign d_mem_addr = MEM_ALU_out;
+assign d_mem_wr_data = MEM_reg_rd_data2_out;
 
 // WB_Reg =====================
 wire [31:0] WB_pc_p4_out;
@@ -181,11 +192,6 @@ Mux2to1 #(.size(32)) m_PC_MUX(
     .out(pc_in)
 );
 
-InstructionMemory m_InstMem(
-    .address(pc_out),
-    .inst(inst)
-);
-
 // ================================
 // Instruction Decode stage
 ID_Reg m_ID_Reg(
@@ -230,11 +236,6 @@ DecodeUnit m_DecodeUnit(
     .rd(decode_rd),
     .imm(decode_imm)
 );
-
-// ======= for validation =======
-// == Dont change this section ==
-assign r = m_Register.regs;
-// ======= for vaildation =======
 
 Control m_Control(
     .inst(ID_inst_out),
@@ -402,17 +403,6 @@ MEM_Reg m_EX_MEM_Reg(
     .mem_ctrl_o(MEM_mem_ctrl_out)
 );
 
-DataMemory m_DataMemory(
-    .rst_n      (rst_n),
-    .clk        (clk),
-    .wr_en      (MEM_mem_wr_en_out),
-    .rd_en      (MEM_mem_rd_en_out),
-    .ctrl       (MEM_mem_ctrl_out),
-    .address    (MEM_ALU_out),
-    .data_i     (MEM_reg_rd_data2_out),
-    .data_o     (mem_data_out)
-);
-
 //================================
 //write back stage
 
@@ -422,7 +412,7 @@ WB_Reg m_MEM_WB_Reg(
 
     .pc_p4_i(MEM_pc_p4_out),
     .ALU_i(MEM_ALU_out),
-    .mem_data_i(mem_data_out),
+    .mem_data_i(d_mem_rd_data),
     .rd_i(MEM_rd_out),
     // control_in
     .reg_wr_en_i(MEM_reg_wr_en_out),
