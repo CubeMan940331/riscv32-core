@@ -1,4 +1,4 @@
-module ID_EX_Reg (
+module EX_Reg (
     input  wire        clk,
     input  wire        rst_n,
     input  wire        en,

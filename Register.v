@@ -1,18 +1,21 @@
 module Register #(parameter sp_init = 65536) (
     input clk,
     input rst_n,
-    input regWrite,
-    input [4:0] readReg1,
-    input [4:0] readReg2,
-    input [4:0] writeReg,
-    input [31:0] writeData,
-    output [31:0] readData1,
-    output [31:0] readData2
+
+    input [4:0] rs1,
+    input [4:0] rs2,
+    
+    input wr_en,
+    input [4:0] rd,
+    input [31:0] data_i,
+    
+    output [31:0] rd_data1_o,
+    output [31:0] rd_data2_o
 );
     reg [31:0] regs [0:31];
     
-    assign readData1 = regs[readReg1];
-    assign readData2 = regs[readReg2];
+    assign rd_data1_o = regs[rs1];
+    assign rd_data2_o = regs[rs2];
 
     always @(negedge clk, negedge rst_n) begin
         if(~rst_n) begin
@@ -25,8 +28,8 @@ module Register #(parameter sp_init = 65536) (
             regs[24] <= 0; regs[25] <= 0; regs[26] <= 0; regs[27] <= 0;
             regs[28] <= 0; regs[29] <= 0; regs[30] <= 0; regs[31] <= 0;
         end
-        else if(regWrite)
-            regs[writeReg] <= (writeReg == 0) ? 0 : writeData;
+        else if(wr_en)
+            regs[rd] <= (rd == 0) ? 0 : data_i;
     end
 
 endmodule

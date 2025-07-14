@@ -4,7 +4,7 @@ module MEM_Reg(
     // data_in
     input  wire [31:0] pc_p4_i,
     input  wire [31:0] ALU_i,
-    input  wire [31:0] mem_w_data_i,
+    input  wire [31:0] reg_rd_data2_i,
     input  wire [4:0]  rd_i,
     // control_in
     input  wire        reg_wr_en_i,
@@ -17,7 +17,7 @@ module MEM_Reg(
     // data_out
     output wire [31:0] pc_p4_o,
     output wire [31:0] ALU_o,
-    output wire [31:0] mem_w_data_o,
+    output wire [31:0] reg_rd_data2_o,
     output wire [4:0]  rd_o,
     // control_out
     output  wire        reg_wr_en_o,
@@ -31,10 +31,10 @@ module MEM_Reg(
     wire clear = 1'b0;
     
     // data_in
-    PipelineRegister #(.WIDTH(32)) reg_pc_p4      (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(pc_p4_i),      .data_o(pc_p4_o));
-    PipelineRegister #(.WIDTH(32)) reg_ALU        (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(ALU_i),        .data_o(ALU_o));
-    PipelineRegister #(.WIDTH(32)) reg_mem_w_data (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(mem_w_data_i), .data_o(mem_w_data_o));
-    PipelineRegister #(.WIDTH(5))  reg_rd         (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(rd_i),         .data_o(rd_o));
+    PipelineRegister #(.WIDTH(32)) reg_pc_p4      (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(pc_p4_i),        .data_o(pc_p4_o));
+    PipelineRegister #(.WIDTH(32)) reg_ALU        (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(ALU_i),          .data_o(ALU_o));
+    PipelineRegister #(.WIDTH(32)) reg_rd_data2   (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(reg_rd_data2_i), .data_o(reg_rd_data2_o));
+    PipelineRegister #(.WIDTH(5))  reg_rd         (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(rd_i),           .data_o(rd_o));
     // control_in
     PipelineRegister #(.WIDTH(1))  reg_reg_wr_en  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(reg_wr_en_i),  .data_o(reg_wr_en_o));
     PipelineRegister #(.WIDTH(2))  reg_reg_w_sel  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(reg_w_sel_i),  .data_o(reg_w_sel_o));

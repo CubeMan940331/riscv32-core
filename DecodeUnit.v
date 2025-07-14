@@ -1,0 +1,52 @@
+module DecodeUnit(
+    input  [31:0]   inst,
+    
+    output [6:0]    opcode,
+    output [2:0]    funct3,
+    output [6:0]    funct7,
+    
+    output [4:0]    rs1,
+    output [4:0]    rs2,
+    output [4:0]    rd,
+
+    output reg signed [31:0]   imm
+);
+
+assign opcode = inst[6:0];
+assign funct3 = inst[14:12];
+assign funct7 = inst[31:25];
+
+assign rs1 = inst[19:15];
+assign rs2 = inst[24:20];
+assign rd  = inst[11:07];
+
+always @(*)begin
+    case(opcode)
+        7'b0010011, // I ADDI SLLI SLTI SLTIU XORI SRLI SRAI ORI ANDI
+        7'b0000011, // I LB LH LW LBU LHU
+        7'b1100111: // JALR
+            // {imm[31:20]}
+            imm = {{20{inst[31]}}, inst[31:20]}; 
+
+        7'b0100011: // S SB SH SW
+            // {imm[11:5], imm[4:0]}
+            imm = {{20{inst[31]}}, inst[31:25], inst[11:7]};
+
+        7'b1100011: // B BEQ BNE BLT BGE BLTU BGEU
+            // {imm[12], imm[10:5], imm[4:1], 0}
+            imm = {{19{inst[31]}}, inst[31], inst[7], inst[30:25], inst[11:8], 1'b0};
+
+        7'b1101111: // J JAL
+            // {imm[20], imm[10:1], imm[11], imm[19:12], 0}
+            imm = {{11{inst[31]}}, inst[31], inst[19:12], inst[20], inst[30:21], 1'b0};
+
+        7'b0110111, // U LUI
+        7'b0010111: // U AUIPC
+            // {imm[31:12]}
+            imm={inst[31:12], 12'b0};
+        default:
+            imm = 32'b0;
+    endcase
+end
+
+endmodule
