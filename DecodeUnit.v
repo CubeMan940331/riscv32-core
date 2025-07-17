@@ -9,7 +9,9 @@ module DecodeUnit(
     output [4:0]    rs2,
     output [4:0]    rd,
 
-    output reg signed [31:0]   imm
+    output reg signed [31:0]   imm,
+
+    output [11:0]              csr_addr
 );
 
 assign opcode = inst[6:0];
@@ -48,5 +50,7 @@ always @(*)begin
             imm = 32'b0;
     endcase
 end
+
+assign csr_addr = inst[31:20];
 
 endmodule

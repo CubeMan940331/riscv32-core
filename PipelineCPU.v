@@ -16,7 +16,7 @@ module PipelineCPU (
 //================================================================
 
 // PC =========================
-wire pc_sel;
+wire [1:0] pc_sel;
 wire pc_en;
 wire [31:0]pc_in;
 wire [31:0]pc_out;
@@ -42,6 +42,8 @@ wire [4:0]    decode_rs1;
 wire [4:0]    decode_rs2;
 wire [4:0]    decode_rd;
 
+wire [11:0]   decode_csr_addr;
+
 // Control Logic ==============
 wire reg_wr_en;
 // 0: pc_p4, 1: ALU, 2: mem
@@ -57,6 +59,16 @@ wire ALU_sel1;
 wire ALU_sel2;
 wire [3:0] ALU_ctrl;
 wire [2:0] cmp_op;
+// csr
+wire trap_ecall;
+wire trap_ebreak;
+wire inst_mret;
+
+wire is_csr;
+wire [2:0] csr_op;
+wire is_csr_imm; // is csr[r w]i
+wire csr_wr_en;
+wire csr_sel; // rs1 or imm
 
 // Register File ==============
 wire [31:0] reg_data_in;
@@ -91,6 +103,17 @@ wire EX_ALU_sel2_out;
 wire [3:0] EX_ALU_ctrl_out;
 // BranchCmp
 wire [2:0] EX_cmp_op_out;
+//csr
+wire [11:0]  EX_csr_addr_out;
+wire EX_trap_ecall_out;
+wire EX_trap_ebreak_out;
+wire EX_inst_mret_out;
+
+wire EX_is_csr_out;
+wire [2:0] EX_csr_op_out;
+wire EX_is_csr_imm_out; // is csr[r w]i
+wire EX_csr_wr_en_out;
+wire EX_csr_sel_out; // rs1 or imm
 
 wire [2:0] EX_funct3_out;
 wire EX_funct7_out;
@@ -103,6 +126,11 @@ wire zero_flag;
 
 // BranchCmp ==================
 wire br_taken;
+
+// CSR ========================
+wire [31:0] csr_wr_data; // from CSR to CSRFile
+wire [31:0] csr_rd_data; // output of CSRFile
+wire [31:0] csr_pc_next;
 
 // MEM_Reg ====================
 wire [31:0] MEM_pc_p4_out;
@@ -185,10 +213,11 @@ PC m_PC(
 );
 assign pc_p4 = pc_out+4;
 
-Mux2to1 #(.size(32)) m_PC_MUX(
+Mux3to1 #(.size(32)) m_PC_MUX(
     .sel(pc_sel),
     .s0(pc_p4),
     .s1(ALU_out),
+    .s2(csr_pc_next),
     .out(pc_in)
 );
 
@@ -234,7 +263,9 @@ DecodeUnit m_DecodeUnit(
     .rs1(decode_rs1),
     .rs2(decode_rs2),
     .rd(decode_rd),
-    .imm(decode_imm)
+    .imm(decode_imm),
+
+    .csr_addr(decode_csr_addr)
 );
 
 Control m_Control(
@@ -249,7 +280,17 @@ Control m_Control(
     .ALU_sel1(ALU_sel1),
     .ALU_sel2(ALU_sel2),
     .ALU_ctrl(ALU_ctrl),
-    .cmp_op(cmp_op)
+    .cmp_op(cmp_op),
+
+    .trap_ecall(trap_ecall),
+    .trap_ebreak(trap_ebreak),
+    .inst_mret(inst_mret),
+    
+    .is_csr(is_csr),
+    .csr_op(csr_op),
+    .is_csr_imm(is_csr_imm),
+    .csr_wr_en(csr_wr_en),
+    .csr_sel(csr_sel)
 );
 
 // ================================
@@ -290,6 +331,19 @@ EX_Reg m_EX_Reg(
 
     .cmp_op_i(cmp_op),
 
+    // csr
+    .csr_addr_i(decode_csr_addr),
+
+    .trap_ecall_i(trap_ecall),
+    .trap_ebreak_i(trap_ebreak),
+    .inst_mret_i(inst_mret),
+
+    .is_csr_i(is_csr),
+    .csr_op_i(csr_op),
+    .is_csr_imm_i(is_csr_imm),
+    .csr_wr_en_i(csr_wr_en),
+    .csr_sel_i(csr_sel),
+
     .funct3_i(decode_funct3),
     .funct7_i(decode_funct7[5]),
     //=================================
@@ -318,8 +372,18 @@ EX_Reg m_EX_Reg(
     .ALU_sel1_o(EX_ALU_sel1_out),
     .ALU_sel2_o(EX_ALU_sel2_out),
     .ALU_ctrl_o(EX_ALU_ctrl_out),
-
+    // BranchCmp
     .cmp_op_o(EX_cmp_op_out),
+    // csr
+    .csr_addr_o(EX_csr_addr_out),
+    .trap_ebreak_o(EX_trap_ebreak_out),
+    .trap_ecall_o(EX_trap_ecall_out),
+    .inst_mret_o(EX_inst_mret_out),
+    .is_csr_o(EX_is_csr_out),
+    .csr_op_o(EX_csr_op_out),
+    .is_csr_imm_o(EX_is_csr_imm_out),
+    .csr_wr_en_o(EX_csr_wr_en_out),
+    .csr_sel_o(EX_csr_sel_out),
 
     .funct3_o(EX_funct3_out),
     .funct7_o(EX_funct7_out)
@@ -369,7 +433,34 @@ BranchCmp m_BranchCmp(
     .br_taken(br_taken)
 );
 
-assign pc_sel = br_taken;
+CSRFile m_CSRFile(
+    .clk(clk),
+    .rst_n(rst_n),
+    // csr access
+    .csr_addr_i(EX_csr_addr_out),
+    .csr_wdata_i(csr_wr_data),
+    .csr_we_i(EX_csr_wr_en_out),
+    .csr_rdata_o(csr_rd_data),
+    // Trap / return
+    .trap_taken_i(EX_trap_ecall_out | EX_trap_ebreak_out),
+    .trap_pc_i(EX_pc_out),
+    .mcause_i(32'h0),
+    .mret_i(EX_inst_mret_out),
+
+    .csr_pc_redirect_o(csr_pc_next),
+    .cur_priv_o()
+);
+
+CSR m_CSR(
+    .csr_op_i(EX_csr_op_out),
+    .csr_imm_i(EX_is_csr_imm_out),
+    .rs1_i(EX_fwd_data1),
+    .csr_old_i(csr_rd_data),
+
+    .csr_wdata_o(csr_wr_data)
+);
+
+assign pc_sel = {EX_trap_ebreak_out | EX_trap_ecall_out, br_taken};
 
 // ================================
 // mem access stage

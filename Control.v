@@ -12,13 +12,24 @@ module Control (
     output reg ALU_sel1, // 0: PC, 1: rs1
     output reg ALU_sel2, // 0: rs2, 1: imm
     output reg [3:0] ALU_ctrl,
-    output reg [2:0] cmp_op
+    output reg [2:0] cmp_op,
+
+    output reg trap_ecall,
+    output reg trap_ebreak,
+    output reg inst_mret,
+
+    output reg is_csr,
+    output reg [2:0] csr_op,
+    output reg is_csr_imm, // is csr[r w]i
+    output reg csr_wr_en,
+    output reg csr_sel // rs1 or imm
 );
 
 // decode
 wire [6:0] opcode = inst[6:0];
 wire [2:0] funct3 = inst[14:12];
 wire [6:0] funct7 = inst[31:25];
+wire [11:0] imm12 = inst[31:20];
 
 always @(*) begin
     reg_wr_en = 1'b0;
@@ -32,6 +43,12 @@ always @(*) begin
     ALU_sel2 = 1'b0;
     ALU_ctrl = `ALU_NONE;
     cmp_op = 3'b000;
+
+    is_csr=0;
+    csr_op=0;
+    is_csr_imm=0;
+    csr_wr_en=0;
+    csr_sel=0;
 
     case (opcode)
         // R-Type (ADD SUB SLL SLT SLTU XOR SRL SRA OR AND)
@@ -156,6 +173,29 @@ always @(*) begin
             reg_wr_en = 1'b1;
             reg_w_sel  = 2'b01;      // ALUout
             ALU_sel2  = 1'b1;       // imm
+        end
+        // CSR-Type (ECALL EBREAK MRET URET* SRET* CSRRW CSRRS CSRRC CSRRWI CSRRSI CSRRCI)
+        7'b1110011: begin
+            case(funct3)
+                3'b000: begin
+                    case (imm12)
+                        12'h000: trap_ecall  = 1'b1;   // ECALL
+                        12'h001: trap_ebreak = 1'b1;   // EBREAK
+                        12'h302: inst_mret   = 1'b1;   // MRET
+                        default:;
+                    endcase
+                end
+                default: begin // ALL CSR
+                    is_csr = 1'b1;
+                    csr_op = funct3;
+                    is_csr_imm = funct3[2];
+                    csr_wr_en = (funct3 == 3'b001 || funct3 == 3'b011 || funct3 == 3'b101);
+                    
+                    reg_wr_en = 1'b1;
+                    reg_w_sel  = 2'b11; // CSR read data path
+                    csr_sel  = is_csr_imm;
+                end
+            endcase
         end
 
         default: begin
