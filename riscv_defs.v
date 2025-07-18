@@ -352,7 +352,7 @@
 `define CSR_MIE           12'h304
 `define CSR_MIE_MASK      `IRQ_MASK
 `define CSR_MTVEC         12'h305
-`define CSR_MTVEC_MASK    32'hFFFFFFFF
+`define CSR_MTVEC_MASK    32'hFFFFFFFC // alway direct mode
 `define CSR_MSCRATCH      12'h340
 `define CSR_MSCRATCH_MASK 32'hFFFFFFFF
 `define CSR_MEPC          12'h341

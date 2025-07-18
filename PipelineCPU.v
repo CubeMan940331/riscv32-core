@@ -1,3 +1,5 @@
+`include "riscv_defs.v"
+
 module PipelineCPU (
     input clk,
     input rst_n,
@@ -130,7 +132,8 @@ wire br_taken;
 // CSR ========================
 wire [31:0] csr_wr_data; // from CSR to CSRFile
 wire [31:0] csr_rd_data; // output of CSRFile
-wire [31:0] csr_pc_next;
+wire [31:0] csr_pc_target;
+wire csr_is_br;
 
 // MEM_Reg ====================
 wire [31:0] MEM_pc_p4_out;
@@ -217,7 +220,7 @@ Mux3to1 #(.size(32)) m_PC_MUX(
     .sel(pc_sel),
     .s0(pc_p4),
     .s1(ALU_out),
-    .s2(csr_pc_next),
+    .s2(csr_pc_target),
     .out(pc_in)
 );
 
@@ -434,33 +437,47 @@ BranchCmp m_BranchCmp(
 );
 
 CSRFile m_CSRFile(
-    .clk(clk),
-    .rst_n(rst_n),
+    .clk(clk)
+    ,.rst_n(rst_n)
     // csr access
-    .csr_addr_i(EX_csr_addr_out),
-    .csr_wdata_i(csr_wr_data),
-    .csr_we_i(EX_csr_wr_en_out),
-    .csr_rdata_o(csr_rd_data),
-    // Trap / return
-    .trap_taken_i(EX_trap_ecall_out | EX_trap_ebreak_out),
-    .trap_pc_i(EX_pc_out),
-    .mcause_i(32'h0),
-    .mret_i(EX_inst_mret_out),
+    ,.cpu_id_i(0)
+    ,.misa_i(`MISA_RV32 | `MISA_RVI)
 
-    .csr_pc_redirect_o(csr_pc_next),
-    .cur_priv_o()
+    ,.exception_i(EX_trap_ecall_out ? `EXCEPTION_ECALL_M: 0)
+    ,.exception_pc_i(EX_pc_out)
+    ,.exception_addr_i(0) // only consider ecall for now
+
+    ,.csr_rd_en_i(1)
+    ,.csr_rd_addr_i(EX_csr_addr_out)
+    ,.csr_rd_data_i(csr_rd_data)
+    
+    ,.csr_wr_addr_i(EX_csr_addr_out)
+    ,.csr_wr_data_i(csr_wr_data)
+
+    ,.csr_branch_o(csr_is_br)
+    ,.csr_target_o(csr_pc_target)
+
+    // CSR registers
+    ,.priv_o()
+    ,.mstatus_o()
+    ,.satp_o()
+
+    ,.interrupt_o()
 );
 
 CSR m_CSR(
     .csr_op_i(EX_csr_op_out),
-    .csr_imm_i(EX_is_csr_imm_out),
-    .rs1_i(EX_fwd_data1),
+    .is_csr_imm_i(EX_is_csr_imm_out),
+    .imm_i(EX_imm_out),
+    .reg_rd_data1_i(EX_fwd_data1),
     .csr_old_i(csr_rd_data),
 
     .csr_wdata_o(csr_wr_data)
 );
 
-assign pc_sel = {EX_trap_ebreak_out | EX_trap_ecall_out, br_taken};
+assign pc_sel = csr_is_br ? 2 : (
+    br_taken ? 1: 0
+);
 
 // ================================
 // mem access stage

@@ -71,12 +71,10 @@ module CSRFile (
 );
 
 // utilities
-reg [1:0] csr_priv_r;
-reg [1:0] csr_priv_q;
-reg [31:0] csr_satp_r;
-reg [31:0] csr_satp_q;
-reg [31:0]  csr_mip_next_q; // what the hell?
-reg [31:0]  csr_mip_next_r;
+reg [1:0]   csr_priv_r;
+reg [1:0]   csr_priv_q;
+reg [31:0]  csr_satp_r;
+reg [31:0]  csr_satp_q;
 
 // CSR - Machine
 
@@ -138,6 +136,31 @@ reg [31:0] csr_mhpmcounterh_q [3:31];
 reg [31:0] csr_mcountinhibit_q;
 reg [31:0] csr_mhpmevent_q    [3:31];
 reg [31:0] csr_mhpmeventh_q   [3:31];
+
+//-----------------------------------------------------------------
+// Masked Interrupts
+//-----------------------------------------------------------------
+reg [31:0] irq_pending_r;
+reg [31:0] irq_masked_r;
+reg [1:0]  irq_priv_r;
+
+// TODO: need to implement s mode check
+reg        m_enabled_r;
+reg [31:0] m_interrupts_r;
+always @(*) begin
+    irq_pending_r = (csr_mip_q & csr_mie_q);
+    irq_masked_r  = csr_mstatus_q[`SR_MIE_R] ? irq_pending_r : 32'b0;
+    irq_priv_r    = `PRIV_MACHINE;
+end
+reg [1:0] irq_priv_q;
+always @(posedge clk or negedge rst_n) begin
+    if(!rst_n) begin
+        irq_priv_q <= `PRIV_MACHINE;
+    end else if(| irq_masked_r)begin
+        irq_priv_q <= irq_priv_r;
+    end
+end
+assign interrupt_o = irq_masked_r;
 
 //-----------------------------------------------------------------
 // CSR Read Port
@@ -249,13 +272,73 @@ always @(*) begin
     csr_mcause_r    = csr_mcause_q;
     csr_mtval_r     = csr_mtval_q;
     csr_mip_r       = csr_mip_q;
-    csr_mip_next_r  = csr_mip_next_q;
 
     // Counter/Timers
     csr_mcycle_r    = csr_mcycle_q + 32'd1;
 
-    if(is_exception) begin
-        // placeholder for interruption and exception handling
+    // Interrupt
+    if((exception_i & `EXCEPTION_TYPE_MASK) == `EXCEPTION_INTERRUPT) begin
+        if(irq_priv_q == `PRIV_MACHINE) begin
+            // Save interrupt / supervisor state
+            csr_mstatus_r[`SR_MPIE_R] = csr_mstatus_r[`SR_MIE_R];
+            csr_mstatus_r[`SR_MPP_R]  = csr_priv_q;
+            csr_mstatus_r[`SR_MIE_R]  = 1'b0;
+
+            // Set privilege level
+            csr_priv_r          = `PRIV_MACHINE;
+
+            // Record interrupt source PC
+            csr_mepc_r           = exception_pc_i;
+            csr_mtval_r          = 32'b0;
+
+            // Piority encoded interrupt cause
+            if (interrupt_o[`IRQ_M_SOFT])
+                csr_mcause_r = `MCAUSE_INTERRUPT + 32'd`IRQ_M_SOFT;
+            else if (interrupt_o[`IRQ_M_TIMER])
+                csr_mcause_r = `MCAUSE_INTERRUPT + 32'd`IRQ_M_TIMER;
+            else if (interrupt_o[`IRQ_M_EXT])
+                csr_mcause_r = `MCAUSE_INTERRUPT + 32'd`IRQ_M_EXT;
+        end else begin
+            // placeholder for S mode interrupt handling
+        end
+
+    // Exception return
+    end else if (exception_i >= `EXCEPTION_ERET_U && exception_i <= `EXCEPTION_ERET_M) begin
+        // mret
+        if(exception_i[1:0] == `PRIV_MACHINE) begin
+            // Restore previous level
+            csr_priv_r          = csr_mstatus_q[`SR_MPP_R];
+            csr_mstatus_r[`SR_MIE_R] = csr_mstatus_q[`SR_MPIE_R];
+            csr_mstatus_r[`SR_MPIE_R] = 1'b1; // previous is enabled
+            csr_mstatus_r[`SR_MPP_R] = `SR_MPP_M;
+        end else begin
+        // placeholder for sret handling
+        end
+    // TODO: need to implement s mode exception handling
+    // Exception - Machine
+    end else if((exception_i & `EXCEPTION_TYPE_MASK) == `EXCEPTION_EXCEPTION) begin
+        csr_mstatus_r[`SR_MPIE_R] = csr_mstatus_r[`SR_MIE_R];
+        csr_mstatus_r[`SR_MPP_R]  = csr_priv_q;
+        csr_mstatus_r[`SR_MIE_R]  = 1'b0;
+        csr_priv_r                = `PRIV_MACHINE;
+        csr_mepc_r                = exception_pc_i;
+        csr_mcause_r              = {28'b0, exception_i[3:0]}; // need to check if this is correct
+        // Bad address / PC
+        case (exception_i)
+            `EXCEPTION_MISALIGNED_FETCH,
+            `EXCEPTION_FAULT_FETCH,
+            `EXCEPTION_PAGE_FAULT_INST:     csr_mtval_r = exception_pc_i;
+            `EXCEPTION_ILLEGAL_INSTRUCTION,
+            `EXCEPTION_MISALIGNED_LOAD,
+            `EXCEPTION_FAULT_LOAD,
+            `EXCEPTION_MISALIGNED_STORE,
+            `EXCEPTION_FAULT_STORE,
+            `EXCEPTION_PAGE_FAULT_LOAD,
+            `EXCEPTION_PAGE_FAULT_STORE:    csr_mtval_r = exception_addr_i;
+            default:                        csr_mtval_r = 32'b0;
+        endcase
+
+    // normal write operation WL
     end else begin
         case(csr_wr_addr_i)
         // CSR - Machine
@@ -275,8 +358,92 @@ always @(*) begin
         endcase
     end
 
-    csr_mip_r = csr_mip_r | csr_mip_next_r;
-
 end
+
+//-----------------------------------------------------------------
+// Sequential
+//-----------------------------------------------------------------
+
+always @(posedge clk or negedge rst_n) begin
+    if(!rst_n) begin
+        // CSR - Machine
+            // privilege level
+        csr_priv_q     <= `PRIV_MACHINE;
+            // Trap Setup
+        csr_mstatus_q  <= 32'h0000_1800;
+        csr_medeleg_q  <= 32'b0;
+        csr_mideleg_q  <= 32'b0;
+        csr_mie_q      <= 32'b0;
+        csr_mtvec_q    <= 32'b0;
+        csr_medelegh_q <= 32'b0;
+            // Trap Handling
+        csr_mscratch_q <= 32'b0;
+        csr_mepc_q     <= 32'b0;
+        csr_mcause_q   <= 32'b0;
+        csr_mtval_q    <= 32'b0;
+        csr_mip_q      <= 32'b0;
+            // Counter/Timers
+        csr_mcycle_q   <= 32'b0;
+        csr_mcycleh_q  <= 32'b0;
+
+    end else begin
+        // CSR - Machine
+            // privilege level
+        csr_priv_q     <= csr_priv_r;
+            // Trap Setup
+        csr_mstatus_q  <= csr_mstatus_r;
+        csr_medeleg_q  <= (csr_medeleg_r  & `CSR_MEDELEG_MASK);
+        csr_mideleg_q  <= (csr_mideleg_r  & `CSR_MIDELEG_MASK);
+        csr_mie_q      <= csr_mie_r;
+        csr_mtvec_q    <= csr_mtvec_r;
+        csr_medelegh_q <= csr_medelegh_r;
+            // Trap Handling
+        csr_mscratch_q <= csr_mscratch_r;
+        csr_mepc_q     <= csr_mepc_r;
+        csr_mcause_q   <= csr_mcause_r;
+        csr_mtval_q    <= csr_mtval_r;
+        csr_mip_q      <= csr_mip_r;
+            // Counter/Timers
+        csr_mcycle_q   <= csr_mcycle_r;
+        if (csr_mcycle_q == 32'hFFFFFFFF)
+            csr_mcycleh_q <= csr_mcycleh_q + 32'd1;
+    end
+end
+
+//-----------------------------------------------------------------
+// CSR branch
+//-----------------------------------------------------------------
+reg        csr_branch_r;
+reg [31:0] csr_target_r;
+
+always @(*) begin
+    csr_branch_r = 1'b0;
+    csr_target_r = 32'b0;
+
+    // Interrupt
+    if(exception_i == `EXCEPTION_INTERRUPT)begin
+        csr_branch_r = 1'b1;
+        // TODO: need to implement s mode check
+        csr_target_r = csr_mtvec_q;
+    end
+    // Exception return
+    else if(exception_i >= `EXCEPTION_ERET_U && exception_i <= `EXCEPTION_ERET_M) begin
+        // mret
+        if(exception_i[1:0] == `PRIV_MACHINE) begin
+            csr_branch_r = 1'b1;
+            csr_target_r = csr_mepc_q;
+        end
+        // TODO: sret
+    end
+    // TODO: need to implement s mode exception handling
+    // Exception - Machine
+    else if((exception_i & `EXCEPTION_TYPE_MASK) == `EXCEPTION_EXCEPTION) begin
+        csr_branch_r = 1'b1;
+        csr_target_r = csr_mtvec_q;
+    end
+end
+
+assign csr_branch_o = csr_branch_r;
+assign csr_target_o = csr_target_r;
 
 endmodule
