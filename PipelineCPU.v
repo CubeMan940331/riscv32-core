@@ -146,6 +146,7 @@ wire [31:0] MEM_pc_p4_out;
 wire [31:0] MEM_ALU_out;
 wire [31:0] MEM_reg_rd_data2_out; 
 wire [4:0]  MEM_rd_out;
+wire [31:0] MEM_csr_rd_data_out;
 
 wire        MEM_reg_wr_en_out;
 wire [1:0]  MEM_reg_w_sel_out;
@@ -164,6 +165,7 @@ wire [31:0] WB_pc_p4_out;
 wire [31:0] WB_ALU_out;
 wire [31:0] WB_mem_data_out;
 wire [4:0]  WB_rd_out;
+wire [31:0] WB_csr_rd_data_out;
 // control_out
 wire        WB_reg_wr_en_out;
 wire [1:0]  WB_reg_w_sel_out;
@@ -205,10 +207,10 @@ HazardUnit m_Hazard(
 );
 
 assign ID_en = hazardIDEn;
-assign ID_clear = br_taken;
+assign ID_clear = br_taken | csr_is_br;
 
 assign EX_en = 1;
-assign EX_clear = hazardEXClear | br_taken;
+assign EX_clear = hazardEXClear | br_taken | csr_is_br;
 
 // ================================
 // Instruction Fetch stage
@@ -454,7 +456,7 @@ CSRFile m_CSRFile(
     ,.exception_addr_i(0) // only consider ecall for now
 
     ,.csr_rd_addr_i(EX_csr_addr_out)
-    ,.csr_rd_data_i(csr_rd_data)
+    ,.csr_rd_data_o(csr_rd_data)
     
     ,.csr_wr_en_i(EX_csr_wr_en_out)
     ,.csr_wr_addr_i(EX_csr_addr_out)
@@ -496,6 +498,7 @@ MEM_Reg m_EX_MEM_Reg(
     .ALU_i(ALU_out),
     .reg_rd_data2_i(EX_fwd_data2),
     .rd_i(EX_rd_out),
+    .csr_rd_data_i(csr_rd_data),
     // control_in
     .reg_wr_en_i(EX_reg_wr_en_out),
     .reg_w_sel_i(EX_reg_w_sel_out),
@@ -509,6 +512,7 @@ MEM_Reg m_EX_MEM_Reg(
     .ALU_o(MEM_ALU_out),
     .reg_rd_data2_o(MEM_reg_rd_data2_out),
     .rd_o(MEM_rd_out),
+    .csr_rd_data_o(MEM_csr_rd_data_out),
     // control_out
     .reg_wr_en_o(MEM_reg_wr_en_out),
     .reg_w_sel_o(MEM_reg_w_sel_out),
@@ -528,6 +532,7 @@ WB_Reg m_MEM_WB_Reg(
     .ALU_i(MEM_ALU_out),
     .mem_data_i(d_mem_rd_data),
     .rd_i(MEM_rd_out),
+    .csr_rd_data_i(MEM_csr_rd_data_out),
     // control_in
     .reg_wr_en_i(MEM_reg_wr_en_out),
     .reg_w_sel_i(MEM_reg_w_sel_out),
@@ -537,16 +542,18 @@ WB_Reg m_MEM_WB_Reg(
     .ALU_o(WB_ALU_out),
     .mem_data_o(WB_mem_data_out),
     .rd_o(WB_rd_out),
+    .csr_rd_data_o(WB_csr_rd_data_out),
     // control_out
     .reg_wr_en_o(WB_reg_wr_en_out),
     .reg_w_sel_o(WB_reg_w_sel_out)
 );
 
-Mux3to1 #(.size(32)) m_Mux_WriteData(
+Mux4to1 #(.size(32)) m_Mux_WriteData(
     .sel(WB_reg_w_sel_out),
     .s0(WB_pc_p4_out),
     .s1(WB_ALU_out),
     .s2(WB_mem_data_out),
+    .s3(WB_csr_rd_data_out),
     .out(reg_data_in)
 );
 

@@ -3,7 +3,7 @@ module Control (
     input [31:0] inst,
 
     output reg reg_wr_en,
-    output reg [1:0] reg_w_sel, // 0: pc_p4, 1: ALU, 2: mem
+    output reg [1:0] reg_w_sel, // 0: pc_p4, 1: ALU, 2: mem, 3:csr
     output reg mem_wr_en,
     output reg mem_rd_en,
     output reg [3:0] mem_ctrl,
