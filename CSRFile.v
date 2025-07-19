@@ -52,10 +52,10 @@ module CSRFile (
     ,input  [31:0]  exception_pc_i
     ,input  [31:0]  exception_addr_i
 
-    ,input          csr_rd_en_i
     ,input  [11:0]  csr_rd_addr_i
     ,output [31:0]  csr_rd_data_i
     
+    ,input          csr_wr_en_i
     ,input  [11:0]  csr_wr_addr_i
     ,input  [31:0]  csr_wr_data_i
 
@@ -65,7 +65,7 @@ module CSRFile (
     // CSR registers
     ,output [1:0]   priv_o
     ,output [31:0]  mstatus_o
-    ,output [31:0]  satp_o
+    // ,output [31:0]  satp_o
 
     ,output [31:0]  interrupt_o
 );
@@ -73,8 +73,8 @@ module CSRFile (
 // utilities
 reg [1:0]   csr_priv_r;
 reg [1:0]   csr_priv_q;
-reg [31:0]  csr_satp_r;
-reg [31:0]  csr_satp_q;
+// reg [31:0]  csr_satp_r;
+// reg [31:0]  csr_satp_q;
 
 // CSR - Machine
 
@@ -196,7 +196,7 @@ end
 assign csr_rd_data_i = csr_rd_data_r;
 assign priv_o        = csr_priv_q;
 assign mstatus_o     = csr_mstatus_q;
-assign satp_o        = csr_satp_q;
+// assign satp_o        = csr_satp_q;
 
 //-----------------------------------------------------------------
 // CSR register next state
@@ -340,24 +340,25 @@ always @(*) begin
 
     // normal write operation WL
     end else begin
-        case(csr_wr_addr_i)
-        // CSR - Machine
-            // Trap Setup
-            `CSR_MSTATUS: csr_mstatus_r   = csr_wr_data_i & `CSR_MSTATUS_MASK;
-            `CSR_MEDELEG: csr_medeleg_r   = csr_wr_data_i & `CSR_MEDELEG_MASK;
-            `CSR_MIDELEG: csr_mideleg_r   = csr_wr_data_i & `CSR_MIDELEG_MASK;
-            `CSR_MIE:     csr_mie_r       = csr_wr_data_i & `CSR_MIE_MASK;
-            `CSR_MTVEC:   csr_mtvec_r     = csr_wr_data_i & `CSR_MTVEC_MASK;
-            // Trap Handling
-            `CSR_MSCRATCH:csr_mscratch_r  = csr_wr_data_i & `CSR_MSCRATCH_MASK;
-            `CSR_MEPC:    csr_mepc_r      = csr_wr_data_i & `CSR_MEPC_MASK;
-            `CSR_MCAUSE:  csr_mcause_r    = csr_wr_data_i & `CSR_MCAUSE_MASK;
-            `CSR_MTVAL:   csr_mtval_r     = csr_wr_data_i & `CSR_MTVAL_MASK;
-            `CSR_MIP:     csr_mip_r       = csr_wr_data_i & `CSR_MIP_MASK;
-            default:;
-        endcase
+        if(csr_wr_en_i) begin
+            case(csr_wr_addr_i)
+            // CSR - Machine
+                // Trap Setup
+                `CSR_MSTATUS: csr_mstatus_r   = csr_wr_data_i & `CSR_MSTATUS_MASK;
+                `CSR_MEDELEG: csr_medeleg_r   = csr_wr_data_i & `CSR_MEDELEG_MASK;
+                `CSR_MIDELEG: csr_mideleg_r   = csr_wr_data_i & `CSR_MIDELEG_MASK;
+                `CSR_MIE:     csr_mie_r       = csr_wr_data_i & `CSR_MIE_MASK;
+                `CSR_MTVEC:   csr_mtvec_r     = csr_wr_data_i & `CSR_MTVEC_MASK;
+                // Trap Handling
+                `CSR_MSCRATCH:csr_mscratch_r  = csr_wr_data_i & `CSR_MSCRATCH_MASK;
+                `CSR_MEPC:    csr_mepc_r      = csr_wr_data_i & `CSR_MEPC_MASK;
+                `CSR_MCAUSE:  csr_mcause_r    = csr_wr_data_i & `CSR_MCAUSE_MASK;
+                `CSR_MTVAL:   csr_mtval_r     = csr_wr_data_i & `CSR_MTVAL_MASK;
+                `CSR_MIP:     csr_mip_r       = csr_wr_data_i & `CSR_MIP_MASK;
+                default:;
+            endcase
+        end
     end
-
 end
 
 //-----------------------------------------------------------------

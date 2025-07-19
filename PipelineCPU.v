@@ -135,6 +135,12 @@ wire [31:0] csr_rd_data; // output of CSRFile
 wire [31:0] csr_pc_target;
 wire csr_is_br;
 
+// CSRFile=====================
+wire [1:0] csr_priv;
+wire [31:0] csr_mstatus;
+//wire [31:0] csr_satp;
+wire [31:0] csr_interrupt;
+
 // MEM_Reg ====================
 wire [31:0] MEM_pc_p4_out;
 wire [31:0] MEM_ALU_out;
@@ -447,10 +453,10 @@ CSRFile m_CSRFile(
     ,.exception_pc_i(EX_pc_out)
     ,.exception_addr_i(0) // only consider ecall for now
 
-    ,.csr_rd_en_i(1)
     ,.csr_rd_addr_i(EX_csr_addr_out)
     ,.csr_rd_data_i(csr_rd_data)
     
+    ,.csr_wr_en_i(EX_csr_wr_en_out)
     ,.csr_wr_addr_i(EX_csr_addr_out)
     ,.csr_wr_data_i(csr_wr_data)
 
@@ -458,11 +464,11 @@ CSRFile m_CSRFile(
     ,.csr_target_o(csr_pc_target)
 
     // CSR registers
-    ,.priv_o()
-    ,.mstatus_o()
-    ,.satp_o()
+    ,.priv_o(csr_priv)
+    ,.mstatus_o(csr_mstatus)
+    //,.satp_o(csr_satp)
 
-    ,.interrupt_o()
+    ,.interrupt_o(csr_interrupt)
 );
 
 CSR m_CSR(
