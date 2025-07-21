@@ -49,6 +49,9 @@ always @(*) begin
     is_csr_imm=0;
     csr_wr_en=0;
     csr_sel=0;
+    trap_ebreak = 1'b0;
+    inst_mret = 1'b0;
+    trap_ecall = 1'b0;
 
     case (opcode)
         // R-Type (ADD SUB SLL SLT SLTU XOR SRL SRA OR AND)
@@ -198,8 +201,7 @@ always @(*) begin
             endcase
         end
 
-        default: begin
-        end
+        default:;
     endcase
 end
 

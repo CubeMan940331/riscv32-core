@@ -451,7 +451,9 @@ CSRFile m_CSRFile(
     ,.cpu_id_i(0)
     ,.misa_i(`MISA_RV32 | `MISA_RVI)
 
-    ,.exception_i(EX_trap_ecall_out ? `EXCEPTION_ECALL_M: 0)
+    ,.exception_i(EX_trap_ecall_out ? `EXCEPTION_ECALL_M: 
+                 (EX_trap_ebreak_out ? 6'd0 :
+                 (EX_inst_mret_out ? `EXCEPTION_ERET_M : 0)))
     ,.exception_pc_i(EX_pc_out)
     ,.exception_addr_i(0) // only consider ecall for now
 
