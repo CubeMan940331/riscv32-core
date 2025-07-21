@@ -1,4 +1,5 @@
 `include "riscv_defs.v"
+/* verilator lint_off UNUSEDSIGNAL */
 module Control (
     input [31:0] inst,
 

@@ -190,6 +190,7 @@ ForwardUnit m_Forward(
     .EX_rs2(EX_rs2_out),
     .MEM_rd(MEM_rd_out),
     .MEM_reg_wr_en(MEM_reg_wr_en_out),
+    .MEM_reg_w_sel(MEM_reg_w_sel_out),
     .WB_rd(WB_rd_out),
     .WB_reg_wr_en(WB_reg_wr_en_out),
     .EX_fwd_sel1(EX_fwd1_sel),
@@ -400,11 +401,12 @@ EX_Reg m_EX_Reg(
     .funct7_o(EX_funct7_out)
 );
 
-Mux3to1 #(.size(32)) m_EX_fwd1_MUX(
+Mux4to1 #(.size(32)) m_EX_fwd1_MUX(
     .sel(EX_fwd1_sel),
     .s0(reg_data_in),
     .s1(EX_reg_rd_data1_out),
     .s2(MEM_ALU_out),
+    .s3(MEM_csr_rd_data_out),
     .out(EX_fwd_data1)
 );
 Mux2to1 #(.size(32)) m_ALU_SRC1_MUX(
@@ -414,11 +416,12 @@ Mux2to1 #(.size(32)) m_ALU_SRC1_MUX(
     .out(ALU_in1)
 );
 
-Mux3to1 #(.size(32)) m_EX_forward2_MUX(
+Mux4to1 #(.size(32)) m_EX_fwd2_MUX(
     .sel(EX_fwd2_sel),
     .s0(reg_data_in),
     .s1(EX_reg_rd_data2_out),
     .s2(MEM_ALU_out),
+    .s3(MEM_csr_rd_data_out),
     .out(EX_fwd_data2)
 );
 Mux2to1 #(.size(32)) m_ALU_SRC2_MUX(
