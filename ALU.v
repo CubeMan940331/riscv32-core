@@ -1,27 +1,27 @@
 //-----------------------------------------------------------------
 // ALU
 //-----------------------------------------------------------------
-`include"ALU_barrel_shifter.v"
+`include"ALU_Shifter.v"
 
 module ALU(
-    input  [15:0] InA,
-    input  [15:0] InB,
+    input  [31:0] InA,
+    input  [31:0] InB,
     input         Cin,
     input  [2:0]  Oper,
     input         invA,
     input         invB,
     input         Sign,
-    output [15:0] Out,
+    output [31:0] Out,
     output        Ofl,
     output        Zero
 );
 
-wire [15:0] shift_out; 
-wire [15:0] invertA, invertB, A, B;
+wire [31:0] shift_out; 
+wire [31:0] invertA, invertB, A, B;
 wire signA, signB, sign_result;
 wire sign_ofl, unsign_ofl;
 
-reg [15:0] result;
+reg [31:0] result;
 reg Ofl_result, Zero_result;
 
 shifter shifter(
@@ -32,9 +32,9 @@ shifter shifter(
 );
 
 // First Bit of A, B, result
-assign signA = A[15];
-assign signB = B[15];
-assign sign_result = result[15];
+assign signA = A[31];
+assign signB = B[31];
+assign sign_result = result[31];
 
 // Inverter
 assign invertA = ~InA + 1;
@@ -65,7 +65,7 @@ always @(*)begin
         default: Ofl_result = 1'b0;
     endcase
     
-    Zero_result = (Out == 16'b0);
+    Zero_result = (Out == 32'b0);
 end
 
 endmodule
