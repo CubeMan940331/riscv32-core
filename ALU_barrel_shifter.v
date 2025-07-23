@@ -14,7 +14,7 @@ reg [31:0] ari_right_1, ari_right_2, ari_right_4, ari_right_8;
 reg [31:0] shift_right_1, shift_right_2, shift_right_4, shift_right_8;
 reg [31:0] result;
 
-always @(*)begin
+always @(In or ShAmt or Oper)begin
     left_rotate_1 = 32'h0;
     left_rotate_2 = 32'h0;
     left_rotate_4 = 32'h0;
@@ -59,13 +59,13 @@ always @(*)begin
             if (ShAmt[0]) shift_left_1 = {In[31:0], 1'b0};
             else          shift_left_1 = In;
 
-            if (ShAmt[1]) shift_left_2 = {shift_left_1[29:0], 2'b00};
+            if (ShAmt[1]) shift_left_2 = {shift_left_1[29:0], 2'h0};
             else          shift_left_2 = shift_left_1;
 
-            if (ShAmt[2]) shift_left_4 = {shift_left_2[27:0], 4'b0000};
+            if (ShAmt[2]) shift_left_4 = {shift_left_2[27:0], 4'h0};
             else          shift_left_4 = shift_left_2;
 
-            if (ShAmt[3]) shift_left_8 = {shift_left_4[23:0], 8'b00000000};
+            if (ShAmt[3]) shift_left_8 = {shift_left_4[23:0], 8'h00};
             else          shift_left_8 = shift_left_4;
 
             result = shift_left_8;
@@ -91,13 +91,13 @@ always @(*)begin
             if (ShAmt[0]) shift_right_1 = {1'b0, In[31:1]};
             else          shift_right_1 = In;
 
-            if (ShAmt[1]) shift_right_2 = {2'b00, shift_right_1[31:2]};
+            if (ShAmt[1]) shift_right_2 = {2'h0, shift_right_1[31:2]};
             else          shift_right_2 = shift_right_1;
 
-            if (ShAmt[2]) shift_right_4 = {4'b0000, shift_right_2[31:4]};
+            if (ShAmt[2]) shift_right_4 = {4'h0, shift_right_2[31:4]};
             else          shift_right_4 = shift_right_2;
 
-            if (ShAmt[3]) shift_right_8 = {8'b00000000, shift_right_4[31:8]};
+            if (ShAmt[3]) shift_right_8 = {8'h00, shift_right_4[31:8]};
             else          shift_right_8 = shift_right_4;
 
             result = shift_right_8;
