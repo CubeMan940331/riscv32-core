@@ -101,6 +101,7 @@ reg [31:0] csr_mepc_q;
 reg [31:0] csr_mcause_q;
 reg [31:0] csr_mtval_q;
 reg [31:0] csr_mip_q;
+reg [31:0] csr_mip_next_q;
 reg [31:0] csr_mtinst_q;
 reg [31:0] csr_mtval2_q;
 
@@ -140,6 +141,10 @@ reg [31:0] csr_mhpmeventh_q   [3:31];
 // Floating Point
 reg [31:0] csr_fcsr_q;
 
+// Timer interrupts
+reg [31:0] csr_mtimecmp_q;
+reg        csr_mtime_ie_q;
+
 //-----------------------------------------------------------------
 // Masked Interrupts
 //-----------------------------------------------------------------
@@ -165,6 +170,14 @@ always @(posedge clk or negedge rst_n) begin
 end
 assign interrupt_o = irq_masked_r;
 
+reg csr_mip_upd_q;
+always @ (posedge clk or negedge rst_n) begin
+    if (rst_n) csr_mip_upd_q <= 1'b0;
+    else if (csr_rd_addr_i == `CSR_MIP) csr_mip_upd_q <= 1'b1;
+    else if (csr_wr_addr_i == `CSR_MIP || (|exception_i)) csr_mip_upd_q <= 1'b0;
+end
+wire buffer_mip_w = (csr_rd_addr_i == `CSR_MIP) | csr_mip_upd_q;
+
 //-----------------------------------------------------------------
 // CSR Read Port
 //-----------------------------------------------------------------
@@ -189,10 +202,12 @@ always @(*) begin
         // Counter/Timers
         `CSR_MCYCLE,    
         `CSR_MTIME:     csr_rd_data_r = csr_mcycle_q;
+        `CSR_MCYCLEH,  
         `CSR_MTIMEH:    csr_rd_data_r = csr_mcycleh_q;
         // Floating Point
         `CSR_FCSR:      csr_rd_data_r = csr_fcsr_q & `CSR_FCSR_MASK;
-        // Non-Standard
+        // Non-Standard Timer Interrupt
+        `CSR_MTIMECMP:  csr_rd_data_r = csr_mtimecmp_q;
     // CSR - Supervisor
         default:
                         csr_rd_data_r = 32'b0;
@@ -228,6 +243,7 @@ reg [31:0] csr_mepc_r;
 reg [31:0] csr_mcause_r;
 reg [31:0] csr_mtval_r;
 reg [31:0] csr_mip_r;
+reg [31:0] csr_mip_next_r;
 reg [31:0] csr_mtinst_r;
 reg [31:0] csr_mtval2_r;
     // configuration
@@ -259,6 +275,9 @@ reg [31:0] csr_mhpmevent_r    [3:31];
 reg [31:0] csr_mhpmeventh_r   [3:31];
     // Floating Point
 reg [31:0] csr_fcsr_r;
+    // Timer interrupts
+reg [31:0] csr_mtimecmp_r;
+reg        csr_mtime_ie_r;
 
 wire is_exception = | exception_i;
 
@@ -280,12 +299,16 @@ always @(*) begin
     csr_mcause_r    = csr_mcause_q;
     csr_mtval_r     = csr_mtval_q;
     csr_mip_r       = csr_mip_q;
+    csr_mip_next_r  = csr_mip_next_q;
 
     // Counter/Timers
     csr_mcycle_r    = csr_mcycle_q + 32'd1;
 
     // Floating Point
     csr_fcsr_r      = csr_fcsr_q;
+
+    // Non-Standard Timer Interrupt
+    csr_mtimecmp_r  = csr_mtimecmp_q;
 
     // Interrupt
     if((exception_i & `EXCEPTION_TYPE_MASK) == `EXCEPTION_INTERRUPT) begin
@@ -367,10 +390,27 @@ always @(*) begin
             `CSR_MIP:     csr_mip_r       = csr_wr_data_i & `CSR_MIP_MASK;
             // Floating Point
             `CSR_FCSR:    csr_fcsr_r      = csr_wr_data_i & `CSR_FCSR_MASK;
-            // Counter/Timers
+            // Non-Standard Timer Interrupt
+            `CSR_MTIMECMP:
+            begin
+                csr_mtimecmp_r = csr_wr_data_i & `CSR_MTIMECMP_MASK;
+                csr_mtime_ie_r = 1'b1;
+            end
             default:;
         endcase
     end
+
+    // Internal timer compare interrupt
+    if(csr_mcycle_q == csr_mtimecmp_q) begin
+        if(!csr_mtime_ie_q)
+            csr_mip_next_r[`SR_IP_MTIP_R] = 1'b0;
+        else
+            csr_mip_next_r[`SR_IP_MTIP_R] = 1'b1;
+        // TODO: need to implement s mode check
+        csr_mtime_ie_r  = 1'b0;
+    end
+
+    csr_mip_r = csr_mip_r | csr_mip_next_r;
 end
 
 //-----------------------------------------------------------------
@@ -395,11 +435,15 @@ always @(posedge clk or negedge rst_n) begin
         csr_mcause_q   <= 32'b0;
         csr_mtval_q    <= 32'b0;
         csr_mip_q      <= 32'b0;
+        csr_mip_next_q <= 32'b0;
             // Counter/Timers
         csr_mcycle_q   <= 32'b0;
         csr_mcycleh_q  <= 32'b0;
             // Floating Point
         csr_fcsr_q     <= 32'b0;
+            // Non-Standard Timer Interrupt
+        csr_mtimecmp_q <= 32'b0;
+        csr_mtime_ie_q <= 1'b0;
     end else begin
         // CSR - Machine
             // privilege level
@@ -423,6 +467,11 @@ always @(posedge clk or negedge rst_n) begin
             csr_mcycleh_q <= csr_mcycleh_q + 32'd1;
             // Floating Point
         csr_fcsr_q     <= csr_fcsr_r;
+            // Non-Standard Timer Interrupt
+        csr_mtimecmp_q <= csr_mtimecmp_r;
+        csr_mtime_ie_q <= csr_mtime_ie_r;
+        csr_mip_next_q <= buffer_mip_w ? csr_mip_next_r : 32'b0;
+
     end
 end
 

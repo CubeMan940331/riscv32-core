@@ -127,7 +127,7 @@ wire [31:0] ALU_out;
 wire zero_flag;
 
 // BranchCmp ==================
-wire br_taken;
+wire br_taken; // indicate any branch happen (trigger by inst, csr unit)
 
 // CSR ========================
 wire [31:0] csr_wr_data; // from CSR to CSRFile
@@ -179,8 +179,7 @@ wire [1:0] EX_fwd1_sel;
 wire [1:0] EX_fwd2_sel;
 
 // Hazerd =====================
-wire hazardIDEn;
-wire hazardEXClear;
+wire [3:0] stall;
 
 //componets
 //================================================================
@@ -202,16 +201,19 @@ HazardUnit m_Hazard(
     .EX_rd          (EX_rd_out),
     .ID_rs1         (ID_inst_out[19:15]),
     .ID_rs2         (ID_inst_out[24:20]),
-    .pc_en          (pc_en),
-    .ID_en          (hazardIDEn),
-    .EX_clear       (hazardEXClear)
+    .stall          (stall)
 );
 
-assign ID_en = hazardIDEn;
-assign ID_clear = br_taken | csr_is_br;
+PipelineCtrl m_PipelineCtrl(
+    .br_taken(br_taken),
+    .stall(stall),
 
-assign EX_en = 1;
-assign EX_clear = hazardEXClear | br_taken | csr_is_br;
+    .pc_en(pc_en),
+    .ID_en(ID_en),
+    .ID_clear(ID_clear),
+    .EX_en(EX_en),
+    .EX_clear(EX_clear)
+);
 
 // ================================
 // Instruction Fetch stage
@@ -438,13 +440,17 @@ ALU m_ALU(
     .out(ALU_out)
 );
 
-BranchCmp m_BranchCmp(
+BranchUnit m_BranchUnit(
     .is_br(EX_is_br_out),
     .is_j(EX_is_j_out),
+    .is_csr_br(csr_is_br),
+
     .cmp_op(EX_cmp_op_out),
     .reg_rd_data1(EX_fwd_data1),
     .reg_rd_data2(EX_fwd_data2),
-    .br_taken(br_taken)
+    
+    .br_taken(br_taken),
+    .pc_sel(pc_sel)
 );
 
 CSRFile m_CSRFile(
@@ -486,10 +492,6 @@ CSR m_CSR(
     .csr_old_i(csr_rd_data),
 
     .csr_wdata_o(csr_wr_data)
-);
-
-assign pc_sel = csr_is_br ? 2 : (
-    br_taken ? 1: 0
 );
 
 // ================================
