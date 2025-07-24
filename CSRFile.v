@@ -137,6 +137,9 @@ reg [31:0] csr_mcountinhibit_q;
 reg [31:0] csr_mhpmevent_q    [3:31];
 reg [31:0] csr_mhpmeventh_q   [3:31];
 
+// Floating Point
+reg [31:0] csr_fcsr_q;
+
 //-----------------------------------------------------------------
 // Masked Interrupts
 //-----------------------------------------------------------------
@@ -187,6 +190,9 @@ always @(*) begin
         `CSR_MCYCLE,    
         `CSR_MTIME:     csr_rd_data_r = csr_mcycle_q;
         `CSR_MTIMEH:    csr_rd_data_r = csr_mcycleh_q;
+        // Floating Point
+        `CSR_FCSR:      csr_rd_data_r = csr_fcsr_q & `CSR_FCSR_MASK;
+        // Non-Standard
     // CSR - Supervisor
         default:
                         csr_rd_data_r = 32'b0;
@@ -251,6 +257,8 @@ reg [31:0] csr_mhpmcounterh_r [3:31];
 reg [31:0] csr_mcountinhibit_r;
 reg [31:0] csr_mhpmevent_r    [3:31];
 reg [31:0] csr_mhpmeventh_r   [3:31];
+    // Floating Point
+reg [31:0] csr_fcsr_r;
 
 wire is_exception = | exception_i;
 
@@ -275,6 +283,9 @@ always @(*) begin
 
     // Counter/Timers
     csr_mcycle_r    = csr_mcycle_q + 32'd1;
+
+    // Floating Point
+    csr_fcsr_r      = csr_fcsr_q;
 
     // Interrupt
     if((exception_i & `EXCEPTION_TYPE_MASK) == `EXCEPTION_INTERRUPT) begin
@@ -354,6 +365,9 @@ always @(*) begin
             `CSR_MCAUSE:  csr_mcause_r    = csr_wr_data_i & `CSR_MCAUSE_MASK;
             `CSR_MTVAL:   csr_mtval_r     = csr_wr_data_i & `CSR_MTVAL_MASK;
             `CSR_MIP:     csr_mip_r       = csr_wr_data_i & `CSR_MIP_MASK;
+            // Floating Point
+            `CSR_FCSR:    csr_fcsr_r      = csr_wr_data_i & `CSR_FCSR_MASK;
+            // Counter/Timers
             default:;
         endcase
     end
@@ -384,7 +398,8 @@ always @(posedge clk or negedge rst_n) begin
             // Counter/Timers
         csr_mcycle_q   <= 32'b0;
         csr_mcycleh_q  <= 32'b0;
-
+            // Floating Point
+        csr_fcsr_q     <= 32'b0;
     end else begin
         // CSR - Machine
             // privilege level
@@ -406,6 +421,8 @@ always @(posedge clk or negedge rst_n) begin
         csr_mcycle_q   <= csr_mcycle_r;
         if (csr_mcycle_q == 32'hFFFFFFFF)
             csr_mcycleh_q <= csr_mcycleh_q + 32'd1;
+            // Floating Point
+        csr_fcsr_q     <= csr_fcsr_r;
     end
 end
 

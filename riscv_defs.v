@@ -371,6 +371,8 @@
 `define CSR_MTIMEH_MASK   32'hFFFFFFFF
 `define CSR_MHARTID       12'hF14
 `define CSR_MHARTID_MASK  32'hFFFFFFFF
+`define CSR_FCSR          12'h3a0
+`define CSR_FCSR_MASK     32'hFFFFFFFF
 
 // Non-std
 `define CSR_MTIMECMP        12'h7c0
