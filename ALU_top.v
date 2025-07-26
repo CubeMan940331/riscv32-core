@@ -12,6 +12,7 @@ reg        invB;
 reg [31:0] ALU_out;
 reg        Overflow;
 reg        Zero;
+reg        Sign;
 
 ALU m_ALU(
     .InA(a),
@@ -27,23 +28,11 @@ ALU m_ALU(
     .Zero(Zero)
 );
 
-/*
-ALU_NONE            
-ALU_SHIFTL          
-ALU_SHIFTR          
-ALU_SHIFTR_ARITH    
-ALU_ADD             
-ALU_SUB             
-ALU_AND             
-ALU_OR              
-ALU_XOR             
-ALU_LESS_THAN       
-ALU_LESS_THAN_SIGNED
-*/
 always @(*) begin
     Oper=3'b100;
     invB=0;
     out = 32'h0;
+    Sign = 0;
     case (ALU_ctrl)
         `ALU_ADD: Oper = 3'b100; // ADD
         `ALU_SUB: begin
@@ -66,12 +55,12 @@ always @(*) begin
             out = ALU_out;
         end
         `ALU_LESS_THAN: begin
-            out = ALU_out;
+            out = {31'b0, a < b};
         end
         `ALU_LESS_THAN_SIGNED: begin
-            Oper = 3'b100; // SLT
+            Oper = 3'b100; // ADD
             invB=1; // -B
-            out = Zero ? 32'h0 : 32'h1; // Set result to 1 if less than
+            out = {31'b0, $signed(a) < $signed(b)}; // Set result to 1 if less than
         end
         `ALU_NONE: begin
             out = b;
