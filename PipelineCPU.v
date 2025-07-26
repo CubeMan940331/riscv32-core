@@ -1,3 +1,5 @@
+`include "riscv_defs.v"
+
 module PipelineCPU (
     input clk,
     input rst_n,
@@ -125,18 +127,26 @@ wire [31:0] ALU_out;
 wire zero_flag;
 
 // BranchCmp ==================
-wire br_taken;
+wire br_taken; // indicate any branch happen (trigger by inst, csr unit)
 
 // CSR ========================
 wire [31:0] csr_wr_data; // from CSR to CSRFile
 wire [31:0] csr_rd_data; // output of CSRFile
-wire [31:0] csr_pc_next;
+wire [31:0] csr_pc_target;
+wire csr_is_br;
+
+// CSRFile=====================
+wire [1:0] csr_priv;
+wire [31:0] csr_mstatus;
+//wire [31:0] csr_satp;
+wire [31:0] csr_interrupt;
 
 // MEM_Reg ====================
 wire [31:0] MEM_pc_p4_out;
 wire [31:0] MEM_ALU_out;
 wire [31:0] MEM_reg_rd_data2_out; 
 wire [4:0]  MEM_rd_out;
+wire [31:0] MEM_csr_rd_data_out;
 
 wire        MEM_reg_wr_en_out;
 wire [1:0]  MEM_reg_w_sel_out;
@@ -155,6 +165,7 @@ wire [31:0] WB_pc_p4_out;
 wire [31:0] WB_ALU_out;
 wire [31:0] WB_mem_data_out;
 wire [4:0]  WB_rd_out;
+wire [31:0] WB_csr_rd_data_out;
 // control_out
 wire        WB_reg_wr_en_out;
 wire [1:0]  WB_reg_w_sel_out;
@@ -168,8 +179,7 @@ wire [1:0] EX_fwd1_sel;
 wire [1:0] EX_fwd2_sel;
 
 // Hazerd =====================
-wire hazardIDEn;
-wire hazardEXClear;
+wire [3:0] stall;
 
 //componets
 //================================================================
@@ -179,6 +189,7 @@ ForwardUnit m_Forward(
     .EX_rs2(EX_rs2_out),
     .MEM_rd(MEM_rd_out),
     .MEM_reg_wr_en(MEM_reg_wr_en_out),
+    .MEM_reg_w_sel(MEM_reg_w_sel_out),
     .WB_rd(WB_rd_out),
     .WB_reg_wr_en(WB_reg_wr_en_out),
     .EX_fwd_sel1(EX_fwd1_sel),
@@ -190,16 +201,19 @@ HazardUnit m_Hazard(
     .EX_rd          (EX_rd_out),
     .ID_rs1         (ID_inst_out[19:15]),
     .ID_rs2         (ID_inst_out[24:20]),
-    .pc_en          (pc_en),
-    .ID_en          (hazardIDEn),
-    .EX_clear       (hazardEXClear)
+    .stall          (stall)
 );
 
-assign ID_en = hazardIDEn;
-assign ID_clear = br_taken;
+PipelineCtrl m_PipelineCtrl(
+    .br_taken(br_taken),
+    .stall(stall),
 
-assign EX_en = 1;
-assign EX_clear = hazardEXClear | br_taken;
+    .pc_en(pc_en),
+    .ID_en(ID_en),
+    .ID_clear(ID_clear),
+    .EX_en(EX_en),
+    .EX_clear(EX_clear)
+);
 
 // ================================
 // Instruction Fetch stage
@@ -217,7 +231,7 @@ Mux3to1 #(.size(32)) m_PC_MUX(
     .sel(pc_sel),
     .s0(pc_p4),
     .s1(ALU_out),
-    .s2(csr_pc_next),
+    .s2(csr_pc_target),
     .out(pc_in)
 );
 
@@ -389,11 +403,12 @@ EX_Reg m_EX_Reg(
     .funct7_o(EX_funct7_out)
 );
 
-Mux3to1 #(.size(32)) m_EX_fwd1_MUX(
+Mux4to1 #(.size(32)) m_EX_fwd1_MUX(
     .sel(EX_fwd1_sel),
     .s0(reg_data_in),
     .s1(EX_reg_rd_data1_out),
     .s2(MEM_ALU_out),
+    .s3(MEM_csr_rd_data_out),
     .out(EX_fwd_data1)
 );
 Mux2to1 #(.size(32)) m_ALU_SRC1_MUX(
@@ -403,11 +418,12 @@ Mux2to1 #(.size(32)) m_ALU_SRC1_MUX(
     .out(ALU_in1)
 );
 
-Mux3to1 #(.size(32)) m_EX_forward2_MUX(
+Mux4to1 #(.size(32)) m_EX_fwd2_MUX(
     .sel(EX_fwd2_sel),
     .s0(reg_data_in),
     .s1(EX_reg_rd_data2_out),
     .s2(MEM_ALU_out),
+    .s3(MEM_csr_rd_data_out),
     .out(EX_fwd_data2)
 );
 Mux2to1 #(.size(32)) m_ALU_SRC2_MUX(
@@ -424,43 +440,59 @@ ALU m_ALU(
     .out(ALU_out)
 );
 
-BranchCmp m_BranchCmp(
+BranchUnit m_BranchUnit(
     .is_br(EX_is_br_out),
     .is_j(EX_is_j_out),
+    .is_csr_br(csr_is_br),
+
     .cmp_op(EX_cmp_op_out),
     .reg_rd_data1(EX_fwd_data1),
     .reg_rd_data2(EX_fwd_data2),
-    .br_taken(br_taken)
+    
+    .br_taken(br_taken),
+    .pc_sel(pc_sel)
 );
 
 CSRFile m_CSRFile(
-    .clk(clk),
-    .rst_n(rst_n),
+    .clk(clk)
+    ,.rst_n(rst_n)
     // csr access
-    .csr_addr_i(EX_csr_addr_out),
-    .csr_wdata_i(csr_wr_data),
-    .csr_we_i(EX_csr_wr_en_out),
-    .csr_rdata_o(csr_rd_data),
-    // Trap / return
-    .trap_taken_i(EX_trap_ecall_out | EX_trap_ebreak_out),
-    .trap_pc_i(EX_pc_out),
-    .mcause_i(32'h0),
-    .mret_i(EX_inst_mret_out),
+    ,.cpu_id_i(0)
+    ,.misa_i(`MISA_RV32 | `MISA_RVI)
 
-    .csr_pc_redirect_o(csr_pc_next),
-    .cur_priv_o()
+    ,.exception_i(EX_trap_ecall_out ? `EXCEPTION_ECALL_M: 
+                 (EX_trap_ebreak_out ? 6'd0 :
+                 (EX_inst_mret_out ? `EXCEPTION_ERET_M : 0)))
+    ,.exception_pc_i(EX_pc_out)
+    ,.exception_addr_i(0) // only consider ecall for now
+
+    ,.csr_rd_addr_i(EX_csr_addr_out)
+    ,.csr_rd_data_o(csr_rd_data)
+    
+    ,.csr_wr_en_i(EX_csr_wr_en_out)
+    ,.csr_wr_addr_i(EX_csr_addr_out)
+    ,.csr_wr_data_i(csr_wr_data)
+
+    ,.csr_branch_o(csr_is_br)
+    ,.csr_target_o(csr_pc_target)
+
+    // CSR registers
+    ,.priv_o(csr_priv)
+    ,.mstatus_o(csr_mstatus)
+    //,.satp_o(csr_satp)
+
+    ,.interrupt_o(csr_interrupt)
 );
 
 CSR m_CSR(
     .csr_op_i(EX_csr_op_out),
-    .csr_imm_i(EX_is_csr_imm_out),
-    .rs1_i(EX_fwd_data1),
+    .is_csr_imm_i(EX_is_csr_imm_out),
+    .imm_i(EX_imm_out),
+    .reg_rd_data1_i(EX_fwd_data1),
     .csr_old_i(csr_rd_data),
 
     .csr_wdata_o(csr_wr_data)
 );
-
-assign pc_sel = {EX_trap_ebreak_out | EX_trap_ecall_out, br_taken};
 
 // ================================
 // mem access stage
@@ -473,6 +505,7 @@ MEM_Reg m_EX_MEM_Reg(
     .ALU_i(ALU_out),
     .reg_rd_data2_i(EX_fwd_data2),
     .rd_i(EX_rd_out),
+    .csr_rd_data_i(csr_rd_data),
     // control_in
     .reg_wr_en_i(EX_reg_wr_en_out),
     .reg_w_sel_i(EX_reg_w_sel_out),
@@ -486,6 +519,7 @@ MEM_Reg m_EX_MEM_Reg(
     .ALU_o(MEM_ALU_out),
     .reg_rd_data2_o(MEM_reg_rd_data2_out),
     .rd_o(MEM_rd_out),
+    .csr_rd_data_o(MEM_csr_rd_data_out),
     // control_out
     .reg_wr_en_o(MEM_reg_wr_en_out),
     .reg_w_sel_o(MEM_reg_w_sel_out),
@@ -505,6 +539,7 @@ WB_Reg m_MEM_WB_Reg(
     .ALU_i(MEM_ALU_out),
     .mem_data_i(d_mem_rd_data),
     .rd_i(MEM_rd_out),
+    .csr_rd_data_i(MEM_csr_rd_data_out),
     // control_in
     .reg_wr_en_i(MEM_reg_wr_en_out),
     .reg_w_sel_i(MEM_reg_w_sel_out),
@@ -514,16 +549,18 @@ WB_Reg m_MEM_WB_Reg(
     .ALU_o(WB_ALU_out),
     .mem_data_o(WB_mem_data_out),
     .rd_o(WB_rd_out),
+    .csr_rd_data_o(WB_csr_rd_data_out),
     // control_out
     .reg_wr_en_o(WB_reg_wr_en_out),
     .reg_w_sel_o(WB_reg_w_sel_out)
 );
 
-Mux3to1 #(.size(32)) m_Mux_WriteData(
+Mux4to1 #(.size(32)) m_Mux_WriteData(
     .sel(WB_reg_w_sel_out),
     .s0(WB_pc_p4_out),
     .s1(WB_ALU_out),
     .s2(WB_mem_data_out),
+    .s3(WB_csr_rd_data_out),
     .out(reg_data_in)
 );
 

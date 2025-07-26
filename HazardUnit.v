@@ -3,28 +3,31 @@ module HazardUnit(
     input  wire [4:0]  EX_rd,
     input  wire [4:0]  ID_rs1,
     input  wire [4:0]  ID_rs2,
-
-    output reg         pc_en,
-    output reg         ID_en,
-    output reg         EX_clear
+    
+    output reg [3:0]   stall
 );
+
+/*
+stall
+0: not stall
+1: stall for IF
+2: stall for ID
+3: stall for EX
+4: stall for MEM
+5: stall for WB
+
+only stall for EX for now
+*/
 
 always @(*) begin
 
-    pc_en = 1'b1;
-    ID_en = 1'b1;
-    EX_clear = 1'b0;
-
+    stall = 0;
+    
     if(
         EX_mem_rd_en && 
         EX_rd != 5'd0 &&
         (EX_rd == ID_rs1 || EX_rd == ID_rs2)
-    ) begin
-        // insert nop in EX stage
-        pc_en = 1'b0;
-        ID_en = 1'b0;
-        EX_clear = 1'b1;
-    end
+    ) stall = 3;
 end
 
 endmodule

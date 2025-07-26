@@ -1,9 +1,10 @@
 `include "riscv_defs.v"
+/* verilator lint_off UNUSEDSIGNAL */
 module Control (
     input [31:0] inst,
 
     output reg reg_wr_en,
-    output reg [1:0] reg_w_sel, // 0: pc_p4, 1: ALU, 2: mem
+    output reg [1:0] reg_w_sel, // 0: pc_p4, 1: ALU, 2: mem, 3:csr
     output reg mem_wr_en,
     output reg mem_rd_en,
     output reg [3:0] mem_ctrl,
@@ -49,6 +50,9 @@ always @(*) begin
     is_csr_imm=0;
     csr_wr_en=0;
     csr_sel=0;
+    trap_ebreak = 1'b0;
+    inst_mret = 1'b0;
+    trap_ecall = 1'b0;
 
     case (opcode)
         // R-Type (ADD SUB SLL SLT SLTU XOR SRL SRA OR AND)
@@ -198,8 +202,7 @@ always @(*) begin
             endcase
         end
 
-        default: begin
-        end
+        default:;
     endcase
 end
 

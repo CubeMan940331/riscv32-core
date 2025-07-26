@@ -352,7 +352,7 @@
 `define CSR_MIE           12'h304
 `define CSR_MIE_MASK      `IRQ_MASK
 `define CSR_MTVEC         12'h305
-`define CSR_MTVEC_MASK    32'hFFFFFFFF
+`define CSR_MTVEC_MASK    32'hFFFFFFFC // alway direct mode
 `define CSR_MSCRATCH      12'h340
 `define CSR_MSCRATCH_MASK 32'hFFFFFFFF
 `define CSR_MEPC          12'h341
@@ -363,14 +363,18 @@
 `define CSR_MTVAL_MASK    32'hFFFFFFFF
 `define CSR_MIP           12'h344
 `define CSR_MIP_MASK      `IRQ_MASK
-`define CSR_MCYCLE        12'hc00
+`define CSR_MCYCLE        12'hb00
 `define CSR_MCYCLE_MASK   32'hFFFFFFFF
-`define CSR_MTIME         12'hc01
+`define CSR_MCYCLEH       12'hb80
+`define CSR_MCYCLEH_MASK  32'hFFFFFFFF
+`define CSR_MTIME         12'hb01
 `define CSR_MTIME_MASK    32'hFFFFFFFF
 `define CSR_MTIMEH        12'hc81
 `define CSR_MTIMEH_MASK   32'hFFFFFFFF
 `define CSR_MHARTID       12'hF14
 `define CSR_MHARTID_MASK  32'hFFFFFFFF
+`define CSR_FCSR          12'h3a0
+`define CSR_FCSR_MASK     32'hFFFFFFFF
 
 // Non-std
 `define CSR_MTIMECMP        12'h7c0
