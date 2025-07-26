@@ -433,7 +433,7 @@ Mux2to1 #(.size(32)) m_ALU_SRC2_MUX(
     .out(ALU_in2)
 );
 
-ALU m_ALU(
+ALU_top m_ALU(
     .ALU_ctrl(EX_ALU_ctrl_out),
     .a(ALU_in1),
     .b(ALU_in2),

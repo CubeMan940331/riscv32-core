@@ -24,7 +24,7 @@ wire sign_ofl, unsign_ofl;
 reg [31:0] result;
 reg Ofl_result, Zero_result;
 
-shifter shifter(
+ALU_barrel_shifter shifter(
     .In(A),
     .ShAmt(B[3:0]),
     .Oper(Oper[1:0]),
@@ -53,7 +53,7 @@ assign Zero = Zero_result;
 
 always @(*)begin
     case(Oper)
-        3'b100: result = A + B + Cin;
+        3'b100: result = A + B + {31'h0, Cin};
         3'b101: result = A & B;
         3'b110: result = A | B;
         3'b111: result = A ^ B;

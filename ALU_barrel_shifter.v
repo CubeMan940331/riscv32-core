@@ -1,7 +1,7 @@
 //-----------------------------------------------------------------
 // Barrel Shifter
 //-----------------------------------------------------------------
-module shifter(
+module ALU_barrel_shifter(
     input [31:0] In,
     input [3:0] ShAmt,
     input [1:0] Oper,
@@ -56,7 +56,7 @@ always @(In or ShAmt or Oper)begin
         end
         2'b01: // shift left logical
         begin 
-            if (ShAmt[0]) shift_left_1 = {In[31:0], 1'b0};
+            if (ShAmt[0]) shift_left_1 = {In[30:0], 1'b0};
             else          shift_left_1 = In;
 
             if (ShAmt[1]) shift_left_2 = {shift_left_1[29:0], 2'h0};
