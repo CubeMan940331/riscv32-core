@@ -34,14 +34,27 @@ always @(*) begin
     out = 32'h0;
     Sign = 0;
     case (ALU_ctrl)
-        `ALU_ADD: Oper = 3'b100; // ADD
+        `ALU_ADD: begin
+            Oper = 3'b100; // ADD
+            out = ALU_out;
+        end
         `ALU_SUB: begin
             Oper = 3'b100; // ADD
             invB = 1; // -B
+            out = ALU_out;
         end
-        `ALU_AND: Oper = 3'b101; // AND
-        `ALU_OR:  Oper = 3'b110; // OR
-        `ALU_XOR: Oper = 3'b111; // XOR
+        `ALU_AND: begin
+            Oper = 3'b101; // AND
+            out = ALU_out;
+        end
+        `ALU_OR: begin
+            Oper = 3'b110; // OR
+            out = ALU_out;
+        end
+        `ALU_XOR: begin
+            Oper = 3'b111; // XOR
+            out = ALU_out;
+        end
         `ALU_SHIFTL: begin
             Oper = 3'b001; // SLL
             out = ALU_out;
