@@ -511,4 +511,12 @@ end
 assign csr_branch_o = csr_branch_r;
 assign csr_target_o = csr_target_r;
 
+`ifdef verilator
+function [31:0] get_mcycle; /*verilator public*/
+begin
+    get_mcycle = csr_mcycle_q;
+end
+endfunction
+`endif
+
 endmodule
