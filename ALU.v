@@ -26,7 +26,7 @@ reg Ofl_result, Zero_result;
 
 ALU_barrel_shifter shifter(
     .In(A),
-    .ShAmt(B[3:0]),
+    .ShAmt(B[4:0]),
     .Oper(Oper[1:0]),
     .Out(shift_out)
 );
