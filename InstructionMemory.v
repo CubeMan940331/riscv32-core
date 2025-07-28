@@ -1,4 +1,4 @@
-module InstructionMemory #(parameter size = 256)(
+module InstructionMemory #(parameter size = 2048)(
     input [31:0] address,
     output [31:0] inst
 );

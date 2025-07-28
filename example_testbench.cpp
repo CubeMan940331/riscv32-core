@@ -5,6 +5,7 @@
 #include <time.h>
 #include <cmath>
 #include <iostream>
+#include <filesystem>
 
 using namespace std;
 
@@ -13,6 +14,17 @@ using namespace std;
 #define MAX_CYCLE 5000
 
 int main(int argc, char **argv){
+    string test_name;
+    string dump_name="waveform.vcd";
+    if(argc>1){
+        test_name=argv[1];
+        dump_name=test_name+".vcd";
+        if(!filesystem::exists(test_name+".mem")){
+            cerr<<"test file not found\n";
+            return 1;
+        }
+    }
+    
     VerilatedContext *contextp = new VerilatedContext;
     VerilatedVcdC *m_trace = new VerilatedVcdC;
     VComputer *top = new VComputer{contextp};
@@ -21,9 +33,10 @@ int main(int argc, char **argv){
     contextp->commandArgs(argc, argv);
 
     top->trace(m_trace, 0);
-    m_trace->open("waveform.vcd");
+    m_trace->open(dump_name.c_str());
 
     // reset
+    
     top->clk = 0;
     top->rst_n = 1;
     top->eval();
