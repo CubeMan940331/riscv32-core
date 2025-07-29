@@ -33,49 +33,52 @@
 
 // Include
 `include"LSU_def.v"
+`include"riscv_def.v"
+
 
 module lsu
 (   
-    input           clk_i,
-    input           rst_i,
-    input   [31:0]  opcode_opcode_i, 
-    // input   [31:0]  opcode_pc_i,
-    input   [ 4:0]  opcode_rd_i,  
-    // input   [ 4:0]  opcode_ra_i,
-    // input   [ 4:0]  opcode_rb_i, 
-    input   [31:0]  opcode_ra_data_i,
-    input   [31:0]  opcode_rb_data_i,
-    input   [31:0]  opcode_fp_ra_data_i,    
-    input   [31:0]  opcode_fp_rb_data_i,
-    input           opcode_valid_i,         
+     input           clk_i
+    ,input           rst_i
+    ,input   [31:0]  opcode_opcode_i
+    ,input   [ 4:0]  opcode_rd_i
+    ,input   [31:0]  opcode_ra_data_i
+    ,input   [31:0]  opcode_rb_data_i
+    ,input   [31:0]  opcode_fp_ra_data_i
+    ,input   [31:0]  opcode_fp_rb_data_i
+    ,input           opcode_valid_i
     
-    input   [31:0]  cache_data_i,
-    // input           cache_addr_i,
-    input           cache_hit_i,
-    input           cache_act_i,
+    ,input   [31:0]  cache_data_i
+    ,input           cache_hit_i
+    ,input           cache_act_i
 
-    input   [31:0]  mem_data_rd_i,
-    input           mem_act_i,
-    input           mem_load_fault,  
-    input           mem_store_fault, 
-    
-    output  [31:0]  cache_addr_o,
-    output  [31:0]  cache_data_o,
-    output          cache_rd_o,
-    output  [ 3:0]  cache_mask_o,
-    output          cache_wait_o,       
+    ,input   [31:0]  mem_data_rd_i
+    ,input           mem_act_i
+    ,input           mem_load_fault  
+    ,input           mem_store_fault
 
-    output  [31:0]  mem_addr_o,
-    output  [31:0]  mem_data_wr_o,
-    output          mem_rd_o,
-    output  [ 3:0]  mem_wr_o,
-    output          mem_cachable_o,   
+    ,output  [31:0]  cache_addr_o
+    ,output  [31:0]  cache_data_o
+    ,output          cache_rd_o
+    ,output  [ 3:0]  cache_mask_o
+    ,output          cache_wait_o
 
-    output  [31:0]  writeback_value_o,
-    output  [ 4:0]  writeback_rd_o,
-    output          writeback_valid_o,
-    output          stall_o,
-    output  [5:0]  exception_o
+    ,output  [31:0]  mem_addr_o
+    ,output  [31:0]  mem_data_wr_o
+    ,output          mem_rd_o
+    ,output  [ 3:0]  mem_wr_o
+    ,output          mem_cachable_o 
+
+    ,output  [31:0]  writeback_value_o
+    ,output  [ 4:0]  writeback_rd_o
+    ,output          writeback_valid_o
+    ,output          stall_o
+
+    ,output  [5:0]   exception_o
+
+    ,output          dflush_o
+    ,output          dinvalidate_o
+    ,output          dwriteback_o
 );
 
 // --------------------------------------------
@@ -87,6 +90,7 @@ localparam DATASIZE = 78;
 localparam LENGTH   = 16;
 localparam DEPTH    = 4;
 
+// FSM
 localparam FSM_INST  = 1'b0;
 localparam FSM_POP   = 1'b1;
 
@@ -132,6 +136,8 @@ wire sign_inst, fp_inst;
 
 wire flw_inst, fsw_inst;
 
+wire csr_inst;
+
 // Queue
 wire                is_load_i;
 wire [DATASIZE-1:0] resp_data_o;
@@ -171,9 +177,9 @@ assign exception_o = (addr_unaligned && mem_rd_r)?`EXCEPTION_MISALIGNED_LOAD:
 always @(*)begin
     unaligned_r = 32'b0;
 
-    if(opcode_valid_i && lw_inst)
+    if(opcode_valid_i && (lw_inst || sw_inst))
         unaligned_r = (mem_addr_r[1:0] != 2'b0);
-    else if (opcode_valid_i && lb_inst)
+    else if (opcode_valid_i && (lh_inst || sh_inst))
         unaligned_r = mem_addr_r[0];
     else 
         unaligned_r = 1'b0;
@@ -204,6 +210,19 @@ assign flw_inst = ((opcode_opcode_i & `INST_FLW_MASK) == `INST_FLW);
 assign fsw_inst = ((opcode_opcode_i & `INST_FLW_MASK) == `INST_FSW);
 
 assign fp_inst = (flw_inst || fsw_inst);
+
+assign csr_inst = ((opcode_opcode_i & `INST_CSR_MASK) == `INST_CSRRW);
+
+// CSRRW Instruction
+wire dflush, dwriteback, dinvalidate;
+
+assign dflush       = opcode_valid_i && (opcode_opcode_i[31:20] == `CSR_DFLUSH);
+assign dwriteback   = opcode_valid_i && (opcode_opcode_i[31:20] == `CSR_DWRITEBACK);
+assign dinvalidate  = opcode_valid_i && (opcode_opcode_i[31:20] == `CSR_DINVALIDATE);
+
+assign dflush_o = dflush && csr_inst;
+assign dwriteback_o = dwriteback && csr_inst;
+assign dinvalidate_o = dinvalidate && csr_inst;
 
 always @(*)begin
     ra_data = 32'b0;
@@ -341,7 +360,7 @@ end
 //  Stall
 // --------------------------------------------
 
-assign stall_o = (~resp_accept_o && (ld_inst || st_inst));
+assign stall_o = (~resp_accept_o && (ld_inst || st_inst)) || (dwriteback || dinvalidate || dflush);
 
 // --------------------------------------------
 //  Writeback
@@ -353,9 +372,9 @@ assign writeback_rd_o    = resp_rd;
 
 always @(posedge clk_i or negedge rst_i)begin
     if(~rst_i)begin
+        cache_act_r <= 0;
         cache_hit_r <= 0;
         mem_act_r   <= 0;
-        cache_act_r <= 0;
     end else begin
         if(is_pop)begin
             cache_act_r <= 0;
