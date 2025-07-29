@@ -1,3 +1,6 @@
+testing/*
 obj_dir/*
 .vscode/*
 *.vcd
+TEST_INSTRUCTIONS.asm
+TEST_INSTRUCTIONS.txt
