@@ -373,8 +373,6 @@
 `define CSR_MTIMEH_MASK   32'hFFFFFFFF
 `define CSR_MHARTID       12'hF14
 `define CSR_MHARTID_MASK  32'hFFFFFFFF
-`define CSR_FCSR          12'h3a0
-`define CSR_FCSR_MASK     32'hFFFFFFFF
 
 // Non-std
 `define CSR_MTIMECMP        12'h7c0
@@ -401,6 +399,16 @@
 `define CSR_SIP_MASK      ((1 << `IRQ_S_EXT) | (1 << `IRQ_S_TIMER) | (1 << `IRQ_S_SOFT))
 `define CSR_SATP          12'h180
 `define CSR_SATP_MASK     32'hFFFFFFFF
+
+//-----------------------------------------------------------------
+// CSR Registers - User
+//-----------------------------------------------------------------
+`define CSR_FFLAGS        12'h001
+`define CSR_FFLAGS_MASK   32'h0000000F
+`define CSR_FRM           12'h002
+`define CSR_FRM_MASK      32'h00000007
+`define CSR_FCSR          12'h003
+`define CSR_FCSR_MASK     32'hFFFFFFFF
 
 //--------------------------------------------------------------------
 // CSR Registers - DCACHE control

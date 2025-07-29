@@ -1,7 +1,8 @@
 // control pipeline register
 // stall or insert nop
 module PipelineCtrl(
-    input br_taken,
+    input inst_br_taken,
+    input csr_br_taken,
     input [3:0] stall,
     
     output reg pc_en,
@@ -10,7 +11,10 @@ module PipelineCtrl(
     output reg ID_clear,
 
     output reg EX_en,
-    output reg EX_clear
+    output reg EX_clear,
+
+    output reg MEM_en,
+    output reg MEM_clear
 );
 /*
 stall
@@ -33,7 +37,17 @@ always @(*)begin
     EX_en=1;
     EX_clear=0;
 
-    if(br_taken)begin
+    MEM_en=1;
+    MEM_clear=0;
+
+    if(csr_br_taken) begin
+        // branch determined at MEM stage
+        // clear Id, EX next clock
+        ID_clear=1;
+        EX_clear=1;
+        MEM_clear=1;
+    end
+    else if(inst_br_taken)begin
         // branch determined at EX stage
         // clear Id, EX next clock
         ID_clear=1;

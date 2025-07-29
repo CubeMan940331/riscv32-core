@@ -7,7 +7,7 @@ module BranchUnit (
     input signed [31:0] reg_rd_data1,
     input signed [31:0] reg_rd_data2,
     
-    output br_taken, // indicate any branch happen (trigger by inst, csr unit)
+    output reg inst_br_taken, // indicate branch happened (trigger by inst)
     output reg [1:0] pc_sel
 );
 // 0 beq
@@ -17,16 +17,15 @@ module BranchUnit (
 // 4 bltu
 // 5 bgeu
 
-reg is_inst_br;
 always @(*)begin
     case(cmp_op)
-        3'b000: is_inst_br = (is_br & (reg_rd_data1 == reg_rd_data2)) | is_j; // beq
-        3'b001: is_inst_br = (is_br & (reg_rd_data1 != reg_rd_data2)) | is_j; // bne
-        3'b010: is_inst_br = (is_br & (reg_rd_data1 < reg_rd_data2)) | is_j; // blt
-        3'b011: is_inst_br = (is_br & (reg_rd_data1 >= reg_rd_data2)) | is_j; // bge
-        3'b100: is_inst_br = (is_br & ($unsigned(reg_rd_data1) < $unsigned(reg_rd_data2))) | is_j; // bltu
-        3'b101: is_inst_br = (is_br & ($unsigned(reg_rd_data1) >= $unsigned(reg_rd_data2))) | is_j; // bgeu
-        default: is_inst_br = 0; // default case
+        3'b000: inst_br_taken = (is_br & (reg_rd_data1 == reg_rd_data2)) | is_j; // beq
+        3'b001: inst_br_taken = (is_br & (reg_rd_data1 != reg_rd_data2)) | is_j; // bne
+        3'b010: inst_br_taken = (is_br & (reg_rd_data1 < reg_rd_data2)) | is_j; // blt
+        3'b011: inst_br_taken = (is_br & (reg_rd_data1 >= reg_rd_data2)) | is_j; // bge
+        3'b100: inst_br_taken = (is_br & ($unsigned(reg_rd_data1) < $unsigned(reg_rd_data2))) | is_j; // bltu
+        3'b101: inst_br_taken = (is_br & ($unsigned(reg_rd_data1) >= $unsigned(reg_rd_data2))) | is_j; // bgeu
+        default: inst_br_taken = 0; // default case
     endcase
 end
 
@@ -36,10 +35,8 @@ end
 // priority: csr_br > inst_br
 always @(*)begin
     if(is_csr_br) pc_sel=2;
-    else if(is_inst_br) pc_sel=1;
+    else if(inst_br_taken) pc_sel=1;
     else pc_sel=0;
 end
-
-assign br_taken = is_inst_br | is_csr_br;
 
 endmodule
