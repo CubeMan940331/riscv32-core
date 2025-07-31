@@ -35,14 +35,14 @@ wire csr_fault_w  = is_csr_i && inst_valid &&( // CSR op is valid
 );
 always @(*) begin
     wdata = csr_old_i;
-    case (csr_op_i)
-        3'b01: begin          // CSRRW / CSRRWI
+    case (csr_op_i[1:0])
+        2'b01: begin          // CSRRW / CSRRWI
             wdata = (is_csr_imm_i ? imm_i : reg_rd_data1_i);
         end
-        3'b10: begin          // CSRRS / CSRRSI
+        2'b10: begin          // CSRRS / CSRRSI
             wdata = csr_old_i | (is_csr_imm_i ? imm_i : reg_rd_data1_i);
         end
-        3'b11: begin          // CSRRC / CSRRCI
+        2'b11: begin          // CSRRC / CSRRCI
             wdata = csr_old_i & ~(is_csr_imm_i ? imm_i : reg_rd_data1_i);
         end
         default: begin
