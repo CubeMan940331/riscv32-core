@@ -30,6 +30,7 @@ assign i_mem_addr = pc_out;
 wire ID_clear;
 wire ID_en;
 
+wire ID_pc_valid_out;
 wire [31:0] ID_pc_out;
 wire [31:0] ID_pc_p4_out;
 wire [31:0] ID_inst_out;
@@ -81,6 +82,7 @@ wire [31:0] reg_data2_out;
 wire EX_en;
 wire EX_clear;
 // data_out
+wire EX_pc_valid_out;
 wire [31:0] EX_pc_out;
 wire [31:0] EX_pc_p4_out;
 wire [31:0] EX_reg_rd_data1_out;
@@ -142,6 +144,8 @@ wire [31:0] csr_mstatus;
 wire [31:0] csr_interrupt;
 
 // MEM_Reg ====================
+wire MEM_pc_valid_out;
+wire [31:0] MEM_pc_out;
 wire [31:0] MEM_pc_p4_out;
 wire [31:0] MEM_ALU_out;
 wire [31:0] MEM_reg_rd_data2_out; 
@@ -161,6 +165,8 @@ assign d_mem_addr = MEM_ALU_out;
 assign d_mem_wr_data = MEM_reg_rd_data2_out;
 
 // WB_Reg =====================
+wire WB_pc_valid_out;
+wire [31:0] WB_pc_out;
 wire [31:0] WB_pc_p4_out;
 wire [31:0] WB_ALU_out;
 wire [31:0] WB_mem_data_out;
@@ -244,6 +250,8 @@ ID_Reg m_ID_Reg(
     .en(ID_en),
     .clear(ID_clear),
 
+    .pc_valid_i(1),
+    .pc_valid_o(ID_pc_valid_out),
     .pc_i(pc_out),
     .pc_p4_i(pc_p4),
     .pc_o(ID_pc_out),
@@ -316,8 +324,9 @@ EX_Reg m_EX_Reg(
     .en(EX_en),
     .clear(EX_clear),
     // data_in
-    .pc_p4_i(ID_pc_p4_out),
+    .pc_valid_i(ID_pc_valid_out),
     .pc_i(ID_pc_out),
+    .pc_p4_i(ID_pc_p4_out),
 
     .reg_rd_data1_i(reg_data1_out),
     .reg_rd_data2_i(reg_data2_out),
@@ -362,6 +371,7 @@ EX_Reg m_EX_Reg(
     .funct7_i(decode_funct7[5]),
     //=================================
     // data_out
+    .pc_valid_o(EX_pc_valid_out),
     .pc_p4_o(EX_pc_p4_out),
     .pc_o(EX_pc_out),
     .reg_rd_data1_o(EX_reg_rd_data1_out),
@@ -501,6 +511,8 @@ MEM_Reg m_EX_MEM_Reg(
     .clk(clk),
     .rst_n(rst_n),
     // data_in
+    .pc_valid_i(EX_pc_valid_out),
+    .pc_i(EX_pc_out),
     .pc_p4_i(EX_pc_p4_out),
     .ALU_i(ALU_out),
     .reg_rd_data2_i(EX_fwd_data2),
@@ -515,6 +527,8 @@ MEM_Reg m_EX_MEM_Reg(
     .mem_ctrl_i(EX_mem_ctrl_out),
     // ===================================
     // data_out
+    .pc_valid_o(MEM_pc_valid_out),
+    .pc_o(MEM_pc_out),
     .pc_p4_o(MEM_pc_p4_out),
     .ALU_o(MEM_ALU_out),
     .reg_rd_data2_o(MEM_reg_rd_data2_out),
@@ -535,6 +549,8 @@ WB_Reg m_MEM_WB_Reg(
     .clk(clk),
     .rst_n(rst_n),
 
+    .pc_valid_i(MEM_pc_valid_out),
+    .pc_i(MEM_pc_out),
     .pc_p4_i(MEM_pc_p4_out),
     .ALU_i(MEM_ALU_out),
     .mem_data_i(d_mem_rd_data),
@@ -545,6 +561,8 @@ WB_Reg m_MEM_WB_Reg(
     .reg_w_sel_i(MEM_reg_w_sel_out),
     // ===================================
     // data_out
+    .pc_valid_o(WB_pc_valid_out),
+    .pc_o(WB_pc_out),
     .pc_p4_o(WB_pc_p4_out),
     .ALU_o(WB_ALU_out),
     .mem_data_o(WB_mem_data_out),

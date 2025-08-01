@@ -4,8 +4,9 @@ module EX_Reg (
     input  wire        en,
     input  wire        clear,
 //=================================
-    // output
+    // input
     // data
+    input  wire        pc_valid_i,
     input  wire [31:0] pc_i,
     input  wire [31:0] pc_p4_i,
     
@@ -52,6 +53,7 @@ module EX_Reg (
 //=================================
     // output
     // data
+    output  wire        pc_valid_o,
     output  wire [31:0] pc_o,
     output  wire [31:0] pc_p4_o,
     
@@ -97,6 +99,7 @@ module EX_Reg (
     output wire        funct7_o
 );
     // data
+    PipelineRegister #(.WIDTH( 1)) reg_pc_valid  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(pc_valid_i),   .data_o(pc_valid_o));
     PipelineRegister #(.WIDTH(32)) reg_pc        (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(pc_i),      .data_o(pc_o));
     PipelineRegister #(.WIDTH(32)) reg_pc_p4     (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(pc_p4_i),   .data_o(pc_p4_o));
     
