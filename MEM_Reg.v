@@ -2,6 +2,8 @@ module MEM_Reg(
     input  wire        clk,
     input  wire        rst_n,
     // data_in
+    input  wire        pc_valid_i,
+    input  wire [31:0] pc_i,
     input  wire [31:0] pc_p4_i,
     input  wire [31:0] ALU_i,
     input  wire [31:0] reg_rd_data2_i,
@@ -16,6 +18,8 @@ module MEM_Reg(
     input  wire [3:0]  mem_ctrl_i,
     // ===================================
     // data_out
+    output wire        pc_valid_o,
+    output wire [31:0] pc_o,
     output wire [31:0] pc_p4_o,
     output wire [31:0] ALU_o,
     output wire [31:0] reg_rd_data2_o,
@@ -33,6 +37,8 @@ module MEM_Reg(
     wire clear = 1'b0;
     
     // data_in
+    PipelineRegister #(.WIDTH( 1)) reg_pc_valid  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(pc_valid_i),   .data_o(pc_valid_o));
+    PipelineRegister #(.WIDTH(32)) reg_pc        (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(pc_i),      .data_o(pc_o));
     PipelineRegister #(.WIDTH(32)) reg_pc_p4      (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(pc_p4_i),        .data_o(pc_p4_o));
     PipelineRegister #(.WIDTH(32)) reg_ALU        (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(ALU_i),          .data_o(ALU_o));
     PipelineRegister #(.WIDTH(32)) reg_rd_data2   (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(reg_rd_data2_i), .data_o(reg_rd_data2_o));
