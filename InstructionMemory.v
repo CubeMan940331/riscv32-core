@@ -1,9 +1,9 @@
-module InstructionMemory #(parameter size = 2048)(
+module InstructionMemory #(parameter size = 8192)(
     input [31:0] address,
     output [31:0] inst
 );
     integer i;
-    reg [7:0] insts [size-1:0];
+    reg [7:0] insts [size-1:0] /* verilator public */;
 
     assign inst = (address >= size) ? 32'h00000013 : {insts[address], insts[address + 1], insts[address + 2], insts[address + 3]};
 
