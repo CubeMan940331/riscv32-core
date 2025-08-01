@@ -1,14 +1,18 @@
 #!/bin/bash
 riscv_test_dir="/opt/riscv/target/share/riscv-tests"
 file_dir="./testing/"
+test_list="00_test_list.txt"
 
 if [ ! -d $file_dir ]; then
     mkdir $file_dir
 fi
 
+printf '' > "$file_dir$test_list"
+
 gen_test(){
     file_name=$(basename $1)    
     echo $file_name
+    echo $file_name >> "$file_dir$test_list"
     
     cat "$1.dump" > "$file_dir$file_name.dump"
     
@@ -29,6 +33,7 @@ gen_test(){
 }
 
 # get test list
-for target in $(ls $riscv_test_dir/isa/rv32[um]*-p-* | grep -v '\.dump$'); do
+# for target in $(ls $riscv_test_dir/isa/rv32[um][ifm]-p-* | grep -v '\.dump$'); do
+for target in $(ls $riscv_test_dir/isa/rv32ui-p-* | grep -v '\.dump$'); do
     gen_test $target
 done
