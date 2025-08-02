@@ -54,6 +54,19 @@
 `define ALU_LESS_THAN_SIGNED                    4'b1011
 
 //--------------------------------------------------------------------
+// MUL/DIV Operations
+//--------------------------------------------------------------------
+`define MUL_LOWER                               3'b000
+`define MUL_HIGHER                              3'b001
+`define MUL_SIGNED_UNSIGNED                     3'b010
+`define MUL_UNSIGNED                            3'b011
+
+`define DIV_SIGNED                              3'b100
+`define DIV_UNSIGNED                            3'b101
+`define DIV_SIGNED_REM                          3'b110
+`define DIV_UNSIGNED_REM                        3'b111
+
+//--------------------------------------------------------------------
 // Instructions Masks
 //--------------------------------------------------------------------
 // andi

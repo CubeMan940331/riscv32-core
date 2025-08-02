@@ -48,8 +48,8 @@ wire [11:0]   decode_csr_addr;
 
 // Control Logic ==============
 wire reg_wr_en;
-// 0: pc_p4, 1: ALU, 2: mem
-wire [1:0] reg_w_sel;
+// 0: pc_p4, 1: ALU, 2: mem, 3: csr, 4: MUL, 5: DIV
+wire [2:0] reg_w_sel;
 wire mem_wr_en;
 wire mem_rd_en;
 wire [3:0] mem_ctrl;
@@ -61,6 +61,8 @@ wire ALU_sel1;
 wire ALU_sel2;
 wire [3:0] ALU_ctrl;
 wire [2:0] cmp_op;
+// mul/div
+wire [2:0] MUL_DIV_ctrl;
 // csr
 wire trap_ecall;
 wire trap_ebreak;
@@ -91,7 +93,7 @@ wire [4:0]  EX_rs1_out;
 wire [4:0]  EX_rs2_out;
 // control_out
 wire EX_reg_wr_en_out;
-wire [1:0] EX_reg_w_sel_out;
+wire [2:0] EX_reg_w_sel_out;
 // mem
 wire EX_mem_rd_en_out;
 wire EX_mem_wr_en_out;
@@ -149,7 +151,7 @@ wire [4:0]  MEM_rd_out;
 wire [31:0] MEM_csr_rd_data_out;
 
 wire        MEM_reg_wr_en_out;
-wire [1:0]  MEM_reg_w_sel_out;
+wire [2:0]  MEM_reg_w_sel_out;
 wire        MEM_mem_wr_en_out;
 wire        MEM_mem_rd_en_out;
 wire [3:0]  MEM_mem_ctrl_out;
@@ -168,7 +170,7 @@ wire [4:0]  WB_rd_out;
 wire [31:0] WB_csr_rd_data_out;
 // control_out
 wire        WB_reg_wr_en_out;
-wire [1:0]  WB_reg_w_sel_out;
+wire [2:0]  WB_reg_w_sel_out;
 
 // EX Forward Mux =============
 wire [31:0] EX_fwd_data1;
@@ -295,6 +297,7 @@ Control m_Control(
     .ALU_sel2(ALU_sel2),
     .ALU_ctrl(ALU_ctrl),
     .cmp_op(cmp_op),
+    .MUL_DIV_ctrl(MUL_DIV_ctrl),
 
     .trap_ecall(trap_ecall),
     .trap_ebreak(trap_ebreak),
@@ -556,7 +559,7 @@ WB_Reg m_MEM_WB_Reg(
 );
 
 Mux4to1 #(.size(32)) m_Mux_WriteData(
-    .sel(WB_reg_w_sel_out),
+    .sel(WB_reg_w_sel_out[1:0]),
     .s0(WB_pc_p4_out),
     .s1(WB_ALU_out),
     .s2(WB_mem_data_out),

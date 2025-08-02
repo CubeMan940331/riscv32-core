@@ -9,7 +9,7 @@ module MEM_Reg(
     input wire [31:0] csr_rd_data_i,
     // control_in
     input  wire        reg_wr_en_i,
-    input  wire [1:0]  reg_w_sel_i,
+    input  wire [2:0]  reg_w_sel_i,
 
     input  wire        mem_wr_en_i,
     input  wire        mem_rd_en_i,
@@ -23,7 +23,7 @@ module MEM_Reg(
     output wire [31:0] csr_rd_data_o,
     // control_out
     output  wire        reg_wr_en_o,
-    output  wire [1:0]  reg_w_sel_o,
+    output  wire [2:0]  reg_w_sel_o,
 
     output  wire        mem_wr_en_o,
     output  wire        mem_rd_en_o,
@@ -40,7 +40,7 @@ module MEM_Reg(
     PipelineRegister #(.WIDTH(32)) csr_rd_data   (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(csr_rd_data_i), .data_o(csr_rd_data_o));
     // control_in
     PipelineRegister #(.WIDTH(1))  reg_reg_wr_en  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(reg_wr_en_i),  .data_o(reg_wr_en_o));
-    PipelineRegister #(.WIDTH(2))  reg_reg_w_sel  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(reg_w_sel_i),  .data_o(reg_w_sel_o));
+    PipelineRegister #(.WIDTH(3))  reg_reg_w_sel  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(reg_w_sel_i),  .data_o(reg_w_sel_o));
 
     PipelineRegister #(.WIDTH(1))  reg_mem_wr_en  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(mem_wr_en_i),  .data_o(mem_wr_en_o));
     PipelineRegister #(.WIDTH(1))  reg_mem_rd_en  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(mem_rd_en_i),  .data_o(mem_rd_en_o));

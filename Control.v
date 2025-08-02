@@ -4,7 +4,7 @@ module Control (
     input [31:0] inst,
 
     output reg reg_wr_en,
-    output reg [1:0] reg_w_sel, // 0: pc_p4, 1: ALU, 2: mem, 3:csr
+    output reg [2:0] reg_w_sel, // 0: pc_p4, 1: ALU, 2: mem, 3: csr, 4: MUL, 5: DIV
     output reg mem_wr_en,
     output reg mem_rd_en,
     output reg [3:0] mem_ctrl,
@@ -14,6 +14,7 @@ module Control (
     output reg ALU_sel2, // 0: rs2, 1: imm
     output reg [3:0] ALU_ctrl,
     output reg [2:0] cmp_op,
+    output reg [2:0] MUL_DIV_ctrl,
 
     output reg trap_ecall,
     output reg trap_ebreak,
@@ -34,7 +35,7 @@ wire [11:0] imm12 = inst[31:20];
 
 always @(*) begin
     reg_wr_en = 1'b0;
-    reg_w_sel = 2'b00;
+    reg_w_sel = 3'b000;
     mem_wr_en = 1'b0;
     mem_rd_en = 1'b0;
     mem_ctrl = 4'b0000;
@@ -44,6 +45,7 @@ always @(*) begin
     ALU_sel2 = 1'b0;
     ALU_ctrl = `ALU_NONE;
     cmp_op = 3'b000;
+    MUL_DIV_ctrl = 3'b000;
 
     is_csr=0;
     csr_op=0;
@@ -55,23 +57,44 @@ always @(*) begin
     trap_ecall = 1'b0;
 
     case (opcode)
-        // R-Type (ADD SUB SLL SLT SLTU XOR SRL SRA OR AND)
+        // R-Type (ADD SUB SLL SLT SLTU XOR SRL SRA OR AND MUL MULH MULHSU MULHU DIV DIVU REM REMU)
         7'b0110011: begin
-            case(funct3)
-                3'b000:  ALU_ctrl = (funct7[5]) ? `ALU_SUB : `ALU_ADD; // SUB : ADD
-                3'b001:  ALU_ctrl = `ALU_SHIFTL; // SLL
-                3'b010:  ALU_ctrl = `ALU_LESS_THAN_SIGNED; // SLT
-                3'b011:  ALU_ctrl = `ALU_LESS_THAN; // SLTU
-                3'b100:  ALU_ctrl = `ALU_XOR; // XOR
-                3'b101:  ALU_ctrl = (funct7[5]) ? `ALU_SHIFTR_ARITH : `ALU_SHIFTR; // SRA : SRL
-                3'b110:  ALU_ctrl = `ALU_OR; // OR
-                3'b111:  ALU_ctrl = `ALU_AND; // AND
-                default: ALU_ctrl = `ALU_NONE; // PASS
+            case(funct7)
+                7'b0000001: begin
+                    case(funct3)
+                        3'b000:  MUL_DIV_ctrl = `MUL_LOWER; // MUL
+                        3'b001:  MUL_DIV_ctrl = `MUL_HIGHER; // MULH
+                        3'b010:  MUL_DIV_ctrl = `MUL_SIGNED_UNSIGNED; // MULHSU
+                        3'b011:  MUL_DIV_ctrl = `MUL_UNSIGNED; // MULHU
+                        3'b100:  MUL_DIV_ctrl = `DIV_SIGNED; // DIV
+                        3'b101:  MUL_DIV_ctrl = `DIV_UNSIGNED; // DIVU
+                        3'b110:  MUL_DIV_ctrl = `DIV_SIGNED_REM; // REM
+                        3'b111:  MUL_DIV_ctrl = `DIV_UNSIGNED_REM; // REMU
+                        default:; // PASS
+                    endcase
+                    reg_wr_en = 1'b1;
+                    ALU_sel1   = 1'b1;  // R1
+                    ALU_sel2  = 1'b0;  // R2
+                    reg_w_sel  = funct3[2] ? 3'b101 : 3'b100; // DIV / MUL
+                end
+                default: begin
+                    case(funct3)
+                        3'b000:  ALU_ctrl = (funct7[5]) ? `ALU_SUB : `ALU_ADD; // SUB : ADD
+                        3'b001:  ALU_ctrl = `ALU_SHIFTL; // SLL
+                        3'b010:  ALU_ctrl = `ALU_LESS_THAN_SIGNED; // SLT
+                        3'b011:  ALU_ctrl = `ALU_LESS_THAN; // SLTU
+                        3'b100:  ALU_ctrl = `ALU_XOR; // XOR
+                        3'b101:  ALU_ctrl = (funct7[5]) ? `ALU_SHIFTR_ARITH : `ALU_SHIFTR; // SRA : SRL
+                        3'b110:  ALU_ctrl = `ALU_OR; // OR
+                        3'b111:  ALU_ctrl = `ALU_AND; // AND
+                        default: ALU_ctrl = `ALU_NONE; // PASS
+                    endcase
+                    reg_wr_en = 1'b1;
+                    ALU_sel1   = 1'b1;  // R1
+                    ALU_sel2  = 1'b0;  // R2
+                    reg_w_sel  = 3'b001; // ALUout
+                end
             endcase
-            reg_wr_en = 1'b1;
-            ALU_sel1   = 1'b1;  // R1
-            ALU_sel2  = 1'b0;  // R2
-            reg_w_sel  = 2'b01; // ALUout
         end
 
         // I-Type (ADDI SLLI SLTI SLTIU XORI SRLI SRAI ORI ANDI)
@@ -90,7 +113,7 @@ always @(*) begin
             reg_wr_en = 1'b1;
             ALU_sel1   = 1'b1;  // R1
             ALU_sel2  = 1'b1; // immediate
-            reg_w_sel  = 2'b01; // ALUout
+            reg_w_sel  = 3'b001; // ALUout
         end
 
         // Load-Type (LB LH LW LBU LHU)
@@ -108,7 +131,7 @@ always @(*) begin
             ALU_sel1   = 1'b1;  // R1
             ALU_sel2  = 1'b1;  // immediate
             mem_rd_en  = 1'b1;
-            reg_w_sel  = 2'b10; // memory
+            reg_w_sel  = 3'b010; // memory
         end
 
         // S-Type (SB SH SW)
@@ -146,7 +169,7 @@ always @(*) begin
         7'b1101111: begin
             ALU_ctrl  = `ALU_ADD; // ADD
             reg_wr_en = 1'b1;
-            reg_w_sel  = 2'b00;    // PC+4
+            reg_w_sel  = 3'b000;    // PC+4
             ALU_sel1   = 1'b0;     // PC
             ALU_sel2  = 1'b1;     // immediate
             is_j   = 1'b1;
@@ -156,7 +179,7 @@ always @(*) begin
         7'b1100111: begin
             ALU_ctrl  = `ALU_ADD; // ADD
             reg_wr_en = 1'b1;
-            reg_w_sel  = 2'b00;    // PC+4
+            reg_w_sel  = 3'b000;    // PC+4
             is_j   = 1'b1;
             ALU_sel1   = 1'b1;     // R1
             ALU_sel2  = 1'b1;     // immediate
@@ -166,7 +189,7 @@ always @(*) begin
         7'b0010111: begin
             ALU_ctrl  = `ALU_ADD; // ADD
             reg_wr_en = 1'b1;
-            reg_w_sel  = 2'b01;    // ALUout
+            reg_w_sel  = 3'b001;    // ALUout
             ALU_sel1   = 1'b0;     // PC
             ALU_sel2  = 1'b1;     // immediate
         end
@@ -175,7 +198,7 @@ always @(*) begin
         7'b0110111: begin
             ALU_ctrl  = `ALU_NONE; // PASS B
             reg_wr_en = 1'b1;
-            reg_w_sel  = 2'b01;      // ALUout
+            reg_w_sel  = 3'b001;      // ALUout
             ALU_sel2  = 1'b1;       // imm
         end
         // CSR-Type (ECALL EBREAK MRET URET* SRET* CSRRW CSRRS CSRRC CSRRWI CSRRSI CSRRCI)
@@ -196,7 +219,7 @@ always @(*) begin
                     csr_wr_en = (funct3 == 3'b001 || funct3 == 3'b011 || funct3 == 3'b101);
                     
                     reg_wr_en = 1'b1;
-                    reg_w_sel  = 2'b11; // CSR read data path
+                    reg_w_sel  = 3'b011; // CSR read data path
                     csr_sel  = is_csr_imm;
                 end
             endcase
