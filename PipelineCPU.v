@@ -107,6 +107,8 @@ wire EX_ALU_sel2_out;
 wire [3:0] EX_ALU_ctrl_out;
 // BranchCmp
 wire [2:0] EX_cmp_op_out;
+// MUL/DIV
+wire [2:0] EX_MUL_DIV_ctrl_out;
 //csr
 wire [11:0]  EX_csr_addr_out;
 wire EX_trap_ecall_out;
@@ -127,6 +129,10 @@ wire [31:0] ALU_in1;
 wire [31:0] ALU_in2;
 wire [31:0] ALU_out;
 wire zero_flag;
+
+// MUL/DIV ========================
+wire [31:0] MUL_out;
+wire [31:0] DIV_out;
 
 // BranchCmp ==================
 wire br_taken; // indicate any branch happen (trigger by inst, csr unit)
@@ -348,6 +354,9 @@ EX_Reg m_EX_Reg(
 
     .cmp_op_i(cmp_op),
 
+    // MUL/DIV
+    .MUL_DIV_ctrl_i(MUL_DIV_ctrl),
+
     // csr
     .csr_addr_i(decode_csr_addr),
 
@@ -391,6 +400,8 @@ EX_Reg m_EX_Reg(
     .ALU_ctrl_o(EX_ALU_ctrl_out),
     // BranchCmp
     .cmp_op_o(EX_cmp_op_out),
+    // MUL/DIV
+    .MUL_DIV_ctrl_o(EX_MUL_DIV_ctrl_out),
     // csr
     .csr_addr_o(EX_csr_addr_out),
     .trap_ebreak_o(EX_trap_ebreak_out),
@@ -441,6 +452,24 @@ ALU_top m_ALU(
     .a(ALU_in1),
     .b(ALU_in2),
     .out(ALU_out)
+);
+
+WallaceMultiplier m_WallaceMultiplier(
+    .clk(clk),
+    .rst_n(rst_n),
+    .multiplicand(ALU_in1), 
+    .multiplier(ALU_in2),
+    .MUL_DIV_ctrl(EX_MUL_DIV_ctrl_out),
+    .MUL_out(MUL_out)
+);
+
+SRTDivider m_SRTDivider(
+    .clk(clk),
+    .rst_n(rst_n),
+    .remainder(ALU_in1), 
+    .divisor(ALU_in2),
+    .MUL_DIV_ctrl(EX_MUL_DIV_ctrl_out),
+    .DIV_out(DIV_out)
 );
 
 BranchUnit m_BranchUnit(
