@@ -4,7 +4,7 @@ module Control (
     input [31:0] inst,
 
     output reg reg_wr_en,
-    output reg [1:0] reg_w_sel, // 0: pc_p4, 1: ALU, 2: mem, 3:csr
+    output reg [2:0] reg_w_sel, // 0: pc_p4, 1: ALU, 2: mem, 3:csr, 4: FPU
     output reg mem_wr_en,
     output reg mem_rd_en,
     output reg [3:0] mem_ctrl,
@@ -33,7 +33,7 @@ wire [11:0] imm12 = inst[31:20];
 
 always @(*) begin
     reg_wr_en = 1'b0;
-    reg_w_sel = 2'b00;
+    reg_w_sel = 3'b000;
     mem_wr_en = 1'b0;
     mem_rd_en = 1'b0;
     mem_ctrl = 4'b0000;
@@ -69,7 +69,7 @@ always @(*) begin
             reg_wr_en = 1'b1;
             ALU_sel1   = 1'b1;  // R1
             ALU_sel2  = 1'b0;  // R2
-            reg_w_sel  = 2'b01; // ALUout
+            reg_w_sel  = 3'b001; // ALUout
         end
 
         // I-Type (ADDI SLLI SLTI SLTIU XORI SRLI SRAI ORI ANDI)
@@ -88,7 +88,7 @@ always @(*) begin
             reg_wr_en = 1'b1;
             ALU_sel1   = 1'b1;  // R1
             ALU_sel2  = 1'b1; // immediate
-            reg_w_sel  = 2'b01; // ALUout
+            reg_w_sel  = 3'b001; // ALUout
         end
 
         // Load-Type (LB LH LW LBU LHU)
@@ -106,7 +106,7 @@ always @(*) begin
             ALU_sel1   = 1'b1;  // R1
             ALU_sel2  = 1'b1;  // immediate
             mem_rd_en  = 1'b1;
-            reg_w_sel  = 2'b10; // memory
+            reg_w_sel  = 3'b010; // memory
         end
 
         // S-Type (SB SH SW)
@@ -144,7 +144,7 @@ always @(*) begin
         7'b1101111: begin
             ALU_ctrl  = `ALU_ADD; // ADD
             reg_wr_en = 1'b1;
-            reg_w_sel  = 2'b00;    // PC+4
+            reg_w_sel  = 3'b000;    // PC+4
             ALU_sel1   = 1'b0;     // PC
             ALU_sel2  = 1'b1;     // immediate
             is_j   = 1'b1;
@@ -154,7 +154,7 @@ always @(*) begin
         7'b1100111: begin
             ALU_ctrl  = `ALU_ADD; // ADD
             reg_wr_en = 1'b1;
-            reg_w_sel  = 2'b00;    // PC+4
+            reg_w_sel  = 3'b000;    // PC+4
             is_j   = 1'b1;
             ALU_sel1   = 1'b1;     // R1
             ALU_sel2  = 1'b1;     // immediate
@@ -164,7 +164,7 @@ always @(*) begin
         7'b0010111: begin
             ALU_ctrl  = `ALU_ADD; // ADD
             reg_wr_en = 1'b1;
-            reg_w_sel  = 2'b01;    // ALUout
+            reg_w_sel  = 3'b001;    // ALUout
             ALU_sel1   = 1'b0;     // PC
             ALU_sel2  = 1'b1;     // immediate
         end
@@ -173,7 +173,7 @@ always @(*) begin
         7'b0110111: begin
             ALU_ctrl  = `ALU_NONE; // PASS B
             reg_wr_en = 1'b1;
-            reg_w_sel  = 2'b01;      // ALUout
+            reg_w_sel  = 3'b001;      // ALUout
             ALU_sel2  = 1'b1;       // imm
         end
         // CSR-Type (ECALL EBREAK MRET URET* SRET* CSRRW CSRRS CSRRC CSRRWI CSRRSI CSRRCI)
@@ -193,12 +193,37 @@ always @(*) begin
                     is_csr_imm = funct3[2];
                     
                     reg_wr_en = 1'b1;
-                    reg_w_sel  = 2'b11; // CSR read data path
+                    reg_w_sel  = 3'b011; // CSR read data path
                     csr_sel  = is_csr_imm;
                 end
             endcase
         end
-
+        // FPU
+        // R4-Type (fmadd fmsub fnmsub fnmadd)
+        7'b1000011, // fmadd
+        7'b1000111, // fmsub
+        7'b1001011, // fnmsub
+        7'b1001111: begin // fnmadd
+            reg_wr_en = 1'b1;
+            reg_w_sel  = 3'b100; // FPU out
+        end
+        // R-Type both (fadd fsub fmul fdiv fsqrt fsgnj fsgnjn fsgnjx fmin fmax feq flt fle fclass)
+        // R-Type RVF only (fcvt.w.s fcvt.wu.s fcvt.s.w fcvt.s.wu fmv.x.w fmv.w.x)
+        // R-Type RVD only (fcvt.w.d fcvt.wu.d fcvt.d.w fcvt.d.wu fcvt.s.d fcvt.d.s)
+        7'b1010011: begin
+            reg_wr_en = 1'b1;
+            reg_w_sel  = 3'b100; // FPU out
+        end
+        // I-Type (flw fld)
+        7'b0000111: begin
+            reg_wr_en = 1'b1;
+            mem_rd_en = 1'b1;
+            reg_w_sel = 3'b100; // FPU out
+        end
+        // S-Type (fsw fsd)
+        7'b0100111: begin
+            mem_wr_en = 1'b1;
+        end
         default:;
     endcase
 end

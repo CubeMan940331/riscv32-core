@@ -129,6 +129,14 @@ wire [31:0] ALU_in2;
 wire [31:0] ALU_out;
 wire zero_flag;
 
+// // FPU ========================
+// wire [63:0] FPU_out;
+// wire FPU_invalid;
+// wire FPU_divbyzero;
+// wire FPU_overflow;
+// wire FPU_underflow;
+// wire FPU_inexact;
+
 // BranchCmp ==================
 wire br_taken; // indicate any branch happen (trigger by inst, csr unit)
 
@@ -458,6 +466,26 @@ ALU_top m_ALU(
     .b(ALU_in2),
     .out(ALU_out)
 );
+
+// FPU_Top m_FPU(
+//     .clk(clk),
+//     .rst_n(rst_n),
+
+//     .func3(EX_funct3_out),
+//     .func7(EX_inst_out[31:25]),
+//     .rs2(EX_rs2_out),
+
+//     .operand_a({32'h0, EX_fwd_data1}),
+//     .operand_b({32'h0, EX_fwd_data2}),
+
+//     .result_out(FPU_out),
+
+//     .flag_invalid(FPU_invalid),
+//     .flag_divbyzero(FPU_divbyzero),
+//     .flag_overflow(FPU_overflow),
+//     .flag_underflow(FPU_underflow),
+//     .flag_inexact(FPU_inexact)
+// );
 
 BranchUnit m_BranchUnit(
     .is_br(EX_is_br_out),
