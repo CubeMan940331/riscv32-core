@@ -14,6 +14,7 @@ using namespace std;
 #include "VComputer.h"
 #include "VComputer_Computer.h"
 #include "VComputer_InstructionMemory.h"
+#include "VComputer_PipelineCPU.h"
 #include "verilated.h"
 
 #define MAX_CYCLE 1000
@@ -84,10 +85,14 @@ int main(int argc, char **argv){
         dump_file=mem_file.substr(0,sep_pos)+".vcd";
     }
     bool is_set_end_pc=false;
+    bool is_reach_end_pc=false;
     int end_pc;
     if(argc>2){
-        end_pc=stoi(argv[2]);
-        is_set_end_pc=true;
+        try{
+            end_pc=stoi(argv[2]);
+            is_set_end_pc=true;
+        }
+        catch(...){}
     }
     
     VerilatedContext *contextp = new VerilatedContext;
@@ -104,11 +109,19 @@ int main(int argc, char **argv){
     top->rst_n = 0;
     do_cycle(contextp, m_trace, top);
 
-    if(mem_file.size()) load_inst_mem(top->Computer->m_InstMem, ifstream(mem_file+".mem"));
+    if(mem_file.size()) load_inst_mem(top->Computer->m_InstMem, ifstream(mem_file));
     do_cycle(contextp, m_trace, top);
 
     top->rst_n = 1;
     for(int i=0; i<MAX_CYCLE; ++i){
+        if(
+            is_set_end_pc &&
+            top->Computer->m_core0->WB_pc_valid_out &&
+            top->Computer->m_core0->WB_pc_out==end_pc
+        ){
+            is_reach_end_pc=true;
+            break;
+        }
         do_cycle(contextp, m_trace, top);
     }
 
@@ -116,7 +129,11 @@ int main(int argc, char **argv){
     top->final();
     m_trace->close();
 
-    // cout<<"\e[32m\e[1mtestbench finish\e[0m\n"; //can be executed
+    if(is_set_end_pc){
+        if(is_reach_end_pc) cout<<"Yes"<<endl;
+        else cout<<"No"<<endl;
+    }
+    else cout<<"Done\n";
 
     return 0;
 }

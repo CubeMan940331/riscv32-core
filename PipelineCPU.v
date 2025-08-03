@@ -165,8 +165,8 @@ assign d_mem_addr = MEM_ALU_out;
 assign d_mem_wr_data = MEM_reg_rd_data2_out;
 
 // WB_Reg =====================
-wire WB_pc_valid_out;
-wire [31:0] WB_pc_out;
+wire WB_pc_valid_out /* verilator public */;
+wire [31:0] WB_pc_out /* verilator public */;
 wire [31:0] WB_pc_p4_out;
 wire [31:0] WB_ALU_out;
 wire [31:0] WB_mem_data_out;
