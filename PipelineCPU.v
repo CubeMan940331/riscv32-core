@@ -149,6 +149,44 @@ wire [31:0] csr_mstatus;
 //wire [31:0] csr_satp;
 wire [31:0] csr_interrupt;
 
+// EX_Sub_Reg ====================
+// EX1
+wire [31:0] EX1_pc_p4_out;
+wire [31:0] EX1_ALU_out;
+wire [31:0] EX1_reg_rd_data2_out; 
+wire [4:0]  EX1_rd_out;
+wire [31:0] EX1_csr_rd_data_out;
+
+wire        EX1_reg_wr_en_out;
+wire [2:0]  EX1_reg_w_sel_out;
+wire        EX1_mem_wr_en_out;
+wire        EX1_mem_rd_en_out;
+wire [3:0]  EX1_mem_ctrl_out;
+// EX2
+wire [31:0] EX2_pc_p4_out;
+wire [31:0] EX2_ALU_out;
+wire [31:0] EX2_reg_rd_data2_out; 
+wire [4:0]  EX2_rd_out;
+wire [31:0] EX2_csr_rd_data_out;
+
+wire        EX2_reg_wr_en_out;
+wire [2:0]  EX2_reg_w_sel_out;
+wire        EX2_mem_wr_en_out;
+wire        EX2_mem_rd_en_out;
+wire [3:0]  EX2_mem_ctrl_out;
+// EX3
+wire [31:0] EX3_pc_p4_out;
+wire [31:0] EX3_ALU_out;
+wire [31:0] EX3_reg_rd_data2_out; 
+wire [4:0]  EX3_rd_out;
+wire [31:0] EX3_csr_rd_data_out;
+
+wire        EX3_reg_wr_en_out;
+wire [2:0]  EX3_reg_w_sel_out;
+wire        EX3_mem_wr_en_out;
+wire        EX3_mem_rd_en_out;
+wire [3:0]  EX3_mem_ctrl_out;
+
 // MEM_Reg ====================
 wire [31:0] MEM_pc_p4_out;
 wire [31:0] MEM_ALU_out;
@@ -179,10 +217,16 @@ wire        WB_reg_wr_en_out;
 wire [2:0]  WB_reg_w_sel_out;
 
 // EX Forward Mux =============
+wire [31:0] EX_fwd_ALU1;
+wire [31:0] EX_fwd_ALU2;
+wire [31:0] EX_fwd_csr1;
+wire [31:0] EX_fwd_csr2;
 wire [31:0] EX_fwd_data1;
 wire [31:0] EX_fwd_data2;
 
 // Forward ====================
+wire [1:0] EX_fwd1_stg_sel;
+wire [1:0] EX_fwd2_stg_sel;
 wire [1:0] EX_fwd1_sel;
 wire [1:0] EX_fwd2_sel;
 
@@ -195,11 +239,26 @@ wire [3:0] stall;
 ForwardUnit m_Forward(
     .EX_rs1(EX_rs1_out),
     .EX_rs2(EX_rs2_out),
+
+    .EX1_rd(EX1_rd_out),
+    .EX2_rd(EX2_rd_out),
+    .EX3_rd(EX3_rd_out),
+    .EX1_reg_wr_en(EX1_reg_wr_en_out),
+    .EX2_reg_wr_en(EX2_reg_wr_en_out),
+    .EX3_reg_wr_en(EX3_reg_wr_en_out),
+    .EX1_reg_w_sel(EX1_reg_w_sel_out),
+    .EX2_reg_w_sel(EX2_reg_w_sel_out),
+    .EX3_reg_w_sel(EX3_reg_w_sel_out),
+
     .MEM_rd(MEM_rd_out),
     .MEM_reg_wr_en(MEM_reg_wr_en_out),
     .MEM_reg_w_sel(MEM_reg_w_sel_out),
+
     .WB_rd(WB_rd_out),
     .WB_reg_wr_en(WB_reg_wr_en_out),
+
+    .EX_fwd_stg_sel1(EX_fwd1_stg_sel),
+    .EX_fwd_stg_sel2(EX_fwd2_stg_sel),
     .EX_fwd_sel1(EX_fwd1_sel),
     .EX_fwd_sel2(EX_fwd2_sel)
 );
@@ -417,12 +476,30 @@ EX_Reg m_EX_Reg(
     .funct7_o(EX_funct7_out)
 );
 
+Mux4to1 #(.size(32)) m_EX_fwd1_ALU_MUX(
+    .sel(EX_fwd1_stg_sel),
+    .s0(EX1_ALU_out),
+    .s1(EX2_ALU_out),
+    .s2(EX3_ALU_out),
+    .s3(MEM_ALU_out),
+    .out(EX_fwd_ALU1)
+);
+
+Mux4to1 #(.size(32)) m_EX_fwd1_csr_MUX(
+    .sel(EX_fwd1_stg_sel),
+    .s0(EX1_csr_rd_data_out),
+    .s1(EX2_csr_rd_data_out),
+    .s2(EX3_csr_rd_data_out),
+    .s3(MEM_csr_rd_data_out),
+    .out(EX_fwd_csr1)
+);
+
 Mux4to1 #(.size(32)) m_EX_fwd1_MUX(
     .sel(EX_fwd1_sel),
     .s0(reg_data_in),
     .s1(EX_reg_rd_data1_out),
-    .s2(MEM_ALU_out),
-    .s3(MEM_csr_rd_data_out),
+    .s2(EX_fwd_ALU1),
+    .s3(EX_fwd_csr1),
     .out(EX_fwd_data1)
 );
 Mux2to1 #(.size(32)) m_ALU_SRC1_MUX(
@@ -432,12 +509,30 @@ Mux2to1 #(.size(32)) m_ALU_SRC1_MUX(
     .out(ALU_in1)
 );
 
+Mux4to1 #(.size(32)) m_EX_fwd2_ALU_MUX(
+    .sel(EX_fwd2_stg_sel),
+    .s0(EX1_ALU_out),
+    .s1(EX2_ALU_out),
+    .s2(EX3_ALU_out),
+    .s3(MEM_ALU_out),
+    .out(EX_fwd_ALU2)
+);
+
+Mux4to1 #(.size(32)) m_EX_fwd2_csr_MUX(
+    .sel(EX_fwd2_stg_sel),
+    .s0(EX1_csr_rd_data_out),
+    .s1(EX2_csr_rd_data_out),
+    .s2(EX3_csr_rd_data_out),
+    .s3(MEM_csr_rd_data_out),
+    .out(EX_fwd_csr2)
+);
+
 Mux4to1 #(.size(32)) m_EX_fwd2_MUX(
     .sel(EX_fwd2_sel),
     .s0(reg_data_in),
     .s1(EX_reg_rd_data2_out),
-    .s2(MEM_ALU_out),
-    .s3(MEM_csr_rd_data_out),
+    .s2(EX_fwd_ALU2),
+    .s3(EX_fwd_csr2),
     .out(EX_fwd_data2)
 );
 Mux2to1 #(.size(32)) m_ALU_SRC2_MUX(
@@ -527,9 +622,9 @@ CSR m_CSR(
 );
 
 // ================================
-// mem access stage
+// Execution sub stages
 
-MEM_Reg m_EX_MEM_Reg(
+EX_Sub_Reg m_EX_1_Reg(
     .clk(clk),
     .rst_n(rst_n),
     // data_in
@@ -545,6 +640,102 @@ MEM_Reg m_EX_MEM_Reg(
     .mem_wr_en_i(EX_mem_wr_en_out),
     .mem_rd_en_i(EX_mem_rd_en_out),
     .mem_ctrl_i(EX_mem_ctrl_out),
+    // ===================================
+    // data_out
+    .pc_p4_o(EX1_pc_p4_out),
+    .ALU_o(EX1_ALU_out),
+    .reg_rd_data2_o(EX1_reg_rd_data2_out),
+    .rd_o(EX1_rd_out),
+    .csr_rd_data_o(EX1_csr_rd_data_out),
+    // control_out
+    .reg_wr_en_o(EX1_reg_wr_en_out),
+    .reg_w_sel_o(EX1_reg_w_sel_out),
+    .mem_wr_en_o(EX1_mem_wr_en_out),
+    .mem_rd_en_o(EX1_mem_rd_en_out),
+    .mem_ctrl_o(EX1_mem_ctrl_out)
+);
+
+EX_Sub_Reg m_EX_2_Reg(
+    .clk(clk),
+    .rst_n(rst_n),
+    // data_in
+    .pc_p4_i(EX1_pc_p4_out),
+    .ALU_i(EX1_ALU_out),
+    .reg_rd_data2_i(EX1_reg_rd_data2_out),
+    .rd_i(EX1_rd_out),
+    .csr_rd_data_i(EX1_csr_rd_data_out),
+    // control_in
+    .reg_wr_en_i(EX1_reg_wr_en_out),
+    .reg_w_sel_i(EX1_reg_w_sel_out),
+
+    .mem_wr_en_i(EX1_mem_wr_en_out),
+    .mem_rd_en_i(EX1_mem_rd_en_out),
+    .mem_ctrl_i(EX1_mem_ctrl_out),
+    // ===================================
+    // data_out
+    .pc_p4_o(EX2_pc_p4_out),
+    .ALU_o(EX2_ALU_out),
+    .reg_rd_data2_o(EX2_reg_rd_data2_out),
+    .rd_o(EX2_rd_out),
+    .csr_rd_data_o(EX2_csr_rd_data_out),
+    // control_out
+    .reg_wr_en_o(EX2_reg_wr_en_out),
+    .reg_w_sel_o(EX2_reg_w_sel_out),
+    .mem_wr_en_o(EX2_mem_wr_en_out),
+    .mem_rd_en_o(EX2_mem_rd_en_out),
+    .mem_ctrl_o(EX2_mem_ctrl_out)
+);
+
+EX_Sub_Reg m_EX_3_Reg(
+    .clk(clk),
+    .rst_n(rst_n),
+    // data_in
+    .pc_p4_i(EX2_pc_p4_out),
+    .ALU_i(EX2_ALU_out),
+    .reg_rd_data2_i(EX2_reg_rd_data2_out),
+    .rd_i(EX2_rd_out),
+    .csr_rd_data_i(EX2_csr_rd_data_out),
+    // control_in
+    .reg_wr_en_i(EX2_reg_wr_en_out),
+    .reg_w_sel_i(EX2_reg_w_sel_out),
+
+    .mem_wr_en_i(EX2_mem_wr_en_out),
+    .mem_rd_en_i(EX2_mem_rd_en_out),
+    .mem_ctrl_i(EX2_mem_ctrl_out),
+    // ===================================
+    // data_out
+    .pc_p4_o(EX3_pc_p4_out),
+    .ALU_o(EX3_ALU_out),
+    .reg_rd_data2_o(EX3_reg_rd_data2_out),
+    .rd_o(EX3_rd_out),
+    .csr_rd_data_o(EX3_csr_rd_data_out),
+    // control_out
+    .reg_wr_en_o(EX3_reg_wr_en_out),
+    .reg_w_sel_o(EX3_reg_w_sel_out),
+    .mem_wr_en_o(EX3_mem_wr_en_out),
+    .mem_rd_en_o(EX3_mem_rd_en_out),
+    .mem_ctrl_o(EX3_mem_ctrl_out)
+);
+
+// ================================
+// mem access stage
+
+MEM_Reg m_EX_MEM_Reg(
+    .clk(clk),
+    .rst_n(rst_n),
+    // data_in
+    .pc_p4_i(EX3_pc_p4_out),
+    .ALU_i(EX3_ALU_out),
+    .reg_rd_data2_i(EX3_reg_rd_data2_out),
+    .rd_i(EX3_rd_out),
+    .csr_rd_data_i(EX3_csr_rd_data_out),
+    // control_in
+    .reg_wr_en_i(EX3_reg_wr_en_out),
+    .reg_w_sel_i(EX3_reg_w_sel_out),
+
+    .mem_wr_en_i(EX3_mem_wr_en_out),
+    .mem_rd_en_i(EX3_mem_rd_en_out),
+    .mem_ctrl_i(EX3_mem_ctrl_out),
     // ===================================
     // data_out
     .pc_p4_o(MEM_pc_p4_out),
