@@ -59,7 +59,7 @@ always @(In or ShAmt or Oper)begin
             if (ShAmt[4]) left_rotate_16 = {left_rotate_8[15:0], left_rotate_8[31:16]};
             else left_rotate_16 = left_rotate_8;
 
-            result = left_rotate_8;
+            result = left_rotate_16;
         end
         2'b01: // shift left logical
         begin 
