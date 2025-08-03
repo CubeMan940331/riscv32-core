@@ -1,5 +1,5 @@
 `include "riscv_defs.v"
-
+/* verilator lint_off UNUSEDSIGNAL */
 module PipelineCPU (
     input clk,
     input rst_n,
@@ -83,6 +83,7 @@ wire EX_en;
 wire EX_clear;
 // data_out
 wire EX_pc_valid_out;
+wire [31:0] EX_inst_out;
 wire [31:0] EX_pc_out;
 wire [31:0] EX_pc_p4_out;
 wire [31:0] EX_reg_rd_data1_out;
@@ -135,7 +136,9 @@ wire br_taken; // indicate any branch happen (trigger by inst, csr unit)
 wire [31:0] csr_wr_data; // from CSR to CSRFile
 wire [31:0] csr_rd_data; // output of CSRFile
 wire [31:0] csr_pc_target;
-wire csr_is_br;
+wire csr_br_taken;
+wire [`EXCEPTION_W-1:0] csr_exception; // from CSR to CSRFile
+
 
 // CSRFile=====================
 wire [1:0] csr_priv;
@@ -145,6 +148,8 @@ wire [31:0] csr_interrupt;
 
 // MEM_Reg ====================
 wire MEM_pc_valid_out;
+wire MEM_en;
+wire MEM_clear;
 wire [31:0] MEM_pc_out;
 wire [31:0] MEM_pc_p4_out;
 wire [31:0] MEM_ALU_out;
@@ -211,14 +216,17 @@ HazardUnit m_Hazard(
 );
 
 PipelineCtrl m_PipelineCtrl(
-    .br_taken(br_taken),
+    .csr_br_taken(csr_br_taken),
+    .inst_br_taken(br_taken),
     .stall(stall),
 
     .pc_en(pc_en),
     .ID_en(ID_en),
     .ID_clear(ID_clear),
     .EX_en(EX_en),
-    .EX_clear(EX_clear)
+    .EX_clear(EX_clear),
+    .MEM_en(MEM_en),
+    .MEM_clear(MEM_clear)
 );
 
 // ================================
@@ -311,7 +319,6 @@ Control m_Control(
     .is_csr(is_csr),
     .csr_op(csr_op),
     .is_csr_imm(is_csr_imm),
-    .csr_wr_en(csr_wr_en),
     .csr_sel(csr_sel)
 );
 
@@ -325,8 +332,9 @@ EX_Reg m_EX_Reg(
     .clear(EX_clear),
     // data_in
     .pc_valid_i(ID_pc_valid_out),
-    .pc_i(ID_pc_out),
+    .inst_i(ID_inst_out),
     .pc_p4_i(ID_pc_p4_out),
+    .pc_i(ID_pc_out),
 
     .reg_rd_data1_i(reg_data1_out),
     .reg_rd_data2_i(reg_data2_out),
@@ -372,6 +380,7 @@ EX_Reg m_EX_Reg(
     //=================================
     // data_out
     .pc_valid_o(EX_pc_valid_out),
+    .inst_o(EX_inst_out),
     .pc_p4_o(EX_pc_p4_out),
     .pc_o(EX_pc_out),
     .reg_rd_data1_o(EX_reg_rd_data1_out),
@@ -453,13 +462,13 @@ ALU_top m_ALU(
 BranchUnit m_BranchUnit(
     .is_br(EX_is_br_out),
     .is_j(EX_is_j_out),
-    .is_csr_br(csr_is_br),
+    .is_csr_br(csr_br_taken),
 
     .cmp_op(EX_cmp_op_out),
     .reg_rd_data1(EX_fwd_data1),
     .reg_rd_data2(EX_fwd_data2),
     
-    .br_taken(br_taken),
+    .inst_br_taken(br_taken),
     .pc_sel(pc_sel)
 );
 
@@ -470,20 +479,18 @@ CSRFile m_CSRFile(
     ,.cpu_id_i(0)
     ,.misa_i(`MISA_RV32 | `MISA_RVI)
 
-    ,.exception_i(EX_trap_ecall_out ? `EXCEPTION_ECALL_M: 
-                 (EX_trap_ebreak_out ? 6'd0 :
-                 (EX_inst_mret_out ? `EXCEPTION_ERET_M : 0)))
-    ,.exception_pc_i(EX_pc_out)
+    ,.exception_i(csr_exception)
+    ,.exception_pc_i(MEM_pc_out)
     ,.exception_addr_i(0) // only consider ecall for now
 
     ,.csr_rd_addr_i(EX_csr_addr_out)
     ,.csr_rd_data_o(csr_rd_data)
     
-    ,.csr_wr_en_i(EX_csr_wr_en_out)
+    ,.csr_wr_en_i(csr_wr_en)
     ,.csr_wr_addr_i(EX_csr_addr_out)
     ,.csr_wr_data_i(csr_wr_data)
 
-    ,.csr_branch_o(csr_is_br)
+    ,.csr_branch_o(csr_br_taken)
     ,.csr_target_o(csr_pc_target)
 
     // CSR registers
@@ -494,14 +501,27 @@ CSRFile m_CSRFile(
     ,.interrupt_o(csr_interrupt)
 );
 
+wire [31:0] csr_rd_data_xtval;
 CSR m_CSR(
+    .clk(clk),
+    .rst_n(rst_n),
+
+    .inst(EX_inst_out),
+    .inst_valid(1), // temporary
+
     .csr_op_i(EX_csr_op_out),
+    .is_csr_i(EX_is_csr_out),
+    .early_exception_i(`EXCEPTION_W'b0), // temporary
     .is_csr_imm_i(EX_is_csr_imm_out),
+    .cur_priv_i(csr_priv),
     .imm_i(EX_imm_out),
     .reg_rd_data1_i(EX_fwd_data1),
     .csr_old_i(csr_rd_data),
 
-    .csr_wdata_o(csr_wr_data)
+    .csr_rd_data_o(csr_rd_data_xtval),
+    .csr_wr_valid_o(csr_wr_en),
+    .csr_wr_data_o(csr_wr_data),
+    .csr_exception_o(csr_exception)
 );
 
 // ================================
@@ -510,6 +530,8 @@ CSR m_CSR(
 MEM_Reg m_EX_MEM_Reg(
     .clk(clk),
     .rst_n(rst_n),
+    .en(MEM_en),
+    .clear(MEM_clear),
     // data_in
     .pc_valid_i(EX_pc_valid_out),
     .pc_i(EX_pc_out),

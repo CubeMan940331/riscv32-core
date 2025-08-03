@@ -29,7 +29,9 @@ always @(*)begin
         7'b1100111: // JALR
             // {imm[31:20]}
             imm = {{20{inst[31]}}, inst[31:20]}; 
-
+        7'b1110011: // CSR
+            // {zero imm[24:20]}
+            imm = {27'b0, inst[19:15]}; 
         7'b0100011: // S SB SH SW
             // {imm[11:5], imm[4:0]}
             imm = {{20{inst[31]}}, inst[31:25], inst[11:7]};

@@ -22,7 +22,6 @@ module Control (
     output reg is_csr,
     output reg [2:0] csr_op,
     output reg is_csr_imm, // is csr[r w]i
-    output reg csr_wr_en,
     output reg csr_sel // rs1 or imm
 );
 
@@ -48,7 +47,6 @@ always @(*) begin
     is_csr=0;
     csr_op=0;
     is_csr_imm=0;
-    csr_wr_en=0;
     csr_sel=0;
     trap_ebreak = 1'b0;
     inst_mret = 1'b0;
@@ -193,7 +191,6 @@ always @(*) begin
                     is_csr = 1'b1;
                     csr_op = funct3;
                     is_csr_imm = funct3[2];
-                    csr_wr_en = (funct3 == 3'b001 || funct3 == 3'b011 || funct3 == 3'b101);
                     
                     reg_wr_en = 1'b1;
                     reg_w_sel  = 2'b11; // CSR read data path

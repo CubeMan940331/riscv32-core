@@ -1,14 +1,15 @@
 module EX_Reg (
-    input  wire        clk,
-    input  wire        rst_n,
-    input  wire        en,
-    input  wire        clear,
+    input wire        clk,
+    input wire        rst_n,
+    input wire        en,
+    input wire        clear,
 //=================================
     // input
     // data
     input  wire        pc_valid_i,
     input  wire [31:0] pc_i,
     input  wire [31:0] pc_p4_i,
+    input  wire [31:0] inst_i,
     
     input  wire [31:0] reg_rd_data1_i,
     input  wire [31:0] reg_rd_data2_i,
@@ -56,15 +57,16 @@ module EX_Reg (
     output  wire        pc_valid_o,
     output  wire [31:0] pc_o,
     output  wire [31:0] pc_p4_o,
+    output wire [31:0] inst_o,
     
-    output  wire [31:0] reg_rd_data1_o,
-    output  wire [31:0] reg_rd_data2_o,
+    output wire [31:0] reg_rd_data1_o,
+    output wire [31:0] reg_rd_data2_o,
     
-    output  wire [31:0] imm_o,
+    output wire [31:0] imm_o,
     
-    output  wire [4:0]  rd_o,
-    output  wire [4:0]  rs1_o,
-    output  wire [4:0]  rs2_o,
+    output wire [4:0]  rd_o,
+    output wire [4:0]  rs1_o,
+    output wire [4:0]  rs2_o,
     
     // reg
     output wire        reg_wr_en_o,
@@ -100,6 +102,7 @@ module EX_Reg (
 );
     // data
     PipelineRegister #(.WIDTH( 1)) reg_pc_valid  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(pc_valid_i),   .data_o(pc_valid_o));
+    PipelineRegister #(.WIDTH(32)) reg_inst      (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(inst_i),     .data_o(inst_o));
     PipelineRegister #(.WIDTH(32)) reg_pc        (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(pc_i),      .data_o(pc_o));
     PipelineRegister #(.WIDTH(32)) reg_pc_p4     (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(pc_p4_i),   .data_o(pc_p4_o));
     
