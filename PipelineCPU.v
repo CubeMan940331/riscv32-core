@@ -209,6 +209,8 @@ assign d_mem_wr_data = MEM_reg_rd_data2_out;
 // WB_Reg =====================
 wire [31:0] WB_pc_p4_out;
 wire [31:0] WB_ALU_out;
+wire [31:0] WB_MUL_out;
+wire [31:0] WB_DIV_out;
 wire [31:0] WB_mem_data_out;
 wire [4:0]  WB_rd_out;
 wire [31:0] WB_csr_rd_data_out;
@@ -760,6 +762,8 @@ WB_Reg m_MEM_WB_Reg(
 
     .pc_p4_i(MEM_pc_p4_out),
     .ALU_i(MEM_ALU_out),
+    .MUL_i(MUL_out),
+    .DIV_i(DIV_out),
     .mem_data_i(d_mem_rd_data),
     .rd_i(MEM_rd_out),
     .csr_rd_data_i(MEM_csr_rd_data_out),
@@ -770,6 +774,8 @@ WB_Reg m_MEM_WB_Reg(
     // data_out
     .pc_p4_o(WB_pc_p4_out),
     .ALU_o(WB_ALU_out),
+    .MUL_o(WB_MUL_out),
+    .DIV_o(WB_DIV_out),
     .mem_data_o(WB_mem_data_out),
     .rd_o(WB_rd_out),
     .csr_rd_data_o(WB_csr_rd_data_out),
@@ -778,12 +784,14 @@ WB_Reg m_MEM_WB_Reg(
     .reg_w_sel_o(WB_reg_w_sel_out)
 );
 
-Mux4to1 #(.size(32)) m_Mux_WriteData(
-    .sel(WB_reg_w_sel_out[1:0]),
+Mux6to1 #(.size(32)) m_Mux_WriteData(
+    .sel(WB_reg_w_sel_out),
     .s0(WB_pc_p4_out),
     .s1(WB_ALU_out),
     .s2(WB_mem_data_out),
     .s3(WB_csr_rd_data_out),
+    .s4(WB_MUL_out),
+    .s5(WB_DIV_out),
     .out(reg_data_in)
 );
 
