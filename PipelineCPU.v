@@ -266,8 +266,21 @@ ForwardUnit m_Forward(
 );
 
 HazardUnit m_Hazard(
-    .EX_mem_rd_en   (EX_mem_rd_en_out),
+    .EX_reg_wr_en   (EX_reg_wr_en_out),
+    .EX1_reg_wr_en  (EX1_reg_wr_en_out),
+    .EX2_reg_wr_en  (EX2_reg_wr_en_out),
+    .EX3_reg_wr_en  (EX3_reg_wr_en_out),
+
+    .EX_reg_w_sel   (EX_reg_w_sel_out),
+    .EX1_reg_w_sel  (EX1_reg_w_sel_out),
+    .EX2_reg_w_sel  (EX2_reg_w_sel_out),
+    .EX3_reg_w_sel  (EX3_reg_w_sel_out),
+
     .EX_rd          (EX_rd_out),
+    .EX1_rd         (EX1_rd_out),
+    .EX2_rd         (EX2_rd_out),
+    .EX3_rd         (EX3_rd_out),
+
     .ID_rs1         (ID_inst_out[19:15]),
     .ID_rs2         (ID_inst_out[24:20]),
     .stall          (stall)
