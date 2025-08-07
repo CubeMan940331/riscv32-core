@@ -1,0 +1,238 @@
+//-----------------------------------------------------------------
+// MMU
+//-----------------------------------------------------------------
+
+`include "riscv_defs.v"
+`include "MMU_file.v"
+
+module mmu 
+#(
+     parameter  ADDR_MIN = 32'h80000000
+    ,parameter  ADDR_MAX = 32'h8fffffff
+)
+(
+     input          clk_i
+    ,input          rst_i
+    ,input  [31:0]  satp_i
+
+    ,input  [31:0]  fetch_pc_i
+    ,input          fetch_rd_i
+    ,input  [31:0]  lsu_in_addr_i
+    ,input  [31:0]  lsu_in_data_i
+    ,input          lsu_in_rd_i
+    ,input  [ 3:0]  lsu_in_wr_i
+    ,input          lsu_in_flush_i
+    ,input          lsu_in_invalidate_i
+    ,input          lsu_in_writeback_i
+
+    ,input  [31:0]  dcache_in_value_i
+    ,input          dcache_in_valid_i
+
+    ,output [31:0]  fetch_out_pc_o
+    ,output         fetch_out_valid_o
+    ,output [31:0]  lsu_out_value_o
+    ,output         lsu_out_valid_o
+
+    ,output [31:0]  dcache_addr_o
+    ,output [31:0]  dcache_value_o
+    ,output         dcache_rd_o
+    ,output [ 3:0]  dcache_wr_o
+    ,output         dcache_flush_o
+    ,output         dcache_invalidate_o
+    ,output         dcache_writeback_o
+
+    ,output         load_fault_o
+    ,output         store_fault_o
+    ,output         inst_fault_o
+    ,output [ 5:0]  mmu_exception_o
+);
+
+// ---------------------------------------
+// Parameter
+// ---------------------------------------
+
+localparam PPN_SIZE             = 20;
+
+// Page Struct
+localparam PAGE_VALID           = 0;
+localparam PAGE_READ            = 1;
+localparam PAGE_WRITE           = 2;
+localparam PAGE_EXE             = 3;
+localparam PAGE_USER            = 4;
+localparam PAGE_GLOBAL          = 5;
+localparam PAGE_ACCESS          = 6;
+localparam PAGE_DIRTY           = 7;
+
+//DEBUG
+localparam DEBUG_MODE   = 1;
+localparam I_FAKE_ADDR  = 20'h80001;
+localparam I_FAKE_ENTRY = 32'h01010409;
+localparam D_FAKE_ADDR  = 20'h00401 ;
+localparam D_FAKE_ENTRY = 32'h01010803;
+
+// ---------------------------------------
+// Wire & Register
+// --------------------------------------- 
+
+wire itlb_req = fetch_rd_i;
+wire dtlb_req = lsu_in_rd_i || (|lsu_in_wr_i);
+
+wire [31:0] itlb_entry_o;
+wire [31:0] dtlb_entry_o;
+wire        itlb_hit;
+wire        dtlb_hit;
+
+reg  [31:0] update_entry;
+wire        is_pte;
+wire        is_update;
+
+// wire        vm_enable   = satp_i[`SATP_MODE_R];
+// wire        vm_asid     - satp_i[`SATP_ASID_R];
+// wire [31:0] vm_ppn      = {satp_i[`SATP_PPN_R],12'b0};
+
+wire [31:0] ptw_pte_addr_o;
+wire [31:0] ptw_pte_value_o;
+wire        ptw_pte_fault_o;
+wire        ptw_pte_rd_o;
+     
+
+// ---------------------------------------
+// Output Control
+//----------------------------------------
+
+reg [31:0] dcache_addr_r;
+
+assign fetch_out_pc_o       = {itlb_entry_o[29:10],fetch_pc_i[11:0]};
+assign fetch_out_valid_o    = fetch_rd_i && itlb_hit;
+assign lsu_out_value_o      = (lsu_out_valid_o)?dcache_in_value_i:32'h0;
+assign lsu_out_valid_o      = dcache_in_valid_i && dtlb_hit;
+
+assign dcache_addr_o    = dcache_addr_r;
+assign dcache_value_o   = lsu_in_data_i;
+assign dcache_rd_o      = (lsu_in_rd_i && dtlb_hit ||  is_pte);
+assign dcache_wr_o      = lsu_in_wr_i && ~is_pte && dtlb_hit;
+
+always @(*)begin
+    dcache_addr_r = 32'b0;
+
+    if(is_pte)
+        dcache_addr_r = ptw_pte_addr_o;
+    else if(dtlb_hit)
+        dcache_addr_r = {dtlb_entry_o[29:10],lsu_in_addr_i[11:0]};
+end
+
+assign load_fault_o     =  lsu_in_rd_i && !dtlb_entry_o[PAGE_READ] && is_pte;
+assign store_fault_o    =  (|lsu_in_wr_i) && !dtlb_entry_o[PAGE_WRITE];
+assign inst_fault_o     = fetch_rd_i && !itlb_entry_o[PAGE_EXE] && itlb_hit;
+
+assign mmu_exception_o  = (ptw_pte_fault_o && fetch_rd_i)?`EXCEPTION_PAGE_FAULT_INST:
+                          (ptw_pte_fault_o && lsu_in_rd_i)?`EXCEPTION_PAGE_FAULT_LOAD:
+                          (ptw_pte_fault_o && (|lsu_in_wr_i))?`EXCEPTION_PAGE_FAULT_STORE:6'h0;
+
+assign dcache_invalidate_o  = lsu_in_invalidate_i;
+assign dcache_flush_o       = lsu_in_flush_i;
+assign dcache_writeback_o   = lsu_in_writeback_i;
+
+// ---------------------------------------
+// TLB
+//----------------------------------------
+
+
+reg [19:0] itlb_vpn_i;
+reg [19:0] dtlb_vpn_i;
+
+TLB #(
+    .PPN_SIZE(PPN_SIZE),
+    .DEBUG_MODE(DEBUG_MODE),
+    .FAKE_ADDR(I_FAKE_ADDR),
+    .FAKE_ENTRY(I_FAKE_ENTRY)
+)ITLB(
+    .clk_i    (clk_i),
+    .rst_i    (rst_i),
+    .addr_i   (itlb_vpn_i),
+    .entry_i  (update_entry),
+    .valid_i  (itlb_req),
+    .update_i (is_update),
+    .hit_o    (itlb_hit),
+    .entry_o  (itlb_entry_o)
+);
+
+TLB #(
+    .PPN_SIZE(PPN_SIZE),
+    .DEBUG_MODE(DEBUG_MODE),
+    .FAKE_ADDR(D_FAKE_ADDR),
+    .FAKE_ENTRY(D_FAKE_ENTRY)
+)DTLB(
+    .clk_i    (clk_i),
+    .rst_i    (rst_i),
+    .addr_i   (dtlb_vpn_i),
+    .entry_i  (update_entry),
+    .valid_i  (dtlb_req),
+    .update_i (is_update),
+    .hit_o    (dtlb_hit),
+    .entry_o  (dtlb_entry_o)
+);
+
+always @(*)begin
+    itlb_vpn_i      = 32'b0;
+    dtlb_vpn_i      = 32'b0;
+    update_entry    = 32'b0;
+
+    if(is_update)
+    begin
+        if(itlb_req)
+        begin
+            itlb_vpn_i   = ptw_pte_addr_o[19:0];   
+            update_entry = ptw_pte_value_o;
+        end
+        else if(dtlb_req)
+        begin
+            dtlb_vpn_i   = ptw_pte_addr_o[19:0];
+            update_entry = ptw_pte_value_o;
+        end
+    end
+    else 
+    begin
+        itlb_vpn_i = fetch_pc_i[31:12];
+        dtlb_vpn_i = lsu_in_addr_i[31:12];
+    end
+end
+
+// ---------------------------------------
+// PTW
+//----------------------------------------
+
+reg  [31:0] ptw_req_addr_r;
+
+wire [31:0] ptw_resp_data_i  = dcache_in_value_i;
+wire        ptw_resp_valid_i = dcache_in_valid_i;
+wire        ptw_req_valid_i  = (itlb_req && ~itlb_hit) || (dtlb_req && ~dtlb_hit);
+wire [31:0] ptw_req_addr_i   = ptw_req_addr_r;
+
+always @(*)begin
+    ptw_req_addr_r = 32'h0;
+
+    if(itlb_req)
+        ptw_req_addr_r = fetch_pc_i;
+    else if(dtlb_req)
+        ptw_req_addr_r = lsu_in_addr_i;
+end
+
+PTW ptw(
+    .clk_i        (clk_i        ),
+    .rst_i        (rst_i        ),
+    .satp_i       (satp_i       ),
+    .req_addr_i   (ptw_req_addr_i   ),
+    .req_valid_i  (ptw_req_valid_i  ),
+    .resp_data_i  (ptw_resp_data_i  ),
+    .resp_valid_i (ptw_resp_valid_i ),
+    .pte_errow_i  (dcache_load_fault_i),
+    .pte_addr_o   (ptw_pte_addr_o   ),
+    .pte_value_o  (ptw_pte_value_o  ),
+    .pte_rd_o     (ptw_pte_rd_o     ),
+    .update_o     (is_update        ),
+    .pte_fault_o  (ptw_pte_fault_o  ),
+    .ptw_work_o   (is_pte)
+);
+
+endmodule
