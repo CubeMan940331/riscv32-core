@@ -4,3 +4,4 @@ obj_dir/*
 *.vcd
 TEST_INSTRUCTIONS.asm
 TEST_INSTRUCTIONS.txt
+*.bak

@@ -6,6 +6,7 @@ module EX_Reg (
 //=================================
     // input
     // data
+    input  wire        is_impl_i,
     input  wire        pc_valid_i,
     input  wire [31:0] pc_i,
     input  wire [31:0] pc_p4_i,
@@ -21,7 +22,7 @@ module EX_Reg (
     input  wire [4:0]  rs2_i,
     // reg
     input wire        reg_wr_en_i,
-    input wire [1:0]  reg_w_sel_i,
+    input wire [2:0]  reg_w_sel_i,
     // mem
     input wire        mem_wr_en_i,
     input wire        mem_rd_en_i,
@@ -54,6 +55,7 @@ module EX_Reg (
 //=================================
     // output
     // data
+    output wire         is_impl_o,
     output  wire        pc_valid_o,
     output  wire [31:0] pc_o,
     output  wire [31:0] pc_p4_o,
@@ -70,7 +72,7 @@ module EX_Reg (
     
     // reg
     output wire        reg_wr_en_o,
-    output wire [1:0]  reg_w_sel_o,
+    output wire [2:0]  reg_w_sel_o,
     // mem
     output wire        mem_wr_en_o,
     output wire        mem_rd_en_o,
@@ -101,6 +103,7 @@ module EX_Reg (
     output wire        funct7_o
 );
     // data
+    PipelineRegister #(.WIDTH( 1)) reg_is_impl   (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(is_impl_i),   .data_o(is_impl_o));
     PipelineRegister #(.WIDTH( 1)) reg_pc_valid  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(pc_valid_i),   .data_o(pc_valid_o));
     PipelineRegister #(.WIDTH(32)) reg_inst      (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(inst_i),     .data_o(inst_o));
     PipelineRegister #(.WIDTH(32)) reg_pc        (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(pc_i),      .data_o(pc_o));
@@ -116,7 +119,7 @@ module EX_Reg (
 
     // control
     PipelineRegister #(.WIDTH(1))  reg_reg_wr_en (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(reg_wr_en_i), .data_o(reg_wr_en_o));
-    PipelineRegister #(.WIDTH(2))  reg_reg_w_sel (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(reg_w_sel_i), .data_o(reg_w_sel_o));
+    PipelineRegister #(.WIDTH(3))  reg_reg_w_sel (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(reg_w_sel_i), .data_o(reg_w_sel_o));
     // mem
     PipelineRegister #(.WIDTH(1))  reg_mem_rd_en (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(mem_rd_en_i), .data_o(mem_rd_en_o));
     PipelineRegister #(.WIDTH(1))  reg_mem_wr_en (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(mem_wr_en_i), .data_o(mem_wr_en_o));

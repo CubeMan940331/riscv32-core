@@ -22,7 +22,9 @@ module Control (
     output reg is_csr,
     output reg [2:0] csr_op,
     output reg is_csr_imm, // is csr[r w]i
-    output reg csr_sel // rs1 or imm
+    output reg csr_sel, // rs1 or imm
+
+    output reg is_impl
 );
 
 // decode
@@ -101,7 +103,7 @@ always @(*) begin
                 3'b101:  mem_ctrl = 4'b0010; // LHU
                 default: mem_ctrl = 4'b0000; // undefined
             endcase
-            ALU_ctrl  = `ALU_ADD; // ADD
+            // ALU_ctrl  = `ALU_ADD; // ADD // don't use ALU
             reg_wr_en = 1'b1;
             ALU_sel1   = 1'b1;  // R1
             ALU_sel2  = 1'b1;  // immediate
@@ -117,7 +119,7 @@ always @(*) begin
                 3'b010:  mem_ctrl = 4'b0100; // SW
                 default: mem_ctrl = 4'b0000; // undefined
             endcase
-            ALU_ctrl  = `ALU_ADD; // ADD
+            // ALU_ctrl  = `ALU_ADD; // ADD // don't use ALU
             ALU_sel1   = 1'b1;     // R1
             ALU_sel2   = 1'b1;    // immediate
             mem_wr_en  = 1'b1;
@@ -226,6 +228,170 @@ always @(*) begin
         end
         default:;
     endcase
+end
+
+always @(*) begin
+    is_impl = 0;
+    // orginized according to the risc-v manual
+// Unprivileged
+// 2 RV32I Base Integer Instruction Set
+// 2.4 Integer Computational Instructions
+// 2.4.1 Integer Register-Immediate Instructions
+    if     ((inst&`INST_ADDI_MASK) == `INST_ADDI) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_SLTI_MASK) == `INST_SLTI) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_SLTIU_MASK) == `INST_SLTIU) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_ANDI_MASK) == `INST_ANDI) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_ORI_MASK) == `INST_ORI) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_XORI_MASK) == `INST_XORI) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_SLLI_MASK) == `INST_SLLI) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_SRLI_MASK) == `INST_SRLI) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_SRAI_MASK) == `INST_SRAI) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_LUI_MASK) == `INST_LUI) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_AUIPC_MASK) == `INST_AUIPC) begin
+       is_impl = 1; 
+    end
+// 2.4.2 Integer Register-Register Operations
+    else if((inst&`INST_ADD_MASK) == `INST_ADD) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_SLT_MASK) == `INST_SLT) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_SLTU_MASK) == `INST_SLTU) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_AND_MASK) == `INST_AND) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_OR_MASK) == `INST_OR) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_XOR_MASK) == `INST_XOR) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_SLL_MASK) == `INST_SLL) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_SRL_MASK) == `INST_SRL) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_SUB_MASK) == `INST_SUB) begin
+        
+    end
+    else if((inst&`INST_SRA_MASK) == `INST_SRA) begin
+        is_impl = 1;
+    end
+// 2.4.3 NOP
+    // addi x0,x0,0
+// 2.5 Control Transfer INstructions
+// 2.5.1 Unconditional Jumps
+    else if((inst&`INST_JAL_MASK) == `INST_JAL) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_JALR_MASK) == `INST_JALR) begin
+        is_impl = 1;
+    end
+// 2.5.2 Conditional Branches
+    else if((inst&`INST_BEQ_MASK) == `INST_BEQ) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_BNE_MASK) == `INST_BNE) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_BLT_MASK) == `INST_BLT) begin
+        is_impl = 1; 
+    end
+    else if((inst&`INST_BLTU_MASK) == `INST_BLTU) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_BGE_MASK) == `INST_BGE) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_BGEU_MASK) == `INST_BGEU) begin
+        is_impl = 1;
+    end
+// 2.6 Load and Store Instructions
+    else if((inst&`INST_LB_MASK) == `INST_LB) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_LBU_MASK) == `INST_LBU) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_LH_MASK) == `INST_LH) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_LHU_MASK) == `INST_LHU) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_LW_MASK) == `INST_LW) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_SB_MASK) == `INST_SB) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_SH_MASK) == `INST_SH) begin
+        is_impl = 1;
+    end
+    else if((inst&`INST_SW_MASK) == `INST_SW) begin
+        is_impl = 1;
+    end
+// 2.7 Memory Ordering Instructions
+    // Ignored for now
+// 2.8 Environment Call and Breakpoints
+    else if((inst&`INST_ECALL_MASK) == `INST_ECALL) begin
+        is_impl = 0; // skip this for now
+    end
+    else if((inst&`INST_EBREAK_MASK) == `INST_EBREAK) begin
+        is_impl = 0; // skip this for now
+    end
+// 2.9 HINT Instructions
+    // Ignored
+    
+// 5 Zifencei Extension
+    // Ignored for now
+    
+// 6 Zicsr
+    else if((inst&`INST_CSRRW_MASK) == `INST_CSRRW) begin
+        is_impl = 0; //skip this for now
+    end
+    else if((inst&`INST_CSRRS_MASK) == `INST_CSRRS) begin
+        is_impl = 0; //skip this for now
+    end
+    else if((inst&`INST_CSRRC_MASK) == `INST_CSRRC) begin
+        is_impl = 0; // skip this for now
+    end
+    else if((inst&`INST_CSRRWI_MASK) == `INST_CSRRWI) begin
+        is_impl = 0; // skip this for now
+    end
+    else if((inst&`INST_CSRRSI_MASK) == `INST_CSRRSI) begin
+        is_impl = 0; // skip this for now
+    end
+    else if((inst&`INST_CSRRCI_MASK) == `INST_CSRRCI) begin
+        is_impl = 0; // skip this for now
+    end
+
+// 12 M Extension
+
 end
 
 endmodule

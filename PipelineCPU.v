@@ -48,9 +48,10 @@ wire [4:0]    decode_rd;
 wire [11:0]   decode_csr_addr;
 
 // Control Logic ==============
+wire is_impl;
 wire reg_wr_en;
 // 0: pc_p4, 1: ALU, 2: mem
-wire [1:0] reg_w_sel;
+wire [2:0] reg_w_sel;
 wire mem_wr_en;
 wire mem_rd_en;
 wire [3:0] mem_ctrl;
@@ -82,6 +83,7 @@ wire [31:0] reg_data2_out;
 wire EX_en;
 wire EX_clear;
 // data_out
+wire EX_is_impl_out;
 wire EX_pc_valid_out;
 wire [31:0] EX_inst_out;
 wire [31:0] EX_pc_out;
@@ -94,7 +96,7 @@ wire [4:0]  EX_rs1_out;
 wire [4:0]  EX_rs2_out;
 // control_out
 wire EX_reg_wr_en_out;
-wire [1:0] EX_reg_w_sel_out;
+wire [2:0] EX_reg_w_sel_out;
 // mem
 wire EX_mem_rd_en_out;
 wire EX_mem_wr_en_out;
@@ -108,76 +110,21 @@ wire EX_ALU_sel2_out;
 wire [3:0] EX_ALU_ctrl_out;
 // BranchCmp
 wire [2:0] EX_cmp_op_out;
-//csr
-wire [11:0]  EX_csr_addr_out;
-wire EX_trap_ecall_out;
-wire EX_trap_ebreak_out;
-wire EX_inst_mret_out;
-
-wire EX_is_csr_out;
-wire [2:0] EX_csr_op_out;
-wire EX_is_csr_imm_out; // is csr[r w]i
-wire EX_csr_wr_en_out;
-wire EX_csr_sel_out; // rs1 or imm
 
 wire [2:0] EX_funct3_out;
 wire EX_funct7_out;
 
+wire EX_done;
 // ALU ========================
-wire [31:0] ALU_in1;
-wire [31:0] ALU_in2;
 wire [31:0] ALU_out;
-wire zero_flag;
-
-// // FPU ========================
-// wire [63:0] FPU_out;
-// wire FPU_invalid;
-// wire FPU_divbyzero;
-// wire FPU_overflow;
-// wire FPU_underflow;
-// wire FPU_inexact;
 
 // BranchCmp ==================
 wire br_taken; // indicate any branch happen (trigger by inst, csr unit)
 
-// CSR ========================
-wire [31:0] csr_wr_data; // from CSR to CSRFile
-wire [31:0] csr_rd_data; // output of CSRFile
-wire [31:0] csr_pc_target;
-wire csr_br_taken;
-wire [`EXCEPTION_W-1:0] csr_exception; // from CSR to CSRFile
-
-
-// CSRFile=====================
-wire [1:0] csr_priv;
-wire [31:0] csr_mstatus;
-//wire [31:0] csr_satp;
-wire [31:0] csr_interrupt;
-
-// MEM_Reg ====================
-wire MEM_pc_valid_out;
-wire MEM_en;
-wire MEM_clear;
-wire [31:0] MEM_pc_out;
-wire [31:0] MEM_pc_p4_out;
-wire [31:0] MEM_ALU_out;
-wire [31:0] MEM_reg_rd_data2_out; 
-wire [4:0]  MEM_rd_out;
-wire [31:0] MEM_csr_rd_data_out;
-
-wire        MEM_reg_wr_en_out;
-wire [1:0]  MEM_reg_w_sel_out;
-wire        MEM_mem_wr_en_out;
-wire        MEM_mem_rd_en_out;
-wire [3:0]  MEM_mem_ctrl_out;
-
-assign d_mem_ctrl = MEM_mem_ctrl_out;
-assign d_mem_wr_en = MEM_mem_wr_en_out;
-assign d_mem_rd_en = MEM_mem_rd_en_out;
-assign d_mem_addr = MEM_ALU_out;
-assign d_mem_wr_data = MEM_reg_rd_data2_out;
-
 // WB_Reg =====================
+wire WB_en;
+wire WB_clear;
+wire WB_is_impl_out;
 wire WB_pc_valid_out /* verilator public */;
 wire [31:0] WB_pc_out /* verilator public */;
 wire [31:0] WB_pc_p4_out;
@@ -187,11 +134,7 @@ wire [4:0]  WB_rd_out;
 wire [31:0] WB_csr_rd_data_out;
 // control_out
 wire        WB_reg_wr_en_out;
-wire [1:0]  WB_reg_w_sel_out;
-
-// EX Forward Mux =============
-wire [31:0] EX_fwd_data1;
-wire [31:0] EX_fwd_data2;
+wire [2:0]  WB_reg_w_sel_out;
 
 // Forward ====================
 wire [1:0] EX_fwd1_sel;
@@ -203,38 +146,17 @@ wire [3:0] stall;
 //componets
 //================================================================
 
-ForwardUnit m_Forward(
-    .EX_rs1(EX_rs1_out),
-    .EX_rs2(EX_rs2_out),
-    .MEM_rd(MEM_rd_out),
-    .MEM_reg_wr_en(MEM_reg_wr_en_out),
-    .MEM_reg_w_sel(MEM_reg_w_sel_out),
-    .WB_rd(WB_rd_out),
-    .WB_reg_wr_en(WB_reg_wr_en_out),
-    .EX_fwd_sel1(EX_fwd1_sel),
-    .EX_fwd_sel2(EX_fwd2_sel)
-);
-
-HazardUnit m_Hazard(
-    .EX_mem_rd_en   (EX_mem_rd_en_out),
-    .EX_rd          (EX_rd_out),
-    .ID_rs1         (ID_inst_out[19:15]),
-    .ID_rs2         (ID_inst_out[24:20]),
-    .stall          (stall)
-);
-
 PipelineCtrl m_PipelineCtrl(
-    .csr_br_taken(csr_br_taken),
-    .inst_br_taken(br_taken),
-    .stall(stall),
+    .br_taken(br_taken),
+    .EX_stall(!EX_done),
 
     .pc_en(pc_en),
     .ID_en(ID_en),
     .ID_clear(ID_clear),
     .EX_en(EX_en),
     .EX_clear(EX_clear),
-    .MEM_en(MEM_en),
-    .MEM_clear(MEM_clear)
+    .WB_en(WB_en),
+    .WB_clear(WB_clear)
 );
 
 // ================================
@@ -253,7 +175,7 @@ Mux3to1 #(.size(32)) m_PC_MUX(
     .sel(pc_sel),
     .s0(pc_p4),
     .s1(ALU_out),
-    .s2(csr_pc_target),
+    .s2(0),
     .out(pc_in)
 );
 
@@ -281,7 +203,7 @@ Register m_Register(
     .clk(clk),
     .rst_n(rst_n),
 
-    .wr_en(WB_reg_wr_en_out),//write enable
+    .wr_en(WB_reg_wr_en_out & WB_is_impl_out),//write enable
 
     .rs1(ID_inst_out[19:15]),//addr
     .rs2(ID_inst_out[24:20]),//addr
@@ -307,6 +229,7 @@ DecodeUnit m_DecodeUnit(
 );
 
 Control m_Control(
+    .is_impl(is_impl),
     .inst(ID_inst_out),
     .reg_wr_en(reg_wr_en),
     .reg_w_sel(reg_w_sel),
@@ -332,13 +255,15 @@ Control m_Control(
 
 // ================================
 // Execution stage
-
-EX_Reg m_EX_Reg(
+EX_Stage m_EX(
     .clk(clk),
     .rst_n(rst_n),
+// Pipeline Reg ================
     .en(EX_en),
     .clear(EX_clear),
+// inputs
     // data_in
+    .is_impl_i(is_impl),
     .pc_valid_i(ID_pc_valid_out),
     .inst_i(ID_inst_out),
     .pc_p4_i(ID_pc_p4_out),
@@ -369,227 +294,35 @@ EX_Reg m_EX_Reg(
     .ALU_ctrl_i(ALU_ctrl),
 
     .cmp_op_i(cmp_op),
-
-    // csr
-    .csr_addr_i(decode_csr_addr),
-
-    .trap_ecall_i(trap_ecall),
-    .trap_ebreak_i(trap_ebreak),
-    .inst_mret_i(inst_mret),
-
-    .is_csr_i(is_csr),
-    .csr_op_i(csr_op),
-    .is_csr_imm_i(is_csr_imm),
-    .csr_wr_en_i(csr_wr_en),
-    .csr_sel_i(csr_sel),
-
-    .funct3_i(decode_funct3),
-    .funct7_i(decode_funct7[5]),
-    //=================================
+// outputs
+    .done_o(EX_done),
     // data_out
+    .is_impl_o(EX_is_impl_out),
     .pc_valid_o(EX_pc_valid_out),
-    .inst_o(EX_inst_out),
-    .pc_p4_o(EX_pc_p4_out),
     .pc_o(EX_pc_out),
-    .reg_rd_data1_o(EX_reg_rd_data1_out),
-    .reg_rd_data2_o(EX_reg_rd_data2_out),
-    .imm_o(EX_imm_out),
-    .rd_o(EX_rd_out),
+    .pc_p4_o(EX_pc_p4_out),
+
     .rs1_o(EX_rs1_out),
     .rs2_o(EX_rs2_out),
-
+    .rd_o(EX_rd_out),
     // control_out
     .reg_wr_en_o(EX_reg_wr_en_out),
     .reg_w_sel_o(EX_reg_w_sel_out),
-    // mem
-    .mem_rd_en_o(EX_mem_rd_en_out),
-    .mem_wr_en_o(EX_mem_wr_en_out),
-    .mem_ctrl_o(EX_mem_ctrl_out),
-    // Br and Jump
-    .is_j_o(EX_is_j_out),
-    .is_br_o(EX_is_br_out),
-
     // ALU
-    .ALU_sel1_o(EX_ALU_sel1_out),
-    .ALU_sel2_o(EX_ALU_sel2_out),
-    .ALU_ctrl_o(EX_ALU_ctrl_out),
-    // BranchCmp
-    .cmp_op_o(EX_cmp_op_out),
-    // csr
-    .csr_addr_o(EX_csr_addr_out),
-    .trap_ebreak_o(EX_trap_ebreak_out),
-    .trap_ecall_o(EX_trap_ecall_out),
-    .inst_mret_o(EX_inst_mret_out),
-    .is_csr_o(EX_is_csr_out),
-    .csr_op_o(EX_csr_op_out),
-    .is_csr_imm_o(EX_is_csr_imm_out),
-    .csr_wr_en_o(EX_csr_wr_en_out),
-    .csr_sel_o(EX_csr_sel_out),
-
-    .funct3_o(EX_funct3_out),
-    .funct7_o(EX_funct7_out)
-);
-
-Mux4to1 #(.size(32)) m_EX_fwd1_MUX(
-    .sel(EX_fwd1_sel),
-    .s0(reg_data_in),
-    .s1(EX_reg_rd_data1_out),
-    .s2(MEM_ALU_out),
-    .s3(MEM_csr_rd_data_out),
-    .out(EX_fwd_data1)
-);
-Mux2to1 #(.size(32)) m_ALU_SRC1_MUX(
-    .sel(EX_ALU_sel1_out),
-    .s0(EX_pc_out),
-    .s1(EX_fwd_data1),
-    .out(ALU_in1)
-);
-
-Mux4to1 #(.size(32)) m_EX_fwd2_MUX(
-    .sel(EX_fwd2_sel),
-    .s0(reg_data_in),
-    .s1(EX_reg_rd_data2_out),
-    .s2(MEM_ALU_out),
-    .s3(MEM_csr_rd_data_out),
-    .out(EX_fwd_data2)
-);
-Mux2to1 #(.size(32)) m_ALU_SRC2_MUX(
-    .sel(EX_ALU_sel2_out),
-    .s0(EX_fwd_data2),
-    .s1(EX_imm_out),
-    .out(ALU_in2)
-);
-
-ALU_top m_ALU(
-    .ALU_ctrl(EX_ALU_ctrl_out),
-    .a(ALU_in1),
-    .b(ALU_in2),
-    .out(ALU_out)
-);
-
-// FPU_Top m_FPU(
-//     .clk(clk),
-//     .rst_n(rst_n),
-
-//     .func3(EX_funct3_out),
-//     .func7(EX_inst_out[31:25]),
-//     .rs2(EX_rs2_out),
-
-//     .operand_a({32'h0, EX_fwd_data1}),
-//     .operand_b({32'h0, EX_fwd_data2}),
-
-//     .result_out(FPU_out),
-
-//     .flag_invalid(FPU_invalid),
-//     .flag_divbyzero(FPU_divbyzero),
-//     .flag_overflow(FPU_overflow),
-//     .flag_underflow(FPU_underflow),
-//     .flag_inexact(FPU_inexact)
-// );
-
-BranchUnit m_BranchUnit(
-    .is_br(EX_is_br_out),
-    .is_j(EX_is_j_out),
-    .is_csr_br(csr_br_taken),
-
-    .cmp_op(EX_cmp_op_out),
-    .reg_rd_data1(EX_fwd_data1),
-    .reg_rd_data2(EX_fwd_data2),
-    
-    .inst_br_taken(br_taken),
-    .pc_sel(pc_sel)
-);
-
-CSRFile m_CSRFile(
-    .clk(clk)
-    ,.rst_n(rst_n)
-    // csr access
-    ,.cpu_id_i(0)
-    ,.misa_i(`MISA_RV32 | `MISA_RVI)
-
-    ,.exception_i(csr_exception)
-    ,.exception_pc_i(MEM_pc_out)
-    ,.exception_addr_i(0) // only consider ecall for now
-
-    ,.csr_rd_addr_i(EX_csr_addr_out)
-    ,.csr_rd_data_o(csr_rd_data)
-    
-    ,.csr_wr_en_i(csr_wr_en)
-    ,.csr_wr_addr_i(EX_csr_addr_out)
-    ,.csr_wr_data_i(csr_wr_data)
-
-    ,.csr_branch_o(csr_br_taken)
-    ,.csr_target_o(csr_pc_target)
-
-    // CSR registers
-    ,.priv_o(csr_priv)
-    ,.mstatus_o(csr_mstatus)
-    //,.satp_o(csr_satp)
-
-    ,.interrupt_o(csr_interrupt)
-);
-
-wire [31:0] csr_rd_data_xtval;
-CSR m_CSR(
-    .clk(clk),
-    .rst_n(rst_n),
-
-    .inst(EX_inst_out),
-    .inst_valid(1), // temporary
-
-    .csr_op_i(EX_csr_op_out),
-    .is_csr_i(EX_is_csr_out),
-    .early_exception_i(`EXCEPTION_W'b0), // temporary
-    .is_csr_imm_i(EX_is_csr_imm_out),
-    .cur_priv_i(csr_priv),
-    .imm_i(EX_imm_out),
-    .reg_rd_data1_i(EX_fwd_data1),
-    .csr_old_i(csr_rd_data),
-
-    .csr_rd_data_o(csr_rd_data_xtval),
-    .csr_wr_valid_o(csr_wr_en),
-    .csr_wr_data_o(csr_wr_data),
-    .csr_exception_o(csr_exception)
-);
-
-// ================================
-// mem access stage
-
-MEM_Reg m_EX_MEM_Reg(
-    .clk(clk),
-    .rst_n(rst_n),
-    .en(MEM_en),
-    .clear(MEM_clear),
-    // data_in
-    .pc_valid_i(EX_pc_valid_out),
-    .pc_i(EX_pc_out),
-    .pc_p4_i(EX_pc_p4_out),
-    .ALU_i(ALU_out),
-    .reg_rd_data2_i(EX_fwd_data2),
-    .rd_i(EX_rd_out),
-    .csr_rd_data_i(csr_rd_data),
-    // control_in
-    .reg_wr_en_i(EX_reg_wr_en_out),
-    .reg_w_sel_i(EX_reg_w_sel_out),
-
-    .mem_wr_en_i(EX_mem_wr_en_out),
-    .mem_rd_en_i(EX_mem_rd_en_out),
-    .mem_ctrl_i(EX_mem_ctrl_out),
-    // ===================================
-    // data_out
-    .pc_valid_o(MEM_pc_valid_out),
-    .pc_o(MEM_pc_out),
-    .pc_p4_o(MEM_pc_p4_out),
-    .ALU_o(MEM_ALU_out),
-    .reg_rd_data2_o(MEM_reg_rd_data2_out),
-    .rd_o(MEM_rd_out),
-    .csr_rd_data_o(MEM_csr_rd_data_out),
-    // control_out
-    .reg_wr_en_o(MEM_reg_wr_en_out),
-    .reg_w_sel_o(MEM_reg_w_sel_out),
-    .mem_wr_en_o(MEM_mem_wr_en_out),
-    .mem_rd_en_o(MEM_mem_rd_en_out),
-    .mem_ctrl_o(MEM_mem_ctrl_out)
+    .ALU_o(ALU_out),
+    // Branch Output
+    .br_taken_o(br_taken),
+    .pc_sel_o(pc_sel),
+    // D-mem Output
+    .d_mem_ctrl_o(d_mem_ctrl),
+    .d_mem_wr_en_o(d_mem_wr_en),
+    .d_mem_rd_en_o(d_mem_rd_en),
+    .d_mem_addr_o(d_mem_addr),
+    .d_mem_wr_data_o(d_mem_wr_data),
+// Forwarding ==================
+    .WB_data_i(reg_data_in),
+    .WB_rd_i(WB_rd_out),
+    .WB_reg_wr_en_i(WB_reg_wr_en_out)
 );
 
 //================================
@@ -598,19 +331,23 @@ MEM_Reg m_EX_MEM_Reg(
 WB_Reg m_MEM_WB_Reg(
     .clk(clk),
     .rst_n(rst_n),
-
-    .pc_valid_i(MEM_pc_valid_out),
-    .pc_i(MEM_pc_out),
-    .pc_p4_i(MEM_pc_p4_out),
-    .ALU_i(MEM_ALU_out),
+    .en(WB_en),
+    .clear(WB_clear),
+    
+    .is_impl_i(EX_is_impl_out),
+    .pc_valid_i(EX_pc_valid_out),
+    .pc_i(EX_pc_out),
+    .pc_p4_i(EX_pc_p4_out),
+    .ALU_i(ALU_out),
     .mem_data_i(d_mem_rd_data),
-    .rd_i(MEM_rd_out),
-    .csr_rd_data_i(MEM_csr_rd_data_out),
+    .rd_i(EX_rd_out),
+    .csr_rd_data_i(0),
     // control_in
-    .reg_wr_en_i(MEM_reg_wr_en_out),
-    .reg_w_sel_i(MEM_reg_w_sel_out),
+    .reg_wr_en_i(EX_reg_wr_en_out),
+    .reg_w_sel_i(EX_reg_w_sel_out),
     // ===================================
     // data_out
+    .is_impl_o(WB_is_impl_out),
     .pc_valid_o(WB_pc_valid_out),
     .pc_o(WB_pc_out),
     .pc_p4_o(WB_pc_p4_out),
@@ -624,7 +361,7 @@ WB_Reg m_MEM_WB_Reg(
 );
 
 Mux4to1 #(.size(32)) m_Mux_WriteData(
-    .sel(WB_reg_w_sel_out),
+    .sel(WB_reg_w_sel_out[1:0]),
     .s0(WB_pc_p4_out),
     .s1(WB_ALU_out),
     .s2(WB_mem_data_out),
