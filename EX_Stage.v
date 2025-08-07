@@ -33,6 +33,12 @@ module EX_Stage(
     input ALU_sel1_i,
     input ALU_sel2_i,
     input [3:0] ALU_ctrl_i,
+    // CSR Control
+    input [11:0] csr_addr_i,
+    input is_csr_i,
+    input [2:0] csr_op_i,
+    input is_csr_imm_i,
+    input csr_sel_i,
     // WB stage control inputs
     input reg_wr_en_i,
     input [2:0] reg_w_sel_i,
@@ -61,8 +67,11 @@ module EX_Stage(
 // Branch ======================
     output br_taken_o,
     output [1:0] pc_sel_o, // pc_p4, ALU_out, csr_pc_target
+    output [31:0] csr_pc_target_o,
 // ALU =========================
     output [31:0] ALU_o,
+// CSR =========================
+    output [31:0] csr_rd_data_o,
 // Forwarding ==================
     input [31:0] WB_data_i,
     input [4:0] WB_rd_i,
@@ -70,8 +79,8 @@ module EX_Stage(
 );
 // Wires =======================
 // Pipiline Reg
-wire EX_is_impl_out;
-wire EX_pc_valid_out;
+wire        EX_is_impl_out;
+wire        EX_pc_valid_out;
 wire [31:0] EX_inst_out;
 wire [31:0] EX_pc_out;
 wire [31:0] EX_pc_p4_out;
@@ -82,57 +91,66 @@ wire [4:0]  EX_rd_out;
 wire [4:0]  EX_rs1_out;
 wire [4:0]  EX_rs2_out;
 
-wire EX_reg_wr_en_out;
-wire [2:0] EX_reg_w_sel_out;
+wire        EX_reg_wr_en_out;
+wire [2:0]  EX_reg_w_sel_out;
 
-wire EX_mem_rd_en_out;
-wire EX_mem_wr_en_out;
-wire [3:0] EX_mem_ctrl_out;
+wire        EX_mem_rd_en_out;
+wire        EX_mem_wr_en_out;
+wire [3:0]  EX_mem_ctrl_out;
 
-wire EX_is_j_out;
-wire EX_is_br_out;
+wire        EX_is_j_out;
+wire        EX_is_br_out;
 
-wire EX_ALU_sel1_out;
-wire EX_ALU_sel2_out;
-wire [3:0] EX_ALU_ctrl_out;
+wire        EX_ALU_sel1_out;
+wire        EX_ALU_sel2_out;
+wire [3:0]  EX_ALU_ctrl_out;
 
-wire [2:0] EX_cmp_op_out;
+wire [2:0]  EX_cmp_op_out;
 
-wire [11:0]  EX_csr_addr_out;
-wire EX_trap_ecall_out;
-wire EX_trap_ebreak_out;
-wire EX_inst_mret_out;
+wire [11:0] EX_csr_addr_out;
 
-wire EX_is_csr_out;
-wire [2:0] EX_csr_op_out;
-wire EX_is_csr_imm_out; // is csr[r w]i
-wire EX_csr_wr_en_out;
-wire EX_csr_sel_out; // rs1 or imm
+wire        EX_is_csr_out;
+wire [2:0]  EX_csr_op_out;
+wire        EX_is_csr_imm_out; // is csr[r w]i
+wire        EX_csr_wr_en_out;
+wire        EX_csr_sel_out; // rs1 or imm
 
-wire [2:0] EX_funct3_out;
-wire EX_funct7_out;
+wire [2:0]  EX_funct3_out;
+wire        EX_funct7_out;
 
 // Forwarding
 wire [31:0] fwd_data1, fwd_data2;
 
 // EX Ctrl
-wire EX_done;
-wire EX_start;
+wire        EX_done;
+wire        EX_start;
 
 // ALU
-wire ALU_start;
-wire ALU_done;
+wire        ALU_start;
+wire        ALU_done;
 wire [31:0] ALU_in1;
 wire [31:0] ALU_in2;
 wire [31:0] ALU_out;
 
 // Branch
-wire Br_start;
-wire Br_done;
+wire        Br_start;
+wire        Br_done;
 
 // LSU
-wire LSU_start;
-wire LSU_done;
+wire        LSU_start;
+wire        LSU_done;
+wire [`EXCEPTION_W-1:0] LSU_exception;
+
+// CSR
+wire        SYS_done;
+wire [31:0] csr_rd_data; // output of CSRFile
+wire [31:0] csr_wr_data; // output of CSR
+wire        csr_wr_en;
+wire [1:0]  csr_priv;
+wire [`EXCEPTION_W-1:0] csr_exception;
+wire        csr_br_taken;
+wire [31:0] csr_mstatus;
+wire [31:0] csr_interrupt;
 
 // Pipeline Register ===========
 EX_Reg m_EX_Reg(
@@ -174,17 +192,12 @@ EX_Reg m_EX_Reg(
     .cmp_op_i(cmp_op_i),
 
     // csr
-    .csr_addr_i(),
-    
-    .trap_ecall_i(),
-    .trap_ebreak_i(),
-    .inst_mret_i(),
+    .csr_addr_i(csr_addr_i),
 
-    .is_csr_i(),
-    .csr_op_i(),
-    .is_csr_imm_i(),
-    .csr_wr_en_i(),
-    .csr_sel_i(),
+    .is_csr_i(is_csr_i),
+    .csr_op_i(csr_op_i),
+    .is_csr_imm_i(is_csr_imm_i),
+    .csr_sel_i(csr_sel_i),
 
     .funct3_i(),
     .funct7_i(),
@@ -221,13 +234,9 @@ EX_Reg m_EX_Reg(
     .cmp_op_o(EX_cmp_op_out),
     // csr
     .csr_addr_o(EX_csr_addr_out),
-    .trap_ebreak_o(EX_trap_ebreak_out),
-    .trap_ecall_o(EX_trap_ecall_out),
-    .inst_mret_o(EX_inst_mret_out),
     .is_csr_o(EX_is_csr_out),
     .csr_op_o(EX_csr_op_out),
     .is_csr_imm_o(EX_is_csr_imm_out),
-    .csr_wr_en_o(EX_csr_wr_en_out),
     .csr_sel_o(EX_csr_sel_out),
 
     .funct3_o(EX_funct3_out),
@@ -287,12 +296,17 @@ assign Br_start  = EX_start && (EX_is_br_out || EX_is_j_out); // only deal with 
 assign LSU_start = EX_start && (EX_mem_wr_en_out || EX_mem_rd_en_out);
 
 // done logic
-assign EX_done = (!EX_pc_valid_out) | ALU_done | Br_done | LSU_done | 0; // (FU_done && !(|FU_err)) | ...
+assign EX_done = (!EX_pc_valid_out) | 
+    ALU_done | 
+    Br_done | 
+    LSU_done | 
+    SYS_done | 
+    0; // (FU_done && !(|FU_err)) | ...
 
 // ALU =========================
 Mux2to1 #(.size(32)) m_ALU_SRC1_MUX(
     .sel(EX_ALU_sel1_out),
-    .s0(pc_o),
+    .s0(EX_pc_out),
     .s1(fwd_data1),
     .out(ALU_in1)
 );
@@ -314,13 +328,13 @@ assign ALU_done=ALU_start;
 BranchUnit m_BranchUnit(
     .is_br(EX_is_br_out),
     .is_j(EX_is_j_out),
-    .is_csr_br(0),
+    .is_csr_br(csr_br_taken),
 
     .cmp_op(EX_cmp_op_out),
     .reg_rd_data1(fwd_data1),
     .reg_rd_data2(fwd_data2),
     
-    .inst_br_taken(br_taken_o),
+    .br_taken(br_taken_o),
     .pc_sel(pc_sel_o)
 );
 assign Br_done = Br_start; // only deal with inst br
@@ -353,6 +367,54 @@ always @(posedge clk or negedge rst_n) begin
 end
 assign LSU_done = MEM_stage_reg;
 
+// CSR =========================
+wire [31:0] csr_rd_data_xtval;
+CSR m_CSR(
+    .inst(EX_inst_out),
+    .inst_valid(1),
+    .csr_op_i(EX_csr_op_out),
+    .is_csr_i(EX_is_csr_out),
+    .is_csr_imm_i(EX_is_csr_imm_out),
+    .cur_priv_i(csr_priv),
+    .imm_i(EX_imm_out),
+    .reg_rd_data1_i(fwd_data1),
+    .csr_old_i(csr_rd_data),
+
+    .csr_rd_data_o(csr_rd_data_xtval),
+    .csr_wr_valid_o(csr_wr_en),
+    .csr_wr_data_o(csr_wr_data),
+    .csr_exception_o(csr_exception) // generate csr related exceptions
+);
+
+CSRFile m_CSRFile(
+    .clk(clk),
+    .rst_n(rst_n),
+
+    .cpu_id_i(0),
+    .misa_i(`MISA_RV32 | `MISA_RVI),
+
+    .exception_i(csr_exception),
+    .exception_pc_i(EX_pc_out),
+    .exception_addr_i(0),
+
+    .csr_rd_addr_i(EX_csr_addr_out),
+    .csr_rd_data_o(csr_rd_data),
+
+    .csr_wr_en_i(csr_wr_en),
+    .csr_wr_addr_i(EX_csr_addr_out),
+    .csr_wr_data_i(csr_wr_data),
+
+    .csr_branch_o(csr_br_taken),
+    .csr_target_o(csr_pc_target_o),
+
+    .priv_o(csr_priv),
+    .mstatus_o(csr_mstatus),
+    .interrupt_o(csr_interrupt)
+);
+
+assign SYS_done = csr_wr_en | (|csr_exception);
+
+
 // Output ======================
 assign done_o      = EX_done;
 
@@ -361,6 +423,8 @@ assign pc_valid_o  = EX_pc_valid_out;
 assign pc_o        = EX_pc_out;
 assign pc_p4_o     = EX_pc_p4_out;
 assign ALU_o       = ALU_out;
+
+assign csr_rd_data_o = csr_rd_data;
 
 assign rs1_o       = EX_rs1_out;
 assign rs2_o       = EX_rs2_out;

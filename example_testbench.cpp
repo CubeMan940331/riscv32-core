@@ -20,7 +20,8 @@ using namespace std;
 #define MAX_CYCLE 1000
 
 void load_inst_mem(VComputer_InstructionMemory *ptr, ifstream in){
-    if(ptr->insts.size()%4){
+    constexpr size_t INST_SIZE = 8192;
+    if(INST_SIZE%4){
         // expect size of InstructionMemory is align
         throw runtime_error("size of InstructionMemory is misalign");
     }
@@ -28,7 +29,7 @@ void load_inst_mem(VComputer_InstructionMemory *ptr, ifstream in){
     string str;
     CData byte_to_wr;
     while(in>>str){
-        if(i>=ptr->insts.size()){
+        if(i>=INST_SIZE){
             throw runtime_error("InstructionMemory not big enough");
         }
         // expect `str` to be a byte in 0/1 string
@@ -45,7 +46,7 @@ void load_inst_mem(VComputer_InstructionMemory *ptr, ifstream in){
         }
         ptr->insts[i++]=byte_to_wr;
     }
-    for(;i<ptr->insts.size();i+=4){
+    for(;i<INST_SIZE;i+=4){
         // set to nop
         ptr->insts[i+3] = 0x00;
         ptr->insts[i+2] = 0x00;

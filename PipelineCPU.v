@@ -74,6 +74,8 @@ wire is_csr_imm; // is csr[r w]i
 wire csr_wr_en;
 wire csr_sel; // rs1 or imm
 
+wire [31:0] csr_rd_data;
+
 // Register File ==============
 wire [31:0] reg_data_in;
 wire [31:0] reg_data1_out;
@@ -120,6 +122,7 @@ wire [31:0] ALU_out;
 
 // BranchCmp ==================
 wire br_taken; // indicate any branch happen (trigger by inst, csr unit)
+wire [31:0] csr_pc_target;
 
 // WB_Reg =====================
 wire WB_en;
@@ -175,7 +178,7 @@ Mux3to1 #(.size(32)) m_PC_MUX(
     .sel(pc_sel),
     .s0(pc_p4),
     .s1(ALU_out),
-    .s2(0),
+    .s2(csr_pc_target),
     .out(pc_in)
 );
 
@@ -242,10 +245,6 @@ Control m_Control(
     .ALU_sel2(ALU_sel2),
     .ALU_ctrl(ALU_ctrl),
     .cmp_op(cmp_op),
-
-    .trap_ecall(trap_ecall),
-    .trap_ebreak(trap_ebreak),
-    .inst_mret(inst_mret),
     
     .is_csr(is_csr),
     .csr_op(csr_op),
@@ -294,6 +293,12 @@ EX_Stage m_EX(
     .ALU_ctrl_i(ALU_ctrl),
 
     .cmp_op_i(cmp_op),
+    // CSR
+    .csr_addr_i(decode_csr_addr),
+    .is_csr_i(is_csr),
+    .csr_op_i(csr_op),
+    .is_csr_imm_i(is_csr_imm),
+    .csr_sel_i(csr_sel),
 // outputs
     .done_o(EX_done),
     // data_out
@@ -310,9 +315,12 @@ EX_Stage m_EX(
     .reg_w_sel_o(EX_reg_w_sel_out),
     // ALU
     .ALU_o(ALU_out),
+    // CSR
+    .csr_rd_data_o(csr_rd_data),
     // Branch Output
     .br_taken_o(br_taken),
     .pc_sel_o(pc_sel),
+    .csr_pc_target_o(csr_pc_target),
     // D-mem Output
     .d_mem_ctrl_o(d_mem_ctrl),
     .d_mem_wr_en_o(d_mem_wr_en),
@@ -341,7 +349,7 @@ WB_Reg m_MEM_WB_Reg(
     .ALU_i(ALU_out),
     .mem_data_i(d_mem_rd_data),
     .rd_i(EX_rd_out),
-    .csr_rd_data_i(0),
+    .csr_rd_data_i(csr_rd_data),
     // control_in
     .reg_wr_en_i(EX_reg_wr_en_out),
     .reg_w_sel_i(EX_reg_w_sel_out),

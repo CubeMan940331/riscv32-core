@@ -15,10 +15,6 @@ module Control (
     output reg [3:0] ALU_ctrl,
     output reg [2:0] cmp_op,
 
-    output reg trap_ecall,
-    output reg trap_ebreak,
-    output reg inst_mret,
-
     output reg is_csr,
     output reg [2:0] csr_op,
     output reg is_csr_imm, // is csr[r w]i
@@ -50,9 +46,6 @@ always @(*) begin
     csr_op=0;
     is_csr_imm=0;
     csr_sel=0;
-    trap_ebreak = 1'b0;
-    inst_mret = 1'b0;
-    trap_ecall = 1'b0;
 
     case (opcode)
         // R-Type (ADD SUB SLL SLT SLTU XOR SRL SRA OR AND)
@@ -180,25 +173,13 @@ always @(*) begin
         end
         // CSR-Type (ECALL EBREAK MRET URET* SRET* CSRRW CSRRS CSRRC CSRRWI CSRRSI CSRRCI)
         7'b1110011: begin
-            case(funct3)
-                3'b000: begin
-                    case (imm12)
-                        12'h000: trap_ecall  = 1'b1;   // ECALL
-                        12'h001: trap_ebreak = 1'b1;   // EBREAK
-                        12'h302: inst_mret   = 1'b1;   // MRET
-                        default:;
-                    endcase
-                end
-                default: begin // ALL CSR
-                    is_csr = 1'b1;
-                    csr_op = funct3;
-                    is_csr_imm = funct3[2];
-                    
-                    reg_wr_en = 1'b1;
-                    reg_w_sel  = 3'b011; // CSR read data path
-                    csr_sel  = is_csr_imm;
-                end
-            endcase
+            is_csr = 1'b1;
+            csr_op = funct3;
+            is_csr_imm = funct3[2];
+            
+            reg_wr_en = 1'b1;
+            reg_w_sel  = 3'b011; // CSR read data path
+            csr_sel  = is_csr_imm;
         end
         // FPU
         // R4-Type (fmadd fmsub fnmsub fnmadd)
@@ -296,7 +277,7 @@ always @(*) begin
         is_impl = 1;
     end
     else if((inst&`INST_SUB_MASK) == `INST_SUB) begin
-        
+        is_impl = 1;
     end
     else if((inst&`INST_SRA_MASK) == `INST_SRA) begin
         is_impl = 1;
@@ -359,7 +340,7 @@ always @(*) begin
     // Ignored for now
 // 2.8 Environment Call and Breakpoints
     else if((inst&`INST_ECALL_MASK) == `INST_ECALL) begin
-        is_impl = 0; // skip this for now
+        is_impl = 1; // skip this for now
     end
     else if((inst&`INST_EBREAK_MASK) == `INST_EBREAK) begin
         is_impl = 0; // skip this for now
@@ -372,22 +353,22 @@ always @(*) begin
     
 // 6 Zicsr
     else if((inst&`INST_CSRRW_MASK) == `INST_CSRRW) begin
-        is_impl = 0; //skip this for now
+        is_impl = 1; //skip this for now
     end
     else if((inst&`INST_CSRRS_MASK) == `INST_CSRRS) begin
-        is_impl = 0; //skip this for now
+        is_impl = 1; //skip this for now
     end
     else if((inst&`INST_CSRRC_MASK) == `INST_CSRRC) begin
-        is_impl = 0; // skip this for now
+        is_impl = 1; // skip this for now
     end
     else if((inst&`INST_CSRRWI_MASK) == `INST_CSRRWI) begin
-        is_impl = 0; // skip this for now
+        is_impl = 1; // skip this for now
     end
     else if((inst&`INST_CSRRSI_MASK) == `INST_CSRRSI) begin
-        is_impl = 0; // skip this for now
+        is_impl = 1; // skip this for now
     end
     else if((inst&`INST_CSRRCI_MASK) == `INST_CSRRCI) begin
-        is_impl = 0; // skip this for now
+        is_impl = 1; // skip this for now
     end
 
 // 12 M Extension

@@ -1,13 +1,13 @@
 module BranchUnit (
     input is_br,
-    input  is_j,
+    input is_j,
     input is_csr_br,
     
     input [2:0] cmp_op,
     input signed [31:0] reg_rd_data1,
     input signed [31:0] reg_rd_data2,
     
-    output reg inst_br_taken, // indicate branch happened (trigger by inst)
+    output br_taken, // indicate branch happened
     output reg [1:0] pc_sel
 );
 // 0 beq
@@ -17,6 +17,7 @@ module BranchUnit (
 // 4 bltu
 // 5 bgeu
 
+reg inst_br_taken;
 always @(*)begin
     case(cmp_op)
         3'b000: inst_br_taken = (is_br & (reg_rd_data1 == reg_rd_data2)) | is_j; // beq
@@ -38,5 +39,7 @@ always @(*)begin
     else if(inst_br_taken) pc_sel=1;
     else pc_sel=0;
 end
+
+assign br_taken = inst_br_taken | is_csr_br;
 
 endmodule
