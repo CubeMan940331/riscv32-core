@@ -2,25 +2,31 @@
 /* verilator lint_off UNUSEDSIGNAL */
 module Control (
     input [31:0] inst,
+    // WB stage
+    output reg reg_wr_en_o,
+    output reg [2:0] reg_w_sel_o, // 0: pc_p4, 1: ALU, 2: mem, 3:csr, 4: FPU
+    
+    // LSU
+    output reg mem_wr_en_o,
+    output reg mem_rd_en_o,
+    output reg [3:0] mem_ctrl_o,
+    
+    // Branch
+    output reg is_j_o,
+    output reg is_br_o,
+    output reg [2:0] cmp_op_o,
+    
+    // ALU
+    output reg [3:0] ALU_ctrl_o,
+    output reg ALU_sel1_o, // 0: PC, 1: rs1
+    output reg ALU_sel2_o, // 0: rs2, 1: imm
 
-    output reg reg_wr_en,
-    output reg [2:0] reg_w_sel, // 0: pc_p4, 1: ALU, 2: mem, 3:csr, 4: FPU
-    output reg mem_wr_en,
-    output reg mem_rd_en,
-    output reg [3:0] mem_ctrl,
-    output reg is_j,
-    output reg is_br,
-    output reg ALU_sel1, // 0: PC, 1: rs1
-    output reg ALU_sel2, // 0: rs2, 1: imm
-    output reg [3:0] ALU_ctrl,
-    output reg [2:0] cmp_op,
+    // CSR
+    output reg is_csr_o,
+    output reg [2:0] csr_op_o,
+    output reg is_csr_imm_o, // is csr[r w]i
 
-    output reg is_csr,
-    output reg [2:0] csr_op,
-    output reg is_csr_imm, // is csr[r w]i
-    output reg csr_sel, // rs1 or imm
-
-    output reg is_impl
+    output is_impl_o
 );
 
 // decode
@@ -29,350 +35,300 @@ wire [2:0] funct3 = inst[14:12];
 wire [6:0] funct7 = inst[31:25];
 wire [11:0] imm12 = inst[31:20];
 
+assign is_impl_o = is_impl_w;
+assign reg_wr_en_o = reg_wr_en_w;
+assign mem_wr_en_o = mem_wr_en_w;
+assign mem_rd_en_o = mem_rd_en_w;
+assign mem_ctrl_o = mem_ctrl_r;
+assign is_j_o = is_j_w;
+assign is_br_o = is_br_w;
+assign ALU_ctrl_o = alu_ctrl_r;
+assign cmp_op_o = cmp_op_r;
+assign is_csr_o = is_csr_w;
+assign csr_op_o = csr_op_w;
+assign is_csr_imm_o = is_csr_imm_w;
+assign ALU_sel1_o = alu_sel1_w;
+assign ALU_sel2_o = alu_sel2_w;
+assign reg_w_sel_o = reg_w_sel_r;
+
+// 0: PC, 1: rs1
+wire alu_sel1_w = ((inst&`INST_ADDI_MASK) == `INST_ADDI)   ||
+                  ((inst&`INST_SLTI_MASK) == `INST_SLTI)   ||
+                  ((inst&`INST_SLTIU_MASK) == `INST_SLTIU) ||
+                  ((inst&`INST_ANDI_MASK) == `INST_ANDI)   ||
+                  ((inst&`INST_ORI_MASK) == `INST_ORI)     ||
+                  ((inst&`INST_XORI_MASK) == `INST_XORI)   ||
+                  ((inst&`INST_SLLI_MASK) == `INST_SLLI)   ||
+                  ((inst&`INST_SRLI_MASK) == `INST_SRLI)   ||
+                  ((inst&`INST_SRAI_MASK) == `INST_SRAI)   ||
+                  ((inst&`INST_ADD_MASK) == `INST_ADD)     ||
+                  ((inst&`INST_SLT_MASK) == `INST_SLT)     ||
+                  ((inst&`INST_SLTU_MASK) == `INST_SLTU)   ||
+                  ((inst&`INST_AND_MASK) == `INST_AND)     ||
+                  ((inst&`INST_OR_MASK) == `INST_OR)       ||
+                  ((inst&`INST_XOR_MASK) == `INST_XOR)     ||
+                  ((inst&`INST_SLL_MASK) == `INST_SLL)     ||
+                  ((inst&`INST_SRL_MASK) == `INST_SRL)     ||
+                  ((inst&`INST_SUB_MASK) == `INST_SUB)     ||
+                  ((inst&`INST_SRA_MASK) == `INST_SRA)     ||
+                  ((inst&`INST_JALR_MASK) == `INST_JALR);
+// 0: rs2, 1: imm
+wire alu_sel2_w = ((inst&`INST_ADDI_MASK) == `INST_ADDI)   ||
+                  ((inst&`INST_SLTI_MASK) == `INST_SLTI)   ||
+                  ((inst&`INST_SLTIU_MASK) == `INST_SLTIU) ||
+                  ((inst&`INST_ANDI_MASK) == `INST_ANDI)   ||
+                  ((inst&`INST_ORI_MASK) == `INST_ORI)     ||
+                  ((inst&`INST_XORI_MASK) == `INST_XORI)   ||
+                  ((inst&`INST_SLLI_MASK) == `INST_SLLI)   ||
+                  ((inst&`INST_SRLI_MASK) == `INST_SRLI)   ||
+                  ((inst&`INST_SRAI_MASK) == `INST_SRAI)   ||
+                  ((inst&`INST_LUI_MASK) == `INST_LUI)     ||
+                  ((inst&`INST_AUIPC_MASK) == `INST_AUIPC) ||
+                  ((inst&`INST_JAL_MASK) == `INST_JAL)     ||
+                  ((inst&`INST_JALR_MASK) == `INST_JALR)   ||
+                  ((inst&`INST_BEQ_MASK) == `INST_BEQ)     ||
+                  ((inst&`INST_BNE_MASK) == `INST_BNE)     ||
+                  ((inst&`INST_BLT_MASK) == `INST_BLT)     ||
+                  ((inst&`INST_BGE_MASK) == `INST_BGE)     ||
+                  ((inst&`INST_BLTU_MASK) == `INST_BLTU)   ||
+                  ((inst&`INST_BGEU_MASK) == `INST_BGEU)   ;
+
+wire is_impl_w =((inst&`INST_ADDI_MASK) == `INST_ADDI)   ||
+                ((inst&`INST_SLTI_MASK) == `INST_SLTI)   ||
+                ((inst&`INST_SLTIU_MASK) == `INST_SLTIU) ||
+                ((inst&`INST_ANDI_MASK) == `INST_ANDI)   ||
+                ((inst&`INST_ORI_MASK) == `INST_ORI)     ||
+                ((inst&`INST_XORI_MASK) == `INST_XORI)   ||
+                ((inst&`INST_SLLI_MASK) == `INST_SLLI)   ||
+                ((inst&`INST_SRLI_MASK) == `INST_SRLI)   ||
+                ((inst&`INST_SRAI_MASK) == `INST_SRAI)   ||
+                ((inst&`INST_LUI_MASK) == `INST_LUI)     ||
+                ((inst&`INST_AUIPC_MASK) == `INST_AUIPC) ||
+                ((inst&`INST_ADD_MASK) == `INST_ADD)     ||
+                ((inst&`INST_SLT_MASK) == `INST_SLT)     ||
+                ((inst&`INST_SLTU_MASK) == `INST_SLTU)   ||
+                ((inst&`INST_AND_MASK) == `INST_AND)     ||
+                ((inst&`INST_OR_MASK) == `INST_OR)       ||
+                ((inst&`INST_XOR_MASK) == `INST_XOR)     ||
+                ((inst&`INST_SLL_MASK) == `INST_SLL)     ||
+                ((inst&`INST_SRL_MASK) == `INST_SRL)     ||
+                ((inst&`INST_SUB_MASK) == `INST_SUB)     ||
+                ((inst&`INST_SRA_MASK) == `INST_SRA)     ||
+                // J-Type
+                ((inst&`INST_JAL_MASK) == `INST_JAL)   ||
+                ((inst&`INST_JALR_MASK) == `INST_JALR) ||
+                ((inst&`INST_BEQ_MASK) == `INST_BEQ)   ||
+                ((inst&`INST_BNE_MASK) == `INST_BNE)   ||
+                ((inst&`INST_BLT_MASK) == `INST_BLT)   ||
+                ((inst&`INST_BGE_MASK) == `INST_BGE)   ||
+                ((inst&`INST_BLTU_MASK) == `INST_BLTU) ||
+                ((inst&`INST_BGEU_MASK) == `INST_BGEU) ||
+                ((inst&`INST_LB_MASK) == `INST_LB)     ||
+                ((inst&`INST_LBU_MASK) == `INST_LBU)   ||
+                ((inst&`INST_LH_MASK) == `INST_LH)     ||
+                ((inst&`INST_LHU_MASK) == `INST_LHU)   ||
+                ((inst&`INST_LW_MASK) == `INST_LW)     ||
+                ((inst&`INST_SB_MASK) == `INST_SB)     ||
+                ((inst&`INST_SH_MASK) == `INST_SH)     ||
+                ((inst&`INST_SW_MASK) == `INST_SW)     ||
+                // Zicsr
+                ((inst&`INST_CSRRW_MASK) == `INST_CSRRW)   ||
+                ((inst&`INST_CSRRS_MASK) == `INST_CSRRS)   ||
+                ((inst&`INST_CSRRC_MASK) == `INST_CSRRC)   ||
+                ((inst&`INST_CSRRWI_MASK) == `INST_CSRRWI) ||
+                ((inst&`INST_CSRRSI_MASK) == `INST_CSRRSI) ||
+                ((inst&`INST_CSRRCI_MASK) == `INST_CSRRCI) ||
+                ((inst&`INST_ECALL_MASK) == `INST_ECALL)   ;
+
+wire reg_wr_en_w = ((inst&`INST_ADDI_MASK) == `INST_ADDI)    ||
+                    ((inst&`INST_SLTI_MASK) == `INST_SLTI)   ||
+                    ((inst&`INST_SLTIU_MASK) == `INST_SLTIU) ||
+                    ((inst&`INST_ANDI_MASK) == `INST_ANDI)   ||
+                    ((inst&`INST_ORI_MASK) == `INST_ORI)     ||
+                    ((inst&`INST_XORI_MASK) == `INST_XORI)   ||
+                    ((inst&`INST_SLLI_MASK) == `INST_SLLI)   ||
+                    ((inst&`INST_SRLI_MASK) == `INST_SRLI)   ||
+                    ((inst&`INST_SRAI_MASK) == `INST_SRAI)   ||
+                    ((inst&`INST_LUI_MASK) == `INST_LUI)     ||
+                    ((inst&`INST_AUIPC_MASK) == `INST_AUIPC) ||
+                    ((inst&`INST_ADD_MASK) == `INST_ADD)     ||
+                    ((inst&`INST_SLT_MASK) == `INST_SLT)     ||
+                    ((inst&`INST_SLTU_MASK) == `INST_SLTU)   ||
+                    ((inst&`INST_AND_MASK) == `INST_AND)     ||
+                    ((inst&`INST_OR_MASK) == `INST_OR)       ||
+                    ((inst&`INST_XOR_MASK) == `INST_XOR)     ||
+                    ((inst&`INST_SLL_MASK) == `INST_SLL)     ||
+                    ((inst&`INST_SRL_MASK) == `INST_SRL)     ||
+                    ((inst&`INST_SUB_MASK) == `INST_SUB)     ||
+                    ((inst&`INST_SRA_MASK) == `INST_SRA)     ||
+                    // Jump
+                    ((inst&`INST_JAL_MASK) == `INST_JAL)   ||
+                    ((inst&`INST_JALR_MASK) == `INST_JALR) ||
+                    // load
+                    ((inst&`INST_LB_MASK) == `INST_LB)   ||
+                    ((inst&`INST_LBU_MASK) == `INST_LBU) ||
+                    ((inst&`INST_LH_MASK) == `INST_LH)   ||
+                    ((inst&`INST_LHU_MASK) == `INST_LHU) ||
+                    ((inst&`INST_LW_MASK) == `INST_LW)   ||
+                    // CSR
+                    ((inst&`INST_CSRRW_MASK) == `INST_CSRRW)   ||
+                    ((inst&`INST_CSRRS_MASK) == `INST_CSRRS)   ||
+                    ((inst&`INST_CSRRC_MASK) == `INST_CSRRC)   ||
+                    ((inst&`INST_CSRRWI_MASK) == `INST_CSRRWI) ||
+                    ((inst&`INST_CSRRSI_MASK) == `INST_CSRRSI) ||
+                    ((inst&`INST_CSRRCI_MASK) == `INST_CSRRCI) ;
+                    // FPU
+                    // TODO
+
+wire mem_rd_en_w = ((inst&`INST_LB_MASK) == `INST_LB)    ||
+                    ((inst&`INST_LBU_MASK) == `INST_LBU) ||
+                    ((inst&`INST_LH_MASK) == `INST_LH)   ||
+                    ((inst&`INST_LHU_MASK) == `INST_LHU) ||
+                    ((inst&`INST_LW_MASK) == `INST_LW)   ;
+                    // FPU
+                    // ((inst&`INST_FLW_MASK) == `INST_FLW) ||
+                    // ((inst&`INST_FLD_MASK) == `INST_FLD);
+                    
+wire mem_wr_en_w = ((inst&`INST_SB_MASK) == `INST_SB) ||
+                    ((inst&`INST_SH_MASK) == `INST_SH)||
+                    ((inst&`INST_SW_MASK) == `INST_SW);
+                    // FPU
+                    // ((inst&`INST_FSW_MASK) == `INST_FSW) ||
+                    // ((inst&`INST_FSD_MASK) == `INST_FSD);
+
+wire is_j_w = ((inst&`INST_JAL_MASK) == `INST_JAL)  ||
+              ((inst&`INST_JALR_MASK) == `INST_JALR);
+
+wire is_br_w = ((inst&`INST_BEQ_MASK) == `INST_BEQ)   ||
+               ((inst&`INST_BNE_MASK) == `INST_BNE)   ||
+               ((inst&`INST_BLT_MASK) == `INST_BLT)   ||
+               ((inst&`INST_BGE_MASK) == `INST_BGE)   ||
+               ((inst&`INST_BLTU_MASK) == `INST_BLTU) ||
+               ((inst&`INST_BGEU_MASK) == `INST_BGEU) ;
+
+wire is_csr_w = ((inst&`INST_CSRRW_MASK) == `INST_CSRRW)    ||
+                ((inst&`INST_CSRRS_MASK) == `INST_CSRRS)    ||
+                ((inst&`INST_CSRRC_MASK) == `INST_CSRRC)    ||
+                ((inst&`INST_CSRRWI_MASK) == `INST_CSRRWI)  ||
+                ((inst&`INST_CSRRSI_MASK) == `INST_CSRRSI)  ||
+                ((inst&`INST_CSRRCI_MASK) == `INST_CSRRCI)  ||
+                ((inst & `INST_ECALL_MASK) == `INST_ECALL)  ||
+                ((inst & `INST_EBREAK_MASK) == `INST_EBREAK)||
+                ((inst & `INST_ERET_MASK) == `INST_ERET)    ;
+
+wire is_csr_imm_w = ((inst&`INST_CSRRWI_MASK) == `INST_CSRRWI)  ||
+                    ((inst&`INST_CSRRSI_MASK) == `INST_CSRRSI)  ||
+                    ((inst&`INST_CSRRCI_MASK) == `INST_CSRRCI)  ;
+
+wire is_alu_w = ((inst&`INST_ADDI_MASK) == `INST_ADDI)   ||
+                ((inst&`INST_SLTI_MASK) == `INST_SLTI)   ||
+                ((inst&`INST_SLTIU_MASK) == `INST_SLTIU) ||
+                ((inst&`INST_ANDI_MASK) == `INST_ANDI)   ||
+                ((inst&`INST_ORI_MASK) == `INST_ORI)     ||
+                ((inst&`INST_XORI_MASK) == `INST_XORI)   ||
+                ((inst&`INST_SLLI_MASK) == `INST_SLLI)   ||
+                ((inst&`INST_SRLI_MASK) == `INST_SRLI)   ||
+                ((inst&`INST_SRAI_MASK) == `INST_SRAI)   ||
+                ((inst&`INST_LUI_MASK) == `INST_LUI)     ||
+                ((inst&`INST_AUIPC_MASK) == `INST_AUIPC) ||
+                ((inst&`INST_ADD_MASK) == `INST_ADD)     ||
+                ((inst&`INST_SLT_MASK) == `INST_SLT)     ||
+                ((inst&`INST_SLTU_MASK) == `INST_SLTU)   ||
+                ((inst&`INST_AND_MASK) == `INST_AND)     ||
+                ((inst&`INST_OR_MASK) == `INST_OR)       ||
+                ((inst&`INST_XOR_MASK) == `INST_XOR)     ||
+                ((inst&`INST_SLL_MASK) == `INST_SLL)     ||
+                ((inst&`INST_SRL_MASK) == `INST_SRL)     ||
+                ((inst&`INST_SUB_MASK) == `INST_SUB)     ||
+                ((inst&`INST_SRA_MASK) == `INST_SRA)     ||
+                // Jump
+                ((inst&`INST_JAL_MASK) == `INST_JAL)     ||
+                ((inst&`INST_JALR_MASK) == `INST_JALR)   ;
+                // FPU
+                // TODO
+
+wire is_lsu_w = ((inst&`INST_LB_MASK) == `INST_LB)   ||
+                ((inst&`INST_LBU_MASK) == `INST_LBU) ||
+                ((inst&`INST_LH_MASK) == `INST_LH)   ||
+                ((inst&`INST_LHU_MASK) == `INST_LHU) ||
+                ((inst&`INST_LW_MASK) == `INST_LW)   ||
+                ((inst&`INST_SB_MASK) == `INST_SB)   ||
+                ((inst&`INST_SH_MASK) == `INST_SH)   ||
+                ((inst&`INST_SW_MASK) == `INST_SW)   ;
+                // FPU
+                // TODO
+
+wire [2:0] csr_op_w = {3{is_csr_w}} & funct3;
+
+reg [3:0] alu_ctrl_r;
+reg [3:0] mem_ctrl_r;
+reg [2:0] cmp_op_r;
+reg [2:0] reg_w_sel_r;
 always @(*) begin
-    reg_wr_en = 1'b0;
-    reg_w_sel = 3'b000;
-    mem_wr_en = 1'b0;
-    mem_rd_en = 1'b0;
-    mem_ctrl = 4'b0000;
-    is_j = 1'b0;
-    is_br = 1'b0;
-    ALU_sel1 = 1'b0;
-    ALU_sel2 = 1'b0;
-    ALU_ctrl = `ALU_NONE;
-    cmp_op = 3'b000;
-
-    is_csr=0;
-    csr_op=0;
-    is_csr_imm=0;
-    csr_sel=0;
-
-    case (opcode)
-        // R-Type (ADD SUB SLL SLT SLTU XOR SRL SRA OR AND)
-        7'b0110011: begin
-            case(funct3)
-                3'b000:  ALU_ctrl = (funct7[5]) ? `ALU_SUB : `ALU_ADD; // SUB : ADD
-                3'b001:  ALU_ctrl = `ALU_SHIFTL; // SLL
-                3'b010:  ALU_ctrl = `ALU_LESS_THAN_SIGNED; // SLT
-                3'b011:  ALU_ctrl = `ALU_LESS_THAN; // SLTU
-                3'b100:  ALU_ctrl = `ALU_XOR; // XOR
-                3'b101:  ALU_ctrl = (funct7[5]) ? `ALU_SHIFTR_ARITH : `ALU_SHIFTR; // SRA : SRL
-                3'b110:  ALU_ctrl = `ALU_OR; // OR
-                3'b111:  ALU_ctrl = `ALU_AND; // AND
-                default: ALU_ctrl = `ALU_NONE; // PASS
-            endcase
-            reg_wr_en = 1'b1;
-            ALU_sel1   = 1'b1;  // R1
-            ALU_sel2  = 1'b0;  // R2
-            reg_w_sel  = 3'b001; // ALUout
-        end
-
-        // I-Type (ADDI SLLI SLTI SLTIU XORI SRLI SRAI ORI ANDI)
-        7'b0010011: begin
-            case(funct3)
-                3'b000:  ALU_ctrl = `ALU_ADD; // ADDI
-                3'b001:  ALU_ctrl = `ALU_SHIFTL; // SLLI
-                3'b010:  ALU_ctrl = `ALU_LESS_THAN_SIGNED; // SLTI
-                3'b011:  ALU_ctrl = `ALU_LESS_THAN; // SLTIU
-                3'b100:  ALU_ctrl = `ALU_XOR; // XORI
-                3'b101:  ALU_ctrl = (funct7[5]) ? `ALU_SHIFTR_ARITH : `ALU_SHIFTR; // SRAI : SRLI
-                3'b110:  ALU_ctrl = `ALU_OR; // ORI
-                3'b111:  ALU_ctrl = `ALU_AND; // ANDI
-                default: ALU_ctrl = `ALU_NONE; // PASS
-            endcase
-            reg_wr_en = 1'b1;
-            ALU_sel1   = 1'b1;  // R1
-            ALU_sel2  = 1'b1; // immediate
-            reg_w_sel  = 3'b001; // ALUout
-        end
-
-        // Load-Type (LB LH LW LBU LHU)
-        7'b0000011: begin
-            case(funct3)
-                3'b000:  mem_ctrl = 4'b1001; // LB
-                3'b001:  mem_ctrl = 4'b1010; // LH
-                3'b010:  mem_ctrl = 4'b0100; // LW
-                3'b100:  mem_ctrl = 4'b0001; // LBU
-                3'b101:  mem_ctrl = 4'b0010; // LHU
-                default: mem_ctrl = 4'b0000; // undefined
-            endcase
-            // ALU_ctrl  = `ALU_ADD; // ADD // don't use ALU
-            reg_wr_en = 1'b1;
-            ALU_sel1   = 1'b1;  // R1
-            ALU_sel2  = 1'b1;  // immediate
-            mem_rd_en  = 1'b1;
-            reg_w_sel  = 3'b010; // memory
-        end
-
-        // S-Type (SB SH SW)
-        7'b0100011: begin
-            case(funct3)
-                3'b000:  mem_ctrl = 4'b0001; // SB
-                3'b001:  mem_ctrl = 4'b0010; // SH
-                3'b010:  mem_ctrl = 4'b0100; // SW
-                default: mem_ctrl = 4'b0000; // undefined
-            endcase
-            // ALU_ctrl  = `ALU_ADD; // ADD // don't use ALU
-            ALU_sel1   = 1'b1;     // R1
-            ALU_sel2   = 1'b1;    // immediate
-            mem_wr_en  = 1'b1;
-        end
-
-        // B-Type (BEQ BNE BLT BGE BLTU BGEU)
-        7'b1100011: begin
-            case(funct3)
-                3'b000:  cmp_op = 3'b000; // BEQ
-                3'b001:  cmp_op = 3'b001; // BNE
-                3'b100:  cmp_op = 3'b010; // BLT
-                3'b101:  cmp_op = 3'b011; // BGE
-                3'b110:  cmp_op = 3'b100; // BLTU
-                3'b111:  cmp_op = 3'b101; // BGEU
-                default: cmp_op = 3'b111; // undefined
-            endcase
-            ALU_ctrl  = `ALU_ADD; // ADD
-            ALU_sel1   = 1'b0;     // PC
-            ALU_sel2  = 1'b1;     // immediate
-            is_br = 1'b1;
-        end
-
-        // JAL
-        7'b1101111: begin
-            ALU_ctrl  = `ALU_ADD; // ADD
-            reg_wr_en = 1'b1;
-            reg_w_sel  = 3'b000;    // PC+4
-            ALU_sel1   = 1'b0;     // PC
-            ALU_sel2  = 1'b1;     // immediate
-            is_j   = 1'b1;
-        end
-
-        // JALR
-        7'b1100111: begin
-            ALU_ctrl  = `ALU_ADD; // ADD
-            reg_wr_en = 1'b1;
-            reg_w_sel  = 3'b000;    // PC+4
-            is_j   = 1'b1;
-            ALU_sel1   = 1'b1;     // R1
-            ALU_sel2  = 1'b1;     // immediate
-        end
-
-        // AUIPC
-        7'b0010111: begin
-            ALU_ctrl  = `ALU_ADD; // ADD
-            reg_wr_en = 1'b1;
-            reg_w_sel  = 3'b001;    // ALUout
-            ALU_sel1   = 1'b0;     // PC
-            ALU_sel2  = 1'b1;     // immediate
-        end
-
-        // LUI
-        7'b0110111: begin
-            ALU_ctrl  = `ALU_NONE; // PASS B
-            reg_wr_en = 1'b1;
-            reg_w_sel  = 3'b001;      // ALUout
-            ALU_sel2  = 1'b1;       // imm
-        end
-        // CSR-Type (ECALL EBREAK MRET URET* SRET* CSRRW CSRRS CSRRC CSRRWI CSRRSI CSRRCI)
-        7'b1110011: begin
-            is_csr = 1'b1;
-            csr_op = funct3;
-            is_csr_imm = funct3[2];
-            
-            reg_wr_en = 1'b1;
-            reg_w_sel  = 3'b011; // CSR read data path
-            csr_sel  = is_csr_imm;
-        end
-        // FPU
-        // R4-Type (fmadd fmsub fnmsub fnmadd)
-        7'b1000011, // fmadd
-        7'b1000111, // fmsub
-        7'b1001011, // fnmsub
-        7'b1001111: begin // fnmadd
-            reg_wr_en = 1'b1;
-            reg_w_sel  = 3'b100; // FPU out
-        end
-        // R-Type both (fadd fsub fmul fdiv fsqrt fsgnj fsgnjn fsgnjx fmin fmax feq flt fle fclass)
-        // R-Type RVF only (fcvt.w.s fcvt.wu.s fcvt.s.w fcvt.s.wu fmv.x.w fmv.w.x)
-        // R-Type RVD only (fcvt.w.d fcvt.wu.d fcvt.d.w fcvt.d.wu fcvt.s.d fcvt.d.s)
-        7'b1010011: begin
-            reg_wr_en = 1'b1;
-            reg_w_sel  = 3'b100; // FPU out
-        end
-        // I-Type (flw fld)
-        7'b0000111: begin
-            reg_wr_en = 1'b1;
-            mem_rd_en = 1'b1;
-            reg_w_sel = 3'b100; // FPU out
-        end
-        // S-Type (fsw fsd)
-        7'b0100111: begin
-            mem_wr_en = 1'b1;
-        end
-        default:;
-    endcase
-end
-
-always @(*) begin
-    is_impl = 0;
-    // orginized according to the risc-v manual
-// Unprivileged
-// 2 RV32I Base Integer Instruction Set
-// 2.4 Integer Computational Instructions
-// 2.4.1 Integer Register-Immediate Instructions
-    if     ((inst&`INST_ADDI_MASK) == `INST_ADDI) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_SLTI_MASK) == `INST_SLTI) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_SLTIU_MASK) == `INST_SLTIU) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_ANDI_MASK) == `INST_ANDI) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_ORI_MASK) == `INST_ORI) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_XORI_MASK) == `INST_XORI) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_SLLI_MASK) == `INST_SLLI) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_SRLI_MASK) == `INST_SRLI) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_SRAI_MASK) == `INST_SRAI) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_LUI_MASK) == `INST_LUI) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_AUIPC_MASK) == `INST_AUIPC) begin
-       is_impl = 1; 
-    end
-// 2.4.2 Integer Register-Register Operations
-    else if((inst&`INST_ADD_MASK) == `INST_ADD) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_SLT_MASK) == `INST_SLT) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_SLTU_MASK) == `INST_SLTU) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_AND_MASK) == `INST_AND) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_OR_MASK) == `INST_OR) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_XOR_MASK) == `INST_XOR) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_SLL_MASK) == `INST_SLL) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_SRL_MASK) == `INST_SRL) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_SUB_MASK) == `INST_SUB) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_SRA_MASK) == `INST_SRA) begin
-        is_impl = 1;
-    end
-// 2.4.3 NOP
-    // addi x0,x0,0
-// 2.5 Control Transfer INstructions
-// 2.5.1 Unconditional Jumps
-    else if((inst&`INST_JAL_MASK) == `INST_JAL) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_JALR_MASK) == `INST_JALR) begin
-        is_impl = 1;
-    end
-// 2.5.2 Conditional Branches
-    else if((inst&`INST_BEQ_MASK) == `INST_BEQ) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_BNE_MASK) == `INST_BNE) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_BLT_MASK) == `INST_BLT) begin
-        is_impl = 1; 
-    end
-    else if((inst&`INST_BLTU_MASK) == `INST_BLTU) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_BGE_MASK) == `INST_BGE) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_BGEU_MASK) == `INST_BGEU) begin
-        is_impl = 1;
-    end
-// 2.6 Load and Store Instructions
-    else if((inst&`INST_LB_MASK) == `INST_LB) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_LBU_MASK) == `INST_LBU) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_LH_MASK) == `INST_LH) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_LHU_MASK) == `INST_LHU) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_LW_MASK) == `INST_LW) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_SB_MASK) == `INST_SB) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_SH_MASK) == `INST_SH) begin
-        is_impl = 1;
-    end
-    else if((inst&`INST_SW_MASK) == `INST_SW) begin
-        is_impl = 1;
-    end
-// 2.7 Memory Ordering Instructions
-    // Ignored for now
-// 2.8 Environment Call and Breakpoints
-    else if((inst&`INST_ECALL_MASK) == `INST_ECALL) begin
-        is_impl = 1; // skip this for now
-    end
-    else if((inst&`INST_EBREAK_MASK) == `INST_EBREAK) begin
-        is_impl = 0; // skip this for now
-    end
-// 2.9 HINT Instructions
-    // Ignored
+    alu_ctrl_r = 4'b0000;
+    mem_ctrl_r = 4'b0000;
+    cmp_op_r   = 3'b000;
     
-// 5 Zifencei Extension
-    // Ignored for now
+    // alu_ctrl
+    if (is_alu_w | is_j_w | is_br_w) begin
+        if      ((inst&`INST_ADD_MASK) == `INST_ADD)     alu_ctrl_r = `ALU_ADD;              // ADD
+        else if ((inst&`INST_SUB_MASK) == `INST_SUB)     alu_ctrl_r = `ALU_SUB;              // SUB
+        else if ((inst&`INST_AND_MASK) == `INST_AND)     alu_ctrl_r = `ALU_AND;              // AND
+        else if ((inst&`INST_OR_MASK) == `INST_OR)       alu_ctrl_r = `ALU_OR;               // OR
+        else if ((inst&`INST_XOR_MASK) == `INST_XOR)     alu_ctrl_r = `ALU_XOR;              // XOR
+        else if ((inst&`INST_SLL_MASK) == `INST_SLL)     alu_ctrl_r = `ALU_SHIFTL;           // SLL
+        else if ((inst&`INST_SRL_MASK) == `INST_SRL)     alu_ctrl_r = `ALU_SHIFTR;           // SRL
+        else if ((inst&`INST_SRA_MASK) == `INST_SRA)     alu_ctrl_r = `ALU_SHIFTR_ARITH;     // SRA
+        else if ((inst&`INST_SLT_MASK) == `INST_SLT)     alu_ctrl_r = `ALU_LESS_THAN_SIGNED; // SLT
+        else if ((inst&`INST_SLTU_MASK) == `INST_SLTU)   alu_ctrl_r = `ALU_LESS_THAN;        // SLTU
+        else if ((inst&`INST_SLTI_MASK) == `INST_SLTI)   alu_ctrl_r = `ALU_LESS_THAN_SIGNED; // SLTI
+        else if ((inst&`INST_SLTIU_MASK) == `INST_SLTIU) alu_ctrl_r = `ALU_LESS_THAN;        // SLTIU
+        else if ((inst&`INST_SLLI_MASK) == `INST_SLLI)   alu_ctrl_r = `ALU_SHIFTL;           // SLLI
+        else if ((inst&`INST_SRLI_MASK) == `INST_SRLI)   alu_ctrl_r = `ALU_SHIFTR;           // SRLI
+        else if ((inst&`INST_SRAI_MASK) == `INST_SRAI)   alu_ctrl_r = `ALU_SHIFTR_ARITH;     // SRAI
+        else if ((inst&`INST_ANDI_MASK) == `INST_ANDI)   alu_ctrl_r = `ALU_AND;              // ANDI
+        else if ((inst&`INST_ORI_MASK) == `INST_ORI)     alu_ctrl_r = `ALU_OR;               // ORI
+        else if ((inst&`INST_XORI_MASK) == `INST_XORI)   alu_ctrl_r = `ALU_XOR;              // XORI
+        else if ((inst&`INST_ADDI_MASK) == `INST_ADDI)   alu_ctrl_r = `ALU_ADD;              // ADDI
+        else if ((inst&`INST_AUIPC_MASK) == `INST_AUIPC) alu_ctrl_r = `ALU_ADD;              // AUIPC
+        else if ((inst&`INST_LUI_MASK) == `INST_LUI)     alu_ctrl_r = `ALU_NONE;             // LUI(PASS-B)
+        else if(is_j_w | is_br_w)                        alu_ctrl_r = `ALU_ADD;              // B+J
+        else                                             alu_ctrl_r = `ALU_NONE;             // NOP(PASS-B)
+    end
+
+    // mem_ctrl
+    if (is_lsu_w) begin
+        if      ((inst&`INST_LB_MASK) == `INST_LB)   mem_ctrl_r = 4'b1001; // LB
+        else if ((inst&`INST_LBU_MASK) == `INST_LBU) mem_ctrl_r = 4'b1010; // LBU
+        else if ((inst&`INST_LH_MASK) == `INST_LH)   mem_ctrl_r = 4'b1011; // LH
+        else if ((inst&`INST_LHU_MASK) == `INST_LHU) mem_ctrl_r = 4'b1100; // LHU
+        else if ((inst&`INST_LW_MASK) == `INST_LW)   mem_ctrl_r = 4'b1101; // LW
+        else if ((inst&`INST_SB_MASK) == `INST_SB)   mem_ctrl_r = 4'b0001; // SB
+        else if ((inst&`INST_SH_MASK) == `INST_SH)   mem_ctrl_r = 4'b0010; // SH
+        else if ((inst&`INST_SW_MASK) == `INST_SW)   mem_ctrl_r = 4'b0100; // SW
+        else mem_ctrl_r = 4'b0000;                                         // undefined
+    end
+
     
-// 6 Zicsr
-    else if((inst&`INST_CSRRW_MASK) == `INST_CSRRW) begin
-        is_impl = 1; //skip this for now
-    end
-    else if((inst&`INST_CSRRS_MASK) == `INST_CSRRS) begin
-        is_impl = 1; //skip this for now
-    end
-    else if((inst&`INST_CSRRC_MASK) == `INST_CSRRC) begin
-        is_impl = 1; // skip this for now
-    end
-    else if((inst&`INST_CSRRWI_MASK) == `INST_CSRRWI) begin
-        is_impl = 1; // skip this for now
-    end
-    else if((inst&`INST_CSRRSI_MASK) == `INST_CSRRSI) begin
-        is_impl = 1; // skip this for now
-    end
-    else if((inst&`INST_CSRRCI_MASK) == `INST_CSRRCI) begin
-        is_impl = 1; // skip this for now
+    if (is_br_w) begin
+        if      ((inst&`INST_BEQ_MASK) == `INST_BEQ)   cmp_op_r = 3'b000; // BEQ
+        else if ((inst&`INST_BNE_MASK) == `INST_BNE)   cmp_op_r = 3'b001; // BNE
+        else if ((inst&`INST_BLT_MASK) == `INST_BLT)   cmp_op_r = 3'b010; // BLT
+        else if ((inst&`INST_BGE_MASK) == `INST_BGE)   cmp_op_r = 3'b011; // BGE
+        else if ((inst&`INST_BLTU_MASK) == `INST_BLTU) cmp_op_r = 3'b100; // BLTU
+        else if ((inst&`INST_BGEU_MASK) == `INST_BGEU) cmp_op_r = 3'b101; // BGEU
+        else cmp_op_r = 3'b111;                                           // NONE
     end
 
-// 12 M Extension
-
+    // 0: pc_p4, 1: ALU, 2: mem, 3:csr, 4: FPU
+    if      ((inst&`INST_JALR_MASK) == `INST_JALR)   reg_w_sel_r = 0;
+    else if ((inst&`INST_JAL_MASK) == `INST_JAL)     reg_w_sel_r = 0;
+    else if ((inst&`INST_LUI_MASK) == `INST_LUI)     reg_w_sel_r = 1;
+    else if ((inst&`INST_AUIPC_MASK) == `INST_AUIPC) reg_w_sel_r = 1;
+    else if (is_alu_w)                               reg_w_sel_r = 1; // ALUout
+    else if (is_lsu_w)                               reg_w_sel_r = 2; // memory
+    else if (is_csr_w)                               reg_w_sel_r = 3; // CSR read data path
+    else                                             reg_w_sel_r = 0; // default PC+4
 end
 
 endmodule
