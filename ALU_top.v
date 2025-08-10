@@ -76,7 +76,7 @@ always @(*) begin
             out = {31'b0, $signed(a) < $signed(b)}; // Set result to 1 if less than
         end
         `ALU_NONE: begin
-            out = b;
+            out = 32'b0;
         end
         default:;
     endcase

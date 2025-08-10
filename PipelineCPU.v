@@ -51,6 +51,7 @@ wire [11:0]   decode_csr_addr;
 wire is_impl;
 // WB stage
 wire reg_wr_en;
+wire freg_wr_en;
 wire [2:0] reg_w_sel; // 0: pc_p4, 1: ALU, 2: mem
 
 // LSU
@@ -73,10 +74,20 @@ wire is_csr;
 wire [2:0] csr_op;
 wire is_csr_imm; // is csr[r w]i
 
+// FPU
+wire is_fpu;
+wire FPU_sel1; // 0: freg_rd_data1, 1: reg_rd_data1
+
+// ByPass
+wire [1:0] bypass_sel;
+
 // Register File ==============
-wire [31:0] reg_data_in;
+wire [31:0] wb_data_in;
 wire [31:0] reg_data1_out;
 wire [31:0] reg_data2_out;
+
+wire [31:0] freg_data1_out;
+wire [31:0] freg_data2_out;
 
 // EX_Reg =====================
 wire EX_en;
@@ -90,6 +101,8 @@ wire [31:0] EX_pc_p4_out;
 // data
 wire [31:0] EX_reg_rd_data1_out;
 wire [31:0] EX_reg_rd_data2_out;
+wire [31:0] EX_freg_rd_data1_out;
+wire [31:0] EX_freg_rd_data2_out;
 wire [31:0] EX_imm_out;
 // reg addr
 wire [4:0]  EX_rd_out;
@@ -97,6 +110,7 @@ wire [4:0]  EX_rs1_out;
 wire [4:0]  EX_rs2_out;
 // WB stage
 wire EX_reg_wr_en_out;
+wire EX_freg_wr_en_out;
 wire [2:0] EX_reg_w_sel_out;
 // MEM
 wire EX_mem_rd_en_out;
@@ -115,6 +129,11 @@ wire EX_is_csr_out;
 wire [2:0] EX_csr_op_out;
 wire EX_is_csr_imm_out;
 wire [11:0] EX_csr_addr_out;
+// FPU
+wire EX_is_fpu_out;
+wire EX_FPU_sel1_out;
+// ByPass
+wire [1:0] EX_bypass_sel_out;
 
 wire EX_start, EX_done;
 // ALU ========================
@@ -146,6 +165,13 @@ wire [`EXCEPTION_W-1:0] csr_exception;
 wire        csr_br_taken;
 wire [31:0] csr_mstatus;
 wire [31:0] csr_interrupt;
+// FPU =========================
+wire FPU_start, FPU_done;
+wire [63:0] FPU_out; // output of FPU
+
+// ByPass ======================
+wire bypass_start, bypass_done;
+wire [31:0] bypass_out;
 
 // WB_Reg =====================
 wire WB_en;
@@ -154,17 +180,23 @@ wire WB_is_impl_out;
 wire WB_pc_valid_out /* verilator public */;
 wire [31:0] WB_pc_out /* verilator public */;
 wire [31:0] WB_pc_p4_out;
+wire [4:0]  WB_rd_out;
+
 wire [31:0] WB_ALU_out;
 wire [31:0] WB_mem_data_out;
-wire [4:0]  WB_rd_out;
 wire [31:0] WB_csr_rd_data_out;
+wire [31:0] WB_FPU_out;
+wire [31:0] WB_bypass_out;
 // control_out
 wire        WB_reg_wr_en_out;
+wire        WB_freg_wr_en_out;
 wire [2:0]  WB_reg_w_sel_out;
 
 // Forward ====================
 wire EX_fwd1_sel;
 wire EX_fwd2_sel;
+wire EX_freg_fwd_sel1;
+wire EX_freg_fwd_sel2;
 wire [31:0] EX_fwd_data1;
 wire [31:0] EX_fwd_data2;
 
@@ -193,9 +225,12 @@ ForwardUnit m_Forward(
     
     .WB_rd(WB_rd_out),
     .WB_reg_wr_en(WB_reg_wr_en_out),
+    .WB_freg_wr_en(WB_freg_wr_en_out),
     
     .EX_fwd_sel1(EX_fwd1_sel),
-    .EX_fwd_sel2(EX_fwd2_sel)
+    .EX_fwd_sel2(EX_fwd2_sel),
+    .EX_freg_fwd_sel1(EX_freg_fwd_sel1),
+    .EX_freg_fwd_sel2(EX_freg_fwd_sel2)
 );
 
 // ================================
@@ -248,10 +283,27 @@ Register m_Register(
     .rs2(ID_inst_out[24:20]),//addr
     
     .rd(WB_rd_out),//addr
-    .data_i(reg_data_in),
+    .data_i(wb_data_in),
     
     .rd_data1_o(reg_data1_out),
     .rd_data2_o(reg_data2_out)
+);
+
+
+FRegister m_FRegister(
+    .clk(clk),
+    .rst_n(rst_n),
+
+    .wr_en(WB_freg_wr_en_out & WB_is_impl_out),//write enable
+
+    .rs1(decode_rs1),//addr
+    .rs2(decode_rs2),//addr
+    
+    .rd(WB_rd_out),//addr
+    .data_i(wb_data_in),
+    
+    .rd_data1_o(freg_data1_out),
+    .rd_data2_o(freg_data2_out)
 );
 
 DecodeUnit m_DecodeUnit(
@@ -270,21 +322,31 @@ DecodeUnit m_DecodeUnit(
 Control m_Control(
     .inst(ID_inst_out),
     .is_impl_o(is_impl),
+    
     .reg_wr_en_o(reg_wr_en),
+    .freg_wr_en_o(freg_wr_en),
     .reg_w_sel_o(reg_w_sel),
+    
     .mem_wr_en_o(mem_wr_en),
     .mem_rd_en_o(mem_rd_en),
     .mem_ctrl_o(mem_ctrl),
+    
     .is_j_o(is_j),
     .is_br_o(is_br),
+    .cmp_op_o(cmp_op),
+    
     .ALU_sel1_o(ALU_sel1),
     .ALU_sel2_o(ALU_sel2),
     .ALU_ctrl_o(ALU_ctrl),
-    .cmp_op_o(cmp_op),
     
     .is_csr_o(is_csr),
     .csr_op_o(csr_op),
-    .is_csr_imm_o(is_csr_imm)
+    .is_csr_imm_o(is_csr_imm),
+
+    .is_fpu_o(is_fpu),
+    .FPU_sel1_o(FPU_sel1), // 0: freg_rd_data1, 1: reg_rd_data1
+
+    .bypass_sel_o(bypass_sel)
 );
 
 // ================================
@@ -306,6 +368,8 @@ EX_Reg m_EX_Reg(
     // data
     .reg_rd_data1_i(reg_data1_out),
     .reg_rd_data2_i(reg_data2_out),
+    .freg_rd_data1_i(freg_data1_out),
+    .freg_rd_data2_i(freg_data2_out),
     .imm_i(decode_imm),
     // reg addr
     .rd_i(decode_rd),
@@ -313,6 +377,7 @@ EX_Reg m_EX_Reg(
     .rs2_i(decode_rs2),
     // WB stage
     .reg_wr_en_i(reg_wr_en),
+    .freg_wr_en_i(freg_wr_en),
     .reg_w_sel_i(reg_w_sel),
     // LSU
     .mem_rd_en_i(mem_rd_en),
@@ -334,6 +399,12 @@ EX_Reg m_EX_Reg(
     .csr_op_i(csr_op),
     .is_csr_imm_i(is_csr_imm),
 
+    // FPU
+    .is_fpu_i(is_fpu),
+    .FPU_sel1_i(FPU_sel1), // 0: freg_rd_data1, 1: reg_rd_data1
+
+    .bypass_sel_i(bypass_sel),
+
     .funct3_i(),
     .funct7_i(),
 // outputs =====================
@@ -346,6 +417,8 @@ EX_Reg m_EX_Reg(
     // data
     .reg_rd_data1_o(EX_reg_rd_data1_out),
     .reg_rd_data2_o(EX_reg_rd_data2_out),
+    .freg_rd_data1_o(EX_freg_rd_data1_out),
+    .freg_rd_data2_o(EX_freg_rd_data2_out),
     .imm_o(EX_imm_out),
     // reg addr
     .rd_o(EX_rd_out),
@@ -353,6 +426,7 @@ EX_Reg m_EX_Reg(
     .rs2_o(EX_rs2_out),
     // WB stage
     .reg_wr_en_o(EX_reg_wr_en_out),
+    .freg_wr_en_o(EX_freg_wr_en_out),
     .reg_w_sel_o(EX_reg_w_sel_out),
     // LSU
     .mem_rd_en_o(EX_mem_rd_en_out),
@@ -373,6 +447,13 @@ EX_Reg m_EX_Reg(
     .is_csr_o(EX_is_csr_out),
     .csr_op_o(EX_csr_op_out),
     .is_csr_imm_o(EX_is_csr_imm_out),
+
+    // FPU
+    .is_fpu_o(EX_is_fpu_out),
+    .FPU_sel1_o(EX_FPU_sel1_out),
+
+    // bypass
+    .bypass_sel_o(EX_bypass_sel_out),
 
     .funct3_o(),
     .funct7_o()
@@ -403,6 +484,9 @@ assign EX_start = (!started) && (EX_pc_valid_out && EX_is_impl_out);
 assign ALU_start = EX_start && (|EX_ALU_ctrl_out || EX_inst_out[6:0]==55);
 assign Br_start  = EX_start && (EX_is_br_out || EX_is_j_out); // only deal with inst br
 assign LSU_start = EX_start && (EX_mem_wr_en_out || EX_mem_rd_en_out);
+assign FPU_start = EX_start && EX_is_fpu_out;
+
+assign bypass_start = EX_start && (|EX_bypass_sel_out);
 
 // done logic
 assign EX_done = (!EX_pc_valid_out) | 
@@ -410,21 +494,47 @@ assign EX_done = (!EX_pc_valid_out) |
     Br_done | 
     LSU_done | 
     SYS_done | 
+    FPU_done | 
+    bypass_done |
     0; // (FU_done && !(|FU_err)) | ...
 
 // Forwarding ==================
 Mux2to1 #(.size(32)) m_EX_fwd1_MUX(
     .sel(EX_fwd1_sel),
-    .s0(reg_data_in),
+    .s0(wb_data_in),
     .s1(EX_reg_rd_data1_out),
     .out(EX_fwd_data1)
 );
 Mux2to1 #(.size(32)) m_EX_fwd2_MUX(
     .sel(EX_fwd2_sel),
-    .s0(reg_data_in),
+    .s0(wb_data_in),
     .s1(EX_reg_rd_data2_out),
     .out(EX_fwd_data2)
 );
+wire [31:0] EX_freg_fwd_data1;
+wire [31:0] EX_freg_fwd_data2;
+Mux2to1 #(.size(32)) m_EX_freg_fwd1_MUX(
+    .sel(EX_freg_fwd_sel1),
+    .s0(wb_data_in),
+    .s1(EX_freg_rd_data1_out),
+    .out(EX_freg_fwd_data1)
+);
+Mux2to1 #(.size(32)) m_EX_freg_fwd2_MUX(
+    .sel(EX_freg_fwd_sel2),
+    .s0(wb_data_in),
+    .s1(EX_freg_rd_data2_out),
+    .out(EX_freg_fwd_data2)
+);
+
+// BypassUnit ==================
+BypassUnit m_BypassUnit(
+    .bypass_sel(EX_bypass_sel_out),
+    .imm(EX_imm_out),
+    .reg_data1(EX_fwd_data1),
+    .freg_data1(EX_freg_fwd_data1),
+    .result_o(bypass_out)
+);
+assign bypass_done = bypass_start;
 
 // ALU =========================
 Mux2to1 #(.size(32)) m_ALU_SRC1_MUX(
@@ -462,6 +572,31 @@ BranchUnit m_BranchUnit(
 );
 assign Br_done = Br_start;
 
+// FPU =========================
+assign FPU_done = FPU_start;
+wire [31:0] FPU_in1;
+Mux2to1 #(.size(32)) m_FPU_SRC1_MUX(
+    .sel(EX_FPU_sel1_out),
+    .s0(EX_freg_fwd_data1),
+    .s1(EX_fwd_data1),
+    .out(FPU_in1)
+);
+FPU_Top m_FPU(
+    .clk(clk),
+    .rst_n(rst_n),
+    .func7(EX_inst_out[31:25]),         // Operation code to select the function
+    .func3(EX_inst_out[14:12]),         // Rounding mode for arithmetic operations
+    .rs2(EX_inst_out[24:20]),           // For selecting convert type
+    .operand_a({32'h0,FPU_in1}),      // Operand A (can be FP64, FP32, INT32, UINT32)
+    .operand_b({32'h0,EX_freg_fwd_data2}),      // Operand B (can be FP64, FP32)
+    .result_out(FPU_out),     // Result of the operation
+    .flag_invalid(),
+    .flag_divbyzero(),
+    .flag_overflow(),
+    .flag_underflow(),
+    .flag_inexact()
+);
+
 // LSU =========================
 // not implemented yet, a simple one is used
 reg MEM_mem_wr_en_out;
@@ -489,8 +624,6 @@ always @(posedge clk or negedge rst_n) begin
     end
 end
 assign LSU_done = MEM_stage_reg;
-
-
 
 // CSR =========================
 wire [31:0] csr_rd_data_xtval;
@@ -551,12 +684,17 @@ WB_Reg m_MEM_WB_Reg(
     .pc_valid_i(EX_pc_valid_out),
     .pc_i(EX_pc_out),
     .pc_p4_i(EX_pc_p4_out),
-    .ALU_i(ALU_out),
-    .mem_data_i(d_mem_rd_data),
     .rd_i(EX_rd_out),
+
+    .bypass_i(bypass_out),
+    .ALU_i(ALU_out),
+    .FPU_i(FPU_out[31:0]),
+    .mem_data_i(d_mem_rd_data),
     .csr_rd_data_i(csr_rd_data),
+    
     // control_in
     .reg_wr_en_i(EX_reg_wr_en_out),
+    .freg_wr_en_i(EX_freg_wr_en_out), // TODO
     .reg_w_sel_i(EX_reg_w_sel_out),
     // ===================================
     // data_out
@@ -564,22 +702,28 @@ WB_Reg m_MEM_WB_Reg(
     .pc_valid_o(WB_pc_valid_out),
     .pc_o(WB_pc_out),
     .pc_p4_o(WB_pc_p4_out),
-    .ALU_o(WB_ALU_out),
-    .mem_data_o(WB_mem_data_out),
     .rd_o(WB_rd_out),
+    
+    .bypass_o(WB_bypass_out),
+    .ALU_o(WB_ALU_out),
+    .FPU_o(WB_FPU_out),
+    .mem_data_o(WB_mem_data_out),
     .csr_rd_data_o(WB_csr_rd_data_out),
     // control_out
     .reg_wr_en_o(WB_reg_wr_en_out),
+    .freg_wr_en_o(WB_freg_wr_en_out),
     .reg_w_sel_o(WB_reg_w_sel_out)
 );
 
-Mux4to1 #(.size(32)) m_Mux_WriteData(
-    .sel(WB_reg_w_sel_out[1:0]),
+Mux6to1 #(.size(32)) m_Mux_WriteData(
+    .sel(WB_reg_w_sel_out),
     .s0(WB_pc_p4_out),
     .s1(WB_ALU_out),
     .s2(WB_mem_data_out),
     .s3(WB_csr_rd_data_out),
-    .out(reg_data_in)
+    .s4(WB_FPU_out),
+    .s5(WB_bypass_out),
+    .out(wb_data_in)
 );
 
 endmodule
