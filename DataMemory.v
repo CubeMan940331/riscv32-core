@@ -13,7 +13,7 @@ module DataMemory
     output reg  [31:0] data_o    // load data (extended)
 );
 
-reg [7:0] mem [0:SIZE-1];
+reg [7:0] mem [0:SIZE-1] /* verilator public */;
 
 always @(posedge clk) begin
     if (wr_en) begin

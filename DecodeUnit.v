@@ -26,13 +26,15 @@ always @(*)begin
     case(opcode)
         7'b0010011, // I ADDI SLLI SLTI SLTIU XORI SRLI SRAI ORI ANDI
         7'b0000011, // I LB LH LW LBU LHU
+        7'b0000111, // I FLW FLD
         7'b1100111: // JALR
             // {imm[31:20]}
             imm = {{20{inst[31]}}, inst[31:20]}; 
         7'b1110011: // CSR
             // {zero imm[24:20]}
             imm = {27'b0, inst[19:15]}; 
-        7'b0100011: // S SB SH SW
+        7'b0100011, // S SB SH SW
+        7'b0100111: // S FSW FSD
             // {imm[11:5], imm[4:0]}
             imm = {{20{inst[31]}}, inst[31:25], inst[11:7]};
 

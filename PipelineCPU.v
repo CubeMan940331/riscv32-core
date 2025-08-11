@@ -485,11 +485,11 @@ assign ALU_start = EX_start && (|EX_ALU_ctrl_out || EX_inst_out[6:0]==55);
 assign Br_start  = EX_start && (EX_is_br_out || EX_is_j_out); // only deal with inst br
 assign LSU_start = EX_start && (EX_mem_wr_en_out || EX_mem_rd_en_out);
 assign FPU_start = EX_start && EX_is_fpu_out;
-
+assign SYS_start = EX_start && (EX_is_csr_out || (|csr_exception) || csr_br_taken);
 assign bypass_start = EX_start && (|EX_bypass_sel_out);
 
 // done logic
-assign EX_done = (!EX_pc_valid_out) | 
+assign EX_done = (!EX_pc_valid_out) | (!EX_is_impl_out) |
     ALU_done | 
     Br_done | 
     LSU_done | 
@@ -669,7 +669,7 @@ CSRFile m_CSRFile(
     .mstatus_o(csr_mstatus),
     .interrupt_o(csr_interrupt)
 );
-assign SYS_done = csr_wr_en | (|csr_exception) | csr_br_taken;
+assign SYS_done = SYS_start;
 
 //================================
 //write back stage

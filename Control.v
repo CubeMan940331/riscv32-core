@@ -176,7 +176,9 @@ wire is_impl_w =((inst&`INST_ADDI_MASK) == `INST_ADDI)   ||
                 ((inst&`INST_FCVT_WU_S_MASK) == `INST_FCVT_WU_S) ||
                 ((inst&`INST_FCVT_S_W_MASK) == `INST_FCVT_S_W)   ||
                 ((inst&`INST_FMV_W_X_MASK) == `INST_FMV_W_X)     ||
-                ((inst&`INST_FMV_X_W_MASK) == `INST_FMV_X_W)     ;      
+                ((inst&`INST_FMV_X_W_MASK) == `INST_FMV_X_W)     ||
+                // m priv
+                ((inst&`INST_MRET_MASK) == `INST_MRET);
 
 wire reg_wr_en_w = ((inst&`INST_ADDI_MASK) == `INST_ADDI)    ||
                     ((inst&`INST_SLTI_MASK) == `INST_SLTI)   ||
@@ -287,8 +289,6 @@ wire is_alu_w = ((inst&`INST_ADDI_MASK) == `INST_ADDI)   ||
                 // Jump
                 ((inst&`INST_JAL_MASK) == `INST_JAL)     ||
                 ((inst&`INST_JALR_MASK) == `INST_JALR)   ;
-                // FPU
-                // TODO
 
 wire is_lsu_w = ((inst&`INST_LB_MASK) == `INST_LB)   ||
                 ((inst&`INST_LBU_MASK) == `INST_LBU) ||
@@ -297,9 +297,10 @@ wire is_lsu_w = ((inst&`INST_LB_MASK) == `INST_LB)   ||
                 ((inst&`INST_LW_MASK) == `INST_LW)   ||
                 ((inst&`INST_SB_MASK) == `INST_SB)   ||
                 ((inst&`INST_SH_MASK) == `INST_SH)   ||
-                ((inst&`INST_SW_MASK) == `INST_SW)   ;
-                // FPU
-                // TODO
+                ((inst&`INST_SW_MASK) == `INST_SW)   ||
+                // F Extension
+                ((inst&`INST_FLW_MASK) == `INST_FLW)  ||
+                ((inst&`INST_FSW_MASK) == `INST_FSW);
 
 wire freg_wr_en_w = ((inst&`INST_FMADD_MASK) == `INST_FMADD)         ||
                     ((inst&`INST_FMSUB_MASK) == `INST_FMSUB)         ||
@@ -399,13 +400,19 @@ always @(*) begin
     // mem_ctrl
     if (is_lsu_w) begin
         if      ((inst&`INST_LB_MASK) == `INST_LB)   mem_ctrl_r = 4'b1001; // LB
-        else if ((inst&`INST_LBU_MASK) == `INST_LBU) mem_ctrl_r = 4'b1010; // LBU
-        else if ((inst&`INST_LH_MASK) == `INST_LH)   mem_ctrl_r = 4'b1011; // LH
-        else if ((inst&`INST_LHU_MASK) == `INST_LHU) mem_ctrl_r = 4'b1100; // LHU
-        else if ((inst&`INST_LW_MASK) == `INST_LW)   mem_ctrl_r = 4'b1101; // LW
+        else if ((inst&`INST_LBU_MASK) == `INST_LBU) mem_ctrl_r = 4'b0001; // LBU
+
+        else if ((inst&`INST_LH_MASK) == `INST_LH)   mem_ctrl_r = 4'b1010; // LH
+        else if ((inst&`INST_LHU_MASK) == `INST_LHU) mem_ctrl_r = 4'b0010; // LHU
+
+        else if ((inst&`INST_LW_MASK) == `INST_LW)   mem_ctrl_r = 4'b0100; // LW
+        
         else if ((inst&`INST_SB_MASK) == `INST_SB)   mem_ctrl_r = 4'b0001; // SB
         else if ((inst&`INST_SH_MASK) == `INST_SH)   mem_ctrl_r = 4'b0010; // SH
         else if ((inst&`INST_SW_MASK) == `INST_SW)   mem_ctrl_r = 4'b0100; // SW
+
+        else if ((inst&`INST_FLW_MASK) == `INST_FLW)   mem_ctrl_r = 4'b0100; // FLW
+        else if ((inst&`INST_FSW_MASK) == `INST_FSW)   mem_ctrl_r = 4'b0100; // FSW
         else mem_ctrl_r = 4'b0000;                                         // undefined
     end
 
