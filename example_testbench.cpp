@@ -14,13 +14,13 @@ using namespace std;
 #include "VComputer.h"
 #include "VComputer_Computer.h"
 #include "VComputer_InstructionMemory.h"
+#include "VComputer_DataMemory.h"
 #include "VComputer_PipelineCPU.h"
 #include "verilated.h"
 
-#define MAX_CYCLE 1000
-
+#define MAX_CYCLE 5000
 void load_inst_mem(VComputer_InstructionMemory *ptr, ifstream in){
-    constexpr size_t INST_SIZE = 8192;
+    constexpr size_t INST_SIZE = 65536;
     if(INST_SIZE%4){
         // expect size of InstructionMemory is align
         throw runtime_error("size of InstructionMemory is misalign");
@@ -52,6 +52,34 @@ void load_inst_mem(VComputer_InstructionMemory *ptr, ifstream in){
         ptr->insts[i+2] = 0x00;
         ptr->insts[i+1] = 0x00;
         ptr->insts[i+0] = 0x13;
+    }
+}
+void load_data_mem(VComputer_DataMemory *ptr, ifstream in){
+    constexpr size_t INST_SIZE = 65536;
+    if(INST_SIZE%4){
+        // expect size of DataMemory is align
+        throw runtime_error("size of DataMemory is misalign");
+    }
+    unsigned long long i=0;
+    string str;
+    CData byte_to_wr;
+    while(in>>str){
+        if(i>=INST_SIZE){
+            throw runtime_error("DataMemory not big enough");
+        }
+        // expect `str` to be a byte in 0/1 string
+        if(str.size()!=8){
+            throw runtime_error(".mem file format error");
+        }
+        byte_to_wr=0;
+        for(auto &a:str){
+            if(a!='0' && a!='1'){
+                throw runtime_error(".mem file format error");
+            }
+            byte_to_wr<<=1;
+            byte_to_wr|=(a=='1');
+        }
+        ptr->mem[i++]=byte_to_wr;
     }
 }
 
@@ -110,7 +138,10 @@ int main(int argc, char **argv){
     top->rst_n = 0;
     do_cycle(contextp, m_trace, top);
 
-    if(mem_file.size()) load_inst_mem(top->Computer->m_InstMem, ifstream(mem_file));
+    if(mem_file.size()){
+        load_inst_mem(top->Computer->m_InstMem, ifstream(mem_file));
+        load_data_mem(top->Computer->m_DataMemory, ifstream(mem_file));
+    }
     do_cycle(contextp, m_trace, top);
 
     top->rst_n = 1;
@@ -138,3 +169,8 @@ int main(int argc, char **argv){
 
     return 0;
 }
+
+/*
+Contents of section .data:
+ 80002000 ff00ff00 00ff00ff f00ff00f 0ff00ff0  ................
+*/

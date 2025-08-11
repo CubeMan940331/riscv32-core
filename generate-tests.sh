@@ -43,13 +43,12 @@ gen_test(){
     # objcopy
     riscv32-unknown-elf-objcopy -O binary $1 "$file_dir$test_name.elfcopy"
 
-    # get inst. count
-    section_size=$(riscv32-unknown-elf-readelf -S $1 | grep ".text.init" | awk '{print $7}')
-    section_size=$(printf "%d" "0x$section_size")
-    inst_cnt=$(printf "%d" $(("$section_size/4")))
-
     # generate .mem file
-    xxd -b -c 4 "$file_dir$test_name.elfcopy" | head -n $inst_cnt | awk '{print $5 "\n" $4 "\n" $3 "\n" $2}' > "$file_dir$test_name.mem"
+    # source binary is little endian
+    # for little endian mem
+    xxd -b -c 4 "$file_dir$test_name.elfcopy" | awk '{print $2 "\n" $3 "\n" $4 "\n" $5}' > "$file_dir$test_name.mem"
+    # for big endian mem
+    # xxd -b -c 4 "$file_dir$test_name.elfcopy" | awk '{print $5 "\n" $4 "\n" $3 "\n" $2}' > "$file_dir$test_name.mem"
     rm "$file_dir$test_name.elfcopy"
 
     # generate spike log
