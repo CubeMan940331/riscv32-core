@@ -51,8 +51,8 @@ localparam DATASIZE = 78;
 // --------------------------------------------
 
 // Opcode
-reg  [31:0] ra_data;
-reg  [31:0] rb_data;
+wire [31:0] ra_data = opcode_ra_data_i;
+wire [31:0] rb_data = opcode_rb_data_i;
 
 // Memory
 reg [31:0] mem_addr_r;
@@ -62,13 +62,6 @@ reg [ 3:0] mem_wr_r;
 
 // Queue
 reg [ DATASIZE-1:0] data_q_i;
-
-// FSM & ACT
-reg     fsm_state;
-reg     cache_act_r;
-reg     cache_hit_r;
-reg     mem_act_r;
-
 
 // --------------------------------------------
 //  Wire Declaration
@@ -159,94 +152,86 @@ assign mmu_dflush_o = dflush && csrrw_inst;
 assign mmu_dwriteback_o = dwriteback && csrrw_inst;
 assign mmu_dinvalidate_o = dinvalidate && csrrw_inst;
 
-always @(*)
-begin
-    ra_data = 32'b0;
-    rb_data = 32'b0;
-
-    ra_data = opcode_ra_data_i;
-    rb_data = opcode_rb_data_i;    
-end
-
 // --------------------------------------------
 //  MMU
 // --------------------------------------------
 
 assign mmu_addr_o   = resp_addr;
 assign mmu_data_o   = resp_data;
-assign mmu_valid_o  = resp_valid_o;
-assign mmu_rd_o     = resp_is_load;
-assign mmu_wr_o     = resp_wr;
+assign mmu_rd_o     = resp_is_load && resp_valid_o;
+assign mmu_wr_o     = (resp_valid_o)?resp_wr:4'h0;
 
 // --------------------------------------------
 //  Input Address & Data Control
 // --------------------------------------------
 
+always @(posedge clk_i or negedge rst_i)begin
+    if(!rst_i)begin
+        mem_wr_r <= 4'h0;
+        mem_rd_r <= 0;
+    end else begin
+        mem_rd_r <= ld_inst;
+
+        if(sw_inst)
+        begin
+            mem_wr_r <= 4'hf;
+        end
+        else if(sh_inst)
+        begin
+            case(mem_addr_r[1])
+            1'b1:    mem_wr_r <= 4'b1100;
+            default: mem_wr_r <= 4'b0011; 
+            endcase
+        end
+        else if(sb_inst)
+        begin
+            case(mem_addr_r[1:0])
+            2'b00:   mem_wr_r <= 4'b0001;
+            2'b01:   mem_wr_r <= 4'b0010;
+            2'b10:   mem_wr_r <= 4'b0100;
+            2'b11:   mem_wr_r <= 4'b1000;
+            default: mem_wr_r <= 4'b0000;
+            endcase
+        end
+        else
+            mem_wr_r <= 4'h0;
+    end
+end
+
 always @(*)begin
     mem_addr_r = 32'b0;
     mem_data_wr_r = 32'b0;
-    mem_wr_r = 4'b0;
 
     // address setting
     if (ld_inst)
         mem_addr_r = ra_data + { {20{opcode_opcode_i[31]}}, opcode_opcode_i[31:20]};
     else if (st_inst) 
         mem_addr_r = ra_data + { {20{opcode_opcode_i[31]}}, opcode_opcode_i[31:25], opcode_opcode_i[11:7]};
-    
-    // read setting
-    mem_rd_r = ld_inst;
         
     // write setting
     if (sw_inst)begin
         mem_data_wr_r = rb_data;
-        mem_wr_r = 4'b1111;
     end else if (sh_inst)begin
         case(mem_addr_r[1:0])
-        2'b10: 
-        begin
-            mem_data_wr_r  = {rb_data[15:0],16'h0000};
-            mem_wr_r    = 4'b1100;
-        end
-        default:
-        begin
-            mem_data_wr_r  = {16'h0000,rb_data[15:0]};
-            mem_wr_r    = 4'b0011;
-        end
+        2'b10:   mem_data_wr_r  = {rb_data[15:0],16'h0000};
+        default: mem_data_wr_r  = {16'h0000,rb_data[15:0]};
         endcase
     end else if (sb_inst)begin
         case(mem_addr_r[1:0])
-        2'b11:
-        begin
-            mem_data_wr_r = {rb_data[7:0],24'h000000};
-            mem_wr_r = 4'b1000;
-        end
-        2'b10:
-        begin
-            mem_data_wr_r = {{8'h00,rb_data[7:0]},16'h0000};
-            mem_wr_r = 4'b0100;
-        end
-        2'b01:
-        begin
-            mem_data_wr_r = {{16'h0000,rb_data[7:0]},8'h00};
-            mem_wr_r = 4'b0010;
-        end
-        2'b00:
-        begin
-            mem_data_wr_r = {24'h000000,rb_data[7:0]};
-            mem_wr_r = 4'b0001;
-        end
-        default: begin
-            mem_data_wr_r = 32'b0;
-            mem_wr_r = 4'b0000;
-        end
+        2'b11:   mem_data_wr_r = {rb_data[7:0],24'h000000};
+        2'b10:   mem_data_wr_r = {{8'h00,rb_data[7:0]},16'h0000};
+        2'b01:   mem_data_wr_r = {{16'h0000,rb_data[7:0]},8'h00};
+        2'b00:   mem_data_wr_r = {24'h000000,rb_data[7:0]};
+        default: mem_data_wr_r = 32'b0;
         endcase
-    end else
-        mem_wr_r = 4'b0000;
+    end
 end
 
 // --------------------------------------------
 //  Queue 
 // --------------------------------------------
+
+wire push_q = (mem_rd_r || (|mem_wr_r) ) && resp_accept_o;
 
 assign is_load_i = ld_inst;
 assign {resp_addr, resp_data, resp_lb, resp_lh, resp_lw, resp_signed, resp_is_load, resp_wr, resp_rd} = resp_data_o; 
@@ -261,7 +246,7 @@ lsu_queue #(
     .rst_i(rst_i),
 
     .data_i(data_q_i),
-    .push_i((mem_rd_r || (|mem_wr_r) ) && resp_accept_o && opcode_valid_i),
+    .push_i(push_q),
     .accept_o(resp_accept_o),
 
     .pop_i(mmu_valid_i && resp_valid_o),
@@ -299,7 +284,7 @@ assign writeback_rd_o    = resp_rd;
 always @(*)begin
     writeback_value_r = 32'b0;
 
-    if (resp_lb && mmu_valid_i)
+    if (resp_lb)
     begin
         case (resp_addr[1:0])
         2'h3: writeback_value_r = {24'b0, mmu_value_i[31:24]};
@@ -311,23 +296,22 @@ always @(*)begin
         if (resp_signed && writeback_value_r[7])
             writeback_value_r = {24'hFFFFFF, writeback_value_r[7:0]};
     end
-    else if (resp_lh && mmu_valid_i)
+    else if (resp_lh)
     begin
         case(resp_addr[1])
-        1'b0: writeback_value_r = {16'h0, mmu_value_i[31:16]};
-        1'b1: writeback_value_r = {16'h0, mmu_value_i[15:0]};
+        1'b1: writeback_value_r = {16'h0, mmu_value_i[31:16]};
+        1'b0: writeback_value_r = {16'h0, mmu_value_i[15:0]};
         default: writeback_value_r = 32'b0;
         endcase 
 
         if (resp_signed && mmu_value_i[15])
             writeback_value_r = {16'hFFFF, writeback_value_r[15:0]};
-    end else if(resp_lw && mmu_valid_i)
+    end else if(resp_lw)
     begin
         writeback_value_r = mmu_value_i;
     end
     else
         writeback_value_r = 32'h0;
-
 end
 
 endmodule
