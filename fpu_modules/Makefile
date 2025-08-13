@@ -22,7 +22,7 @@ VERILOG_SOURCES = \
     ../FPU_Top.v
 
 # --- Verilator Flags ---
-VERILATOR_FLAGS = --cc --exe --trace -Wall -Wno-UNUSED
+VERILATOR_FLAGS = --cc --exe --trace -Wall -Wno-UNUSED -Wno-pinconnectempty
 
 # --- 目標 ---
 all: $(SIM_EXE)

@@ -28,7 +28,7 @@ module FPU_Top (
     localparam OP_FMUL_D  = 7'b0001001; // FP64 Multiply
     localparam OP_FDIV_S  = 7'b0001100; // FP32 Divide
     localparam OP_FDIV_D  = 7'b0001101; // FP64 Divide
-    // localparam OP_FSQRT_S = 7'b0101100; // FP32 Square Root
+    localparam OP_FSQRT_S = 7'b0101100; // FP32 Square Root
     // localparam OP_FSQRT_D = 7'b0101101; // FP64 Square Root
     localparam OP_FCMP_S  = 7'b1010000; // FP32 Compare
     localparam OP_FCMP_D  = 7'b1010001; // FP64 Compare
@@ -69,6 +69,9 @@ module FPU_Top (
 
     reg [63:0] dp_divider_result;
     reg dp_divider_invalid, dp_divider_divbyzero, dp_divider_overflow, dp_divider_underflow, dp_divider_inexact;
+
+    reg [31:0] sp_sqrt_result;
+    reg sp_sqrt_invalid, sp_sqrt_inexact;
 
     // --- Sub-module control signals ---
     reg [2:0]  rounding_mode;
@@ -162,15 +165,12 @@ module FPU_Top (
         .flag_overflow(dp_divider_overflow), .flag_underflow(dp_divider_underflow), .flag_inexact(dp_divider_inexact)
     );
 
-    // FP_Sqrt sqrt_inst (
-    //     .clk(clk), .rst_n(rst_n),
-    //     .operand_a(operand_a),
-    //     .is_double_precision(is_double),
-    //     .rounding_mode(rounding_mode),
-    //     .result(sqrt_result),
-    //     .flag_invalid(sqrt_invalid), .flag_overflow(sqrt_overflow),
-    //     .flag_underflow(sqrt_underflow), .flag_inexact(sqrt_inexact)
-    // );
+    SP_Sqrt sp_sqrt_inst (
+        .operand_a(operand_a[31:0]),
+        .rounding_mode(rounding_mode),
+        .result(sp_sqrt_result),
+        .flag_invalid(sp_sqrt_invalid), .flag_inexact(sp_sqrt_inexact)
+    );
 
 
     // --- Main Combinational Logic: Opcode Decoding and Output Muxing ---
@@ -237,11 +237,10 @@ module FPU_Top (
                 result_out = dp_divider_result;
                 {fflags[4], fflags[3], fflags[2], fflags[1], fflags[0]} = {dp_divider_invalid, dp_divider_divbyzero, dp_divider_overflow, dp_divider_underflow, dp_divider_inexact};
             end
-            // OP_FSQRT_S, OP_FSQRT_D: begin
-            //     is_double = opcode[0];
-            //     result_out = sqrt_result;
-            //     {flag_invalid, flag_overflow, flag_underflow, flag_inexact} = {sqrt_invalid, sqrt_overflow, sqrt_underflow, sqrt_inexact};
-            // end
+            OP_FSQRT_S: begin
+                result_out = {32'b0, sp_sqrt_result};
+                {fflags[4], fflags[0]} = {sp_sqrt_invalid, sp_sqrt_inexact};
+            end
 
             default: begin
                 // Default to an invalid operation, return QNaN
