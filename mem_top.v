@@ -106,7 +106,7 @@ mmu #(
     .lsu_in_invalidate_i (lsu_mmu_dinvalidafte ),
     .lsu_in_writeback_i  (lsu_mmu_writeback  ),
     .dcache_in_value_i   (dcache_mmu_data   ),
-    .dcache_in_valid_i   (dcache_mmu_available && dcache_rd_r),
+    .dcache_in_valid_i   (dcache_valid),
     .icache_in_value_i   (icache_mmu_value   ),
     .icache_in_valid_i   (icache_mmu_valid      ),
     .fetch_out_value_o   (mmu_fetch_value   ),
@@ -157,28 +157,33 @@ lsu u_lsu(
 
 reg [31:0] dcache_in_addr_r;
 reg [31:0] dcache_in_value_r;
-// reg [31:0] dcache_out_value_r;
 reg        dcache_wr_r;
 reg        dcache_rd_r;
+reg        pre_available;
+wire       dcache_valid;
 
 wire debug_w;
 assign debug_w = !(dcache_mmu_data == 32'h0);
+assign dcache_valid = (pre_available)?(dcache_mmu_available && dcache_rd_r):0;
 
 always @(posedge clk_i or negedge rst_i) begin
     if(!rst_i)begin
         dcache_in_value_r  <= 32'h0;
-        // dcache_out_value_r <= 32'h0;
         dcache_wr_r        <= 0;
         dcache_rd_r        <= 0;
+        pre_available      <= 1;
 
     end else begin
         dcache_in_addr_r   <= mmu_dcache_addr;
         dcache_in_value_r  <= mmu_dcache_data;
-        // dcache_out_value_r <= dcache_mmu_data;
         dcache_wr_r        <= mmu_dcache_wr;
-        dcache_rd_r        <= (dcache_mmu_available)?mmu_dcache_rd:dcache_rd_r;
+        pre_available <= dcache_mmu_available;
 
-    end
+        if(dcache_rd_r && dcache_mmu_available)
+            dcache_rd_r        <= (dcache_mmu_available && debug_w)?mmu_dcache_rd:dcache_rd_r;
+        else
+            dcache_rd_r        <= (dcache_mmu_available)?mmu_dcache_rd:dcache_rd_r;
+    end 
 end
 
 dcache_top u_dcache_top(

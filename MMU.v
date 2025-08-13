@@ -78,6 +78,20 @@ localparam D_FAKE_ADDR  = 20'h00401 ;
 localparam D_FAKE_ENTRY = 32'h01010803;
 
 // ---------------------------------------
+// Dcache
+// --------------------------------------- 
+
+// reg dcache_valid;
+
+// always @(posedge clk_i or negedge rst_i)begin
+//     if(!rst_i)begin
+//         dcache_valid <= 1;
+//     end else begin
+//         dcache_valid <= dcache_in_valid_i;
+//     end
+// end
+
+// ---------------------------------------
 // Wire & Register
 // --------------------------------------- 
 
@@ -225,12 +239,12 @@ end
 
 // ---------------------------------------
 // PTW
-//----------------------------------------
+//---------------------------------------- // 10 /00 0000 0111
 
 reg  [31:0] ptw_req_addr_r;
 
 wire [31:0] ptw_resp_data_i  = dcache_in_value_i;
-wire        ptw_resp_valid_i = dcache_in_valid_i && is_pte;
+wire        ptw_resp_valid_i = dcache_in_valid_i;
 wire        ptw_req_valid_i  = (itlb_req && ~itlb_hit) || (dtlb_req && ~dtlb_hit);
 wire [31:0] ptw_req_addr_i   = ptw_req_addr_r;
 wire        ptw_error_i      = dcache_addr_error && dcache_rd_o; 
