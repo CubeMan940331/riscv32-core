@@ -664,6 +664,7 @@
 `define EXCEPTION_ERET_H                   6'h32
 `define EXCEPTION_ERET_M                   6'h33
 `define EXCEPTION_FENCE                    6'h34
+`define EXCEPTION_FPU                      6'h35
 `define EXCEPTION_TYPE_MASK                6'h30
 `define EXCEPTION_SUBTYPE_R                3:0
 

@@ -44,7 +44,7 @@ for mem_file in "$file_dir"*.mem; do
         ext_results[$ext]=1  # assume pass until proven fail
     fi
 
-    if [[ "$output" != "Yes" && "$output" != "Done" ]]; then
+    if [[ "$output" != "yes" && "$output" != "done" ]]; then
         ext_results[$ext]=0
         ext_details[$ext]+=$(printf "%-30s %-16s %s\n" "$test_name" "pass_pc=$pass_pc" "$output\n")
     fi

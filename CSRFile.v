@@ -376,6 +376,9 @@ always @(*) begin
             default:                        csr_mtval_r = 32'b0;
         endcase
 
+    // FPU flag write-in
+    end else if(exception_i == `EXCEPTION_FPU) begin
+        csr_fflags_r = csr_wr_data_i & `CSR_FFLAGS_MASK;
     // normal write operation WL
     end else if(csr_wr_en_i) begin
         case(csr_wr_addr_i)
