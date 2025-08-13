@@ -19,7 +19,7 @@ VERILOG_SOURCES = \
 	SP_Convert.v DP_Convert.v \
 	SP_Multiplier.v DP_Multiplier.v \
 	SP_Divider.v DP_Divider.v \
-    FPU_Top.v
+    ../FPU_Top.v
 
 # --- Verilator Flags ---
 VERILATOR_FLAGS = --cc --exe --trace -Wall -Wno-UNUSED
