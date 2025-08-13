@@ -5,3 +5,4 @@ obj_dir/*
 TEST_INSTRUCTIONS.asm
 TEST_INSTRUCTIONS.txt
 *.bak
+fpu_modules/obj_dir/*
