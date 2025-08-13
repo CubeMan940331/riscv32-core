@@ -3,8 +3,9 @@ module FPU_Top (
     input rst_n,
 
     // --- Control Signals ---
-    input [6:0]  func7,         // Operation code to select the function
-    input [2:0]  func3,         // Rounding mode for arithmetic operations
+    input [6:0]  func7,         // func7 code to select the function
+    input [2:0]  func3,         // Rounding mode for arithmetic operations (if 111 swap to frm)
+    input [2:0]  frm,           // Rounding mode (dynamic from frm)
     input [4:0]  rs2,           // For selecting convert type
 
     // --- Data Inputs ---
@@ -74,6 +75,7 @@ module FPU_Top (
     reg dp_divider_invalid, dp_divider_divbyzero, dp_divider_overflow, dp_divider_underflow, dp_divider_inexact;
 
     // --- Sub-module control signals ---
+    reg [2:0]  rounding_mode;
     reg [1:0]  convert_input_type;
     reg [1:0]  convert_output_type;
 
@@ -85,7 +87,7 @@ module FPU_Top (
         .operand_a(operand_a[31:0]),
         .operand_b(operand_b[31:0]),
         .is_subtraction(func7[2]),
-        .rounding_mode(func3),
+        .rounding_mode(rouding_mode),
         .result(sp_adder_result),
         .flag_invalid(sp_adder_invalid), .flag_overflow(sp_adder_overflow),
         .flag_underflow(sp_adder_underflow), .flag_inexact(sp_adder_inexact)
@@ -94,7 +96,7 @@ module FPU_Top (
         .operand_a(operand_a),
         .operand_b(operand_b),
         .is_subtraction(func7[2]),
-        .rounding_mode(func3),
+        .rounding_mode(rouding_mode),
         .result(dp_adder_result),
         .flag_invalid(dp_adder_invalid), .flag_overflow(dp_adder_overflow),
         .flag_underflow(dp_adder_underflow), .flag_inexact(dp_adder_inexact)
@@ -116,7 +118,7 @@ module FPU_Top (
         .operand_in(operand_a[31:0]), 
         .input_type(convert_input_type),
         .output_type(convert_output_type),
-        .rounding_mode(func3),
+        .rounding_mode(rouding_mode),
         .result(sp_convert_result),
         .flag_invalid(sp_convert_invalid), .flag_overflow(sp_convert_overflow),
         .flag_underflow(sp_convert_underflow), .flag_inexact(sp_convert_inexact)
@@ -126,7 +128,7 @@ module FPU_Top (
         .operand_in(operand_a), 
         .input_type(convert_input_type),
         .output_type(convert_output_type),
-        .rounding_mode(func3),
+        .rounding_mode(rouding_mode),
         .result(dp_convert_result),
         .flag_invalid(dp_convert_invalid), .flag_overflow(dp_convert_overflow),
         .flag_underflow(dp_convert_underflow), .flag_inexact(dp_convert_inexact)
@@ -134,7 +136,7 @@ module FPU_Top (
 
     SP_Multiplier sp_multiplier_inst (
         .operand_a(operand_a[31:0]), .operand_b(operand_b[31:0]),
-        .rounding_mode(func3),
+        .rounding_mode(rouding_mode),
         .result(sp_multiplier_result),
         .flag_invalid(sp_multiplier_invalid), .flag_overflow(sp_multiplier_overflow),
         .flag_underflow(sp_multiplier_underflow), .flag_inexact(sp_multiplier_inexact)
@@ -142,7 +144,7 @@ module FPU_Top (
 
     DP_Multiplier dp_multiplier_inst (
         .operand_a(operand_a), .operand_b(operand_b),
-        .rounding_mode(func3),
+        .rounding_mode(rouding_mode),
         .result(dp_multiplier_result),
         .flag_invalid(dp_multiplier_invalid), .flag_overflow(dp_multiplier_overflow),
         .flag_underflow(dp_multiplier_underflow), .flag_inexact(dp_multiplier_inexact)
@@ -150,7 +152,7 @@ module FPU_Top (
 
     SP_Divider sp_divider_inst (
         .operand_a(operand_a[31:0]), .operand_b(operand_b[31:0]),
-        .rounding_mode(func3),
+        .rounding_mode(rouding_mode),
         .result(sp_divider_result),
         .flag_invalid(sp_divider_invalid), .flag_divbyzero(sp_divider_divbyzero),
         .flag_overflow(sp_divider_overflow), .flag_underflow(sp_divider_underflow), .flag_inexact(sp_divider_inexact)
@@ -158,7 +160,7 @@ module FPU_Top (
 
     DP_Divider dp_divider_inst (
         .operand_a(operand_a), .operand_b(operand_b),
-        .rounding_mode(func3),
+        .rounding_mode(rouding_mode),
         .result(dp_divider_result),
         .flag_invalid(dp_divider_invalid), .flag_divbyzero(dp_divider_divbyzero),
         .flag_overflow(dp_divider_overflow), .flag_underflow(dp_divider_underflow), .flag_inexact(dp_divider_inexact)
@@ -185,6 +187,7 @@ module FPU_Top (
         flag_underflow = 1'b0;
         flag_inexact   = 1'b0;
 
+        rounding_mode = (func3 == 3'b111) ? frm : func3;
         convert_input_type = '0;
         convert_output_type = '0;
 
