@@ -551,11 +551,11 @@
 // CSR Registers - User
 //-----------------------------------------------------------------
 `define CSR_FFLAGS        12'h001
-`define CSR_FFLAGS_MASK   32'h0000000F
+`define CSR_FFLAGS_MASK   32'b11111
 `define CSR_FRM           12'h002
-`define CSR_FRM_MASK      32'h00000007
+`define CSR_FRM_MASK      32'b11100000
 `define CSR_FCSR          12'h003
-`define CSR_FCSR_MASK     32'hFFFFFFFF
+`define CSR_FCSR_MASK     32'hFF
 
 //--------------------------------------------------------------------
 // CSR Registers - DCACHE control
