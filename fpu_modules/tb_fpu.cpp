@@ -223,7 +223,8 @@ int main(int argc, char** argv, char** env) {
         //     {"FADD.D: MAX_FLOAT + MAX_FLOAT -> Overflow",    OP_FADD_D,      RNE,       CVT_NN,    FP64,    0x7FEFFFFFFFFFFFFF,                0x7FEFFFFFFFFFFFFF,               f64_to_u64(INFINITY),             0b00101},
         // // --- Compare Tests ---    
         // // SP_Compare    
-        //     {"FCMP.S: -2.0 < -1.0",                          OP_FCMP_S,      CMP_LT,    CVT_NN,    INT,     f32_to_u32(-2.0f),                 f32_to_u32(-1.0f),                0x0000000000000001,               0b00000},
+            {"FCMP.S: -2.0 < -1.0",                          OP_FCMP_S,      CMP_LT,    CVT_NN,    INT,     0x7fffffff,                 0,                0,               0b10000},
+            // {"FCMP.S: -2.0 < -1.0",                          OP_FCMP_S,      CMP_LT,    CVT_NN,    INT,     f32_to_u32(-2.0f),                 f32_to_u32(-1.0f),                0x0000000000000001,               0b00000},
         //     {"FCMP.S: 2.0 = 2.0",                            OP_FCMP_S,      CMP_EQ,    CVT_NN,    INT,     f32_to_u32(2.0f),                  f32_to_u32(2.0f),                 0x0000000000000001,               0b00000},
         //     {"FCMP.S: 1.0 <= 2.0",                           OP_FCMP_S,      CMP_LE,    CVT_NN,    INT,     f32_to_u32(1.0f),                  f32_to_u32(2.0f),                 0x0000000000000001,               0b00000},
         //     {"FCMP.S: 0.0 < -1.0",                           OP_FCMP_S,      CMP_LT,    CVT_NN,    INT,     f32_to_u32(0.0f),                  f32_to_u32(-1.0f),                0x0000000000000000,               0b00000},
