@@ -36,11 +36,14 @@ module DP_Compare (
         flag_cmp = 0;
         temp_eq=0; temp_gt=0; temp_lt=0; flag_eq=0; flag_gt=0; flag_lt=0; flag_unordered=0;
 
+        // Invalid flag is set for SNaN in comparison
+        flag_invalid = (is_a_snan | is_b_snan) && (func3 == CMP_EQ);
+
         // --- Comparison Logic ---
         // Path 1: At least one operand is NaN
         if (is_a_nan || is_b_nan) begin
             flag_unordered = 1'b1;
-            flag_invalid = 1'b1;
+            if (func3 != CMP_EQ) begin flag_invalid = 1'b1; end
         end
         // Path 2: Both operands are Zero (+0 or -0)
         else if (is_a_zero && is_b_zero) begin
