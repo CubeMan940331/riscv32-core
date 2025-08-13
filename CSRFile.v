@@ -139,7 +139,8 @@ reg [31:0] csr_mhpmevent_q    [3:31];
 reg [31:0] csr_mhpmeventh_q   [3:31];
 
 // Floating Point
-reg [31:0] csr_fcsr_q;
+reg [31:0] csr_fflags_q;
+reg [31:0] csr_frm_q;
 
 // Timer interrupts
 reg [31:0] csr_mtimecmp_q;
@@ -205,7 +206,9 @@ always @(*) begin
         `CSR_MCYCLEH,  
         `CSR_MTIMEH:    csr_rd_data_r = csr_mcycleh_q;
         // Floating Point
-        `CSR_FCSR:      csr_rd_data_r = csr_fcsr_q & `CSR_FCSR_MASK;
+        `CSR_FFLAGS:    csr_rd_data_r = csr_fflags_q & `CSR_FFLAGS_MASK;
+        `CSR_FRM:       csr_rd_data_r = csr_frm_q & `CSR_FRM_MASK;
+        `CSR_FCSR:      csr_rd_data_r = {24'b0, csr_frm_q[2:0], csr_fflags_q[4:0]} & `CSR_FCSR_MASK;
         // Non-Standard Timer Interrupt
         `CSR_MTIMECMP:  csr_rd_data_r = csr_mtimecmp_q;
     // CSR - Supervisor
@@ -274,12 +277,11 @@ reg [31:0] csr_mcountinhibit_r;
 reg [31:0] csr_mhpmevent_r    [3:31];
 reg [31:0] csr_mhpmeventh_r   [3:31];
     // Floating Point
-reg [31:0] csr_fcsr_r;
+reg [31:0] csr_fflags_r;
+reg [31:0] csr_frm_r;
     // Timer interrupts
 reg [31:0] csr_mtimecmp_r;
 reg        csr_mtime_ie_r;
-
-wire is_exception = | exception_i;
 
 always @(*) begin
     // privilege level
@@ -305,10 +307,12 @@ always @(*) begin
     csr_mcycle_r    = csr_mcycle_q + 32'd1;
 
     // Floating Point
-    csr_fcsr_r      = csr_fcsr_q;
+    csr_fflags_r    = csr_fflags_q;
+    csr_frm_r       = csr_frm_q;
 
     // Non-Standard Timer Interrupt
     csr_mtimecmp_r  = csr_mtimecmp_q;
+    csr_mtime_ie_r  = csr_mtime_ie_q;
 
     // Interrupt
     if((exception_i & `EXCEPTION_TYPE_MASK) == `EXCEPTION_INTERRUPT) begin
@@ -372,6 +376,9 @@ always @(*) begin
             default:                        csr_mtval_r = 32'b0;
         endcase
 
+    // FPU flag write-in
+    end else if(exception_i == `EXCEPTION_FPU) begin
+        csr_fflags_r = csr_wr_data_i & `CSR_FFLAGS_MASK;
     // normal write operation WL
     end else if(csr_wr_en_i) begin
         case(csr_wr_addr_i)
@@ -389,7 +396,13 @@ always @(*) begin
             `CSR_MTVAL:   csr_mtval_r     = csr_wr_data_i & `CSR_MTVAL_MASK;
             `CSR_MIP:     csr_mip_r       = csr_wr_data_i & `CSR_MIP_MASK;
             // Floating Point
-            `CSR_FCSR:    csr_fcsr_r      = csr_wr_data_i & `CSR_FCSR_MASK;
+            `CSR_FFLAGS:  csr_fflags_r    = csr_wr_data_i & `CSR_FFLAGS_MASK;
+            `CSR_FRM:     csr_frm_r       = csr_wr_data_i & `CSR_FRM_MASK;
+            `CSR_FCSR:
+            begin
+                csr_fflags_r = csr_wr_data_i & `CSR_FFLAGS_MASK;
+                csr_frm_r    = (csr_wr_data_i >> 5) & `CSR_FRM_MASK;
+            end
             // Non-Standard Timer Interrupt
             `CSR_MTIMECMP:
             begin
@@ -440,7 +453,8 @@ always @(posedge clk or negedge rst_n) begin
         csr_mcycle_q   <= 32'b0;
         csr_mcycleh_q  <= 32'b0;
             // Floating Point
-        csr_fcsr_q     <= 32'b0;
+        csr_fflags_q   <= 32'b0;
+        csr_frm_q      <= 32'b0;
             // Non-Standard Timer Interrupt
         csr_mtimecmp_q <= 32'b0;
         csr_mtime_ie_q <= 1'b0;
@@ -466,7 +480,8 @@ always @(posedge clk or negedge rst_n) begin
         if (csr_mcycle_q == 32'hFFFFFFFF)
             csr_mcycleh_q <= csr_mcycleh_q + 32'd1;
             // Floating Point
-        csr_fcsr_q     <= csr_fcsr_r;
+        csr_fflags_q   <= csr_fflags_r;
+        csr_frm_q      <= csr_frm_r;
             // Non-Standard Timer Interrupt
         csr_mtimecmp_q <= csr_mtimecmp_r;
         csr_mtime_ie_q <= csr_mtime_ie_r;

@@ -307,7 +307,9 @@ FRegister m_FRegister(
 );
 
 DecodeUnit m_DecodeUnit(
-    .inst(ID_inst_out),
+    .inst_i(ID_inst_out),
+    .is_fpu_i(is_fpu),
+
     .opcode(decode_opcode),
     .funct3(decode_funct3),
     .funct7(decode_funct7),
@@ -316,7 +318,7 @@ DecodeUnit m_DecodeUnit(
     .rd(decode_rd),
     .imm(decode_imm),
 
-    .csr_addr(decode_csr_addr)
+    .csr_addr_o(decode_csr_addr)
 );
 
 Control m_Control(
@@ -575,6 +577,7 @@ assign Br_done = Br_start;
 // FPU =========================
 assign FPU_done = FPU_start;
 wire [31:0] FPU_in1;
+wire [4:0] FPU_flags;
 Mux2to1 #(.size(32)) m_FPU_SRC1_MUX(
     .sel(EX_FPU_sel1_out),
     .s0(EX_freg_fwd_data1),
@@ -584,17 +587,14 @@ Mux2to1 #(.size(32)) m_FPU_SRC1_MUX(
 FPU_Top m_FPU(
     .clk(clk),
     .rst_n(rst_n),
+    .frm(csr_rd_data[2:0]),
     .func7(EX_inst_out[31:25]),         // Operation code to select the function
     .func3(EX_inst_out[14:12]),         // Rounding mode for arithmetic operations
     .rs2(EX_inst_out[24:20]),           // For selecting convert type
     .operand_a({32'h0,FPU_in1}),      // Operand A (can be FP64, FP32, INT32, UINT32)
     .operand_b({32'h0,EX_freg_fwd_data2}),      // Operand B (can be FP64, FP32)
     .result_out(FPU_out),     // Result of the operation
-    .flag_invalid(),
-    .flag_divbyzero(),
-    .flag_overflow(),
-    .flag_underflow(),
-    .flag_inexact()
+    .fflags(FPU_flags)
 );
 
 // LSU =========================
@@ -637,6 +637,8 @@ CSR m_CSR(
     .imm_i(EX_imm_out),
     .reg_rd_data1_i(EX_fwd_data1),
     .csr_old_i(csr_rd_data),
+    .is_fpu_done_i(FPU_done),
+    .fpu_flags_i(FPU_flags),
 
     .csr_rd_data_o(csr_rd_data_xtval),
     .csr_wr_valid_o(csr_wr_en),
