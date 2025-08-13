@@ -69,6 +69,10 @@ wire ALU_sel1; // 0: PC, 1: rs1
 wire ALU_sel2; // 0: rs2, 1: imm
 wire [3:0] ALU_ctrl;
 
+// MUL/DIV
+wire is_MUL_DIV;
+wire [2:0] MUL_DIV_ctrl;
+
 // CSR
 wire is_csr;
 wire [2:0] csr_op;
@@ -124,6 +128,9 @@ wire [2:0] EX_cmp_op_out;
 wire EX_ALU_sel1_out;
 wire EX_ALU_sel2_out;
 wire [3:0] EX_ALU_ctrl_out;
+// MUL/DIV
+wire EX_is_MUL_DIV_out;
+wire [2:0] EX_MUL_DIV_ctrl_out;
 // CSR
 wire EX_is_csr_out;
 wire [2:0] EX_csr_op_out;
@@ -145,6 +152,10 @@ wire [31:0] ALU_out;
 // BranchCmp ==================
 wire Br_start, Br_done;
 wire br_taken; // indicate any branch happen (trigger by inst, csr unit)
+
+// MUL/DIV ====================
+wire MUL_DIV_start, MUL_DIV_done;
+wire [31:0] MUL_DIV_out;
 
 // LSU =========================
 wire LSU_start, LSU_done;
@@ -183,6 +194,7 @@ wire [31:0] WB_pc_p4_out;
 wire [4:0]  WB_rd_out;
 
 wire [31:0] WB_ALU_out;
+wire [31:0] WB_MUL_DIV_out;
 wire [31:0] WB_mem_data_out;
 wire [31:0] WB_csr_rd_data_out;
 wire [31:0] WB_FPU_out;
@@ -338,6 +350,9 @@ Control m_Control(
     .ALU_sel1_o(ALU_sel1),
     .ALU_sel2_o(ALU_sel2),
     .ALU_ctrl_o(ALU_ctrl),
+
+    .is_MUL_DIV_o(is_MUL_DIV),
+    .MUL_DIV_ctrl_o(MUL_DIV_ctrl),
     
     .is_csr_o(is_csr),
     .csr_op_o(csr_op),
@@ -393,6 +408,10 @@ EX_Reg m_EX_Reg(
     .ALU_sel2_i(ALU_sel2),
     .ALU_ctrl_i(ALU_ctrl),
 
+    // MUL/DIV
+    .is_MUL_DIV_i(is_MUL_DIV),
+    .MUL_DIV_ctrl_i(MUL_DIV_ctrl),
+
     // CSR
     .csr_addr_i(decode_csr_addr),
     .is_csr_i(is_csr),
@@ -442,6 +461,10 @@ EX_Reg m_EX_Reg(
     .ALU_sel2_o(EX_ALU_sel2_out),
     .ALU_ctrl_o(EX_ALU_ctrl_out),
 
+    // MUL/DIV
+    .is_MUL_DIV_o(EX_is_MUL_DIV_out),
+    .MUL_DIV_ctrl_o(EX_MUL_DIV_ctrl_out),
+
     // CSR
     .csr_addr_o(EX_csr_addr_out),
     .is_csr_o(EX_is_csr_out),
@@ -487,6 +510,7 @@ assign LSU_start = EX_start && (EX_mem_wr_en_out || EX_mem_rd_en_out);
 assign FPU_start = EX_start && EX_is_fpu_out;
 assign SYS_start = EX_start && (EX_is_csr_out || (|csr_exception) || csr_br_taken);
 assign bypass_start = EX_start && (|EX_bypass_sel_out);
+assign MUL_DIV_start = EX_start && EX_is_MUL_DIV_out;
 
 // done logic
 assign EX_done = (!EX_pc_valid_out) | (!EX_is_impl_out) |
@@ -496,6 +520,7 @@ assign EX_done = (!EX_pc_valid_out) | (!EX_is_impl_out) |
     SYS_done | 
     FPU_done | 
     bypass_done |
+    MUL_DIV_done |
     0; // (FU_done && !(|FU_err)) | ...
 
 // Forwarding ==================
@@ -571,6 +596,20 @@ BranchUnit m_BranchUnit(
     .pc_sel(pc_sel)
 );
 assign Br_done = Br_start;
+
+// MUL/DIV =====================
+MUL_DIV_top m_MUL_DIV_top(
+    .clk(clk),
+    .rst_n(rst_n),
+
+    .data1(EX_fwd_data1),
+    .data2(EX_fwd_data2),
+    
+    .MUL_DIV_start(MUL_DIV_start),
+    .MUL_DIV_ctrl(EX_MUL_DIV_ctrl_out),
+    .MUL_DIV_out(MUL_DIV_out),
+    .MUL_DIV_done(MUL_DIV_done)
+);
 
 // FPU =========================
 assign FPU_done = FPU_start;
@@ -688,6 +727,7 @@ WB_Reg m_MEM_WB_Reg(
 
     .bypass_i(bypass_out),
     .ALU_i(ALU_out),
+    .MUL_DIV_i(MUL_DIV_out),
     .FPU_i(FPU_out[31:0]),
     .mem_data_i(d_mem_rd_data),
     .csr_rd_data_i(csr_rd_data),
@@ -706,6 +746,7 @@ WB_Reg m_MEM_WB_Reg(
     
     .bypass_o(WB_bypass_out),
     .ALU_o(WB_ALU_out),
+    .MUL_DIV_o(WB_MUL_DIV_out),
     .FPU_o(WB_FPU_out),
     .mem_data_o(WB_mem_data_out),
     .csr_rd_data_o(WB_csr_rd_data_out),
@@ -715,7 +756,7 @@ WB_Reg m_MEM_WB_Reg(
     .reg_w_sel_o(WB_reg_w_sel_out)
 );
 
-Mux6to1 #(.size(32)) m_Mux_WriteData(
+Mux7to1 #(.size(32)) m_Mux_WriteData(
     .sel(WB_reg_w_sel_out),
     .s0(WB_pc_p4_out),
     .s1(WB_ALU_out),
@@ -723,6 +764,7 @@ Mux6to1 #(.size(32)) m_Mux_WriteData(
     .s3(WB_csr_rd_data_out),
     .s4(WB_FPU_out),
     .s5(WB_bypass_out),
+    .s6(WB_MUL_DIV_out),
     .out(wb_data_in)
 );
 

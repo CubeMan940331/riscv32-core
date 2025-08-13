@@ -5,7 +5,7 @@ module Control (
     // WB stage
     output reg reg_wr_en_o,
     output reg freg_wr_en_o,
-    output reg [2:0] reg_w_sel_o, // 0: pc_p4, 1: ALU, 2: mem, 3:csr, 4: FPU
+    output reg [2:0] reg_w_sel_o, // 0: pc_p4, 1: ALU, 2: mem, 3:csr, 4: FPU, 5: bypass, 6: MUL_DIV_top
     
     // LSU
     output reg mem_wr_en_o,
@@ -21,6 +21,10 @@ module Control (
     output reg [3:0] ALU_ctrl_o,
     output reg ALU_sel1_o, // 0: PC, 1: rs1
     output reg ALU_sel2_o, // 0: rs2, 1: imm
+
+    // MUL/DIV
+    output reg is_MUL_DIV_o,
+    output reg [2:0] MUL_DIV_ctrl_o,
 
     // CSR
     output reg is_csr_o,
@@ -51,6 +55,8 @@ assign mem_ctrl_o = mem_ctrl_r;
 assign is_j_o = is_j_w;
 assign is_br_o = is_br_w;
 assign ALU_ctrl_o = alu_ctrl_r;
+assign is_MUL_DIV_o = is_MUL_DIV_w;
+assign MUL_DIV_ctrl_o = MUL_DIV_ctrl_w;
 assign cmp_op_o = cmp_op_r;
 assign is_csr_o = is_csr_w;
 assign csr_op_o = csr_op_w;
@@ -143,6 +149,15 @@ wire is_impl_w =((inst&`INST_ADDI_MASK) == `INST_ADDI)   ||
                 ((inst&`INST_SB_MASK) == `INST_SB)     ||
                 ((inst&`INST_SH_MASK) == `INST_SH)     ||
                 ((inst&`INST_SW_MASK) == `INST_SW)     ||
+                // M-Ext
+                ((inst&`INST_MUL_MASK) == `INST_MUL)        ||
+                ((inst&`INST_MULH_MASK) == `INST_MULH)      ||
+                ((inst&`INST_MULHSU_MASK) == `INST_MULHSU)  ||
+                ((inst&`INST_MULHU_MASK) == `INST_MULHU)    ||
+                ((inst&`INST_DIV_MASK) == `INST_DIV)        ||
+                ((inst&`INST_DIVU_MASK) == `INST_DIVU)      ||
+                ((inst&`INST_REM_MASK) == `INST_REM)        ||
+                ((inst&`INST_REMU_MASK) == `INST_REMU)      ||
                 // Zicsr
                 ((inst&`INST_CSRRW_MASK) == `INST_CSRRW)   ||
                 ((inst&`INST_CSRRS_MASK) == `INST_CSRRS)   ||
@@ -210,6 +225,15 @@ wire reg_wr_en_w = ((inst&`INST_ADDI_MASK) == `INST_ADDI)    ||
                     ((inst&`INST_LH_MASK) == `INST_LH)   ||
                     ((inst&`INST_LHU_MASK) == `INST_LHU) ||
                     ((inst&`INST_LW_MASK) == `INST_LW)   ||
+                    // M-Ext
+                    ((inst&`INST_MUL_MASK) == `INST_MUL)        ||
+                    ((inst&`INST_MULH_MASK) == `INST_MULH)      ||
+                    ((inst&`INST_MULHSU_MASK) == `INST_MULHSU)  ||
+                    ((inst&`INST_MULHU_MASK) == `INST_MULHU)    ||
+                    ((inst&`INST_DIV_MASK) == `INST_DIV)        ||
+                    ((inst&`INST_DIVU_MASK) == `INST_DIVU)      ||
+                    ((inst&`INST_REM_MASK) == `INST_REM)        ||
+                    ((inst&`INST_REMU_MASK) == `INST_REMU)      ||
                     // CSR
                     ((inst&`INST_CSRRW_MASK) == `INST_CSRRW)   ||
                     ((inst&`INST_CSRRS_MASK) == `INST_CSRRS)   ||
@@ -251,6 +275,15 @@ wire is_br_w = ((inst&`INST_BEQ_MASK) == `INST_BEQ)   ||
                ((inst&`INST_BGE_MASK) == `INST_BGE)   ||
                ((inst&`INST_BLTU_MASK) == `INST_BLTU) ||
                ((inst&`INST_BGEU_MASK) == `INST_BGEU) ;
+
+wire is_MUL_DIV_w = ((inst&`INST_MUL_MASK) == `INST_MUL)        ||
+                    ((inst&`INST_MULH_MASK) == `INST_MULH)      ||
+                    ((inst&`INST_MULHSU_MASK) == `INST_MULHSU)  ||
+                    ((inst&`INST_MULHU_MASK) == `INST_MULHU)    ||
+                    ((inst&`INST_DIV_MASK) == `INST_DIV)        ||
+                    ((inst&`INST_DIVU_MASK) == `INST_DIVU)      ||
+                    ((inst&`INST_REM_MASK) == `INST_REM)        ||
+                    ((inst&`INST_REMU_MASK) == `INST_REMU)      ;
 
 wire is_csr_w = ((inst&`INST_CSRRW_MASK) == `INST_CSRRW)    ||
                 ((inst&`INST_CSRRS_MASK) == `INST_CSRRS)    ||
@@ -358,6 +391,7 @@ wire is_fpu_w = ((inst&`INST_FMADD_MASK) == `INST_FMADD)         ||
 wire FPU_sel1_w = ((inst&`INST_FCVT_S_W_MASK) == `INST_FCVT_S_W)   ||
                   ((inst&`INST_FCVT_S_WU_MASK) == `INST_FCVT_S_WU) ;
 
+wire [2:0] MUL_DIV_ctrl_w = {3{is_MUL_DIV_w}} & funct3;
 wire [2:0] csr_op_w = {3{is_csr_w}} & funct3;
 
 reg [3:0] alu_ctrl_r;
@@ -441,6 +475,7 @@ always @(*) begin
     else if (is_lsu_w)                               reg_w_sel_r = 2; // memory
     else if (is_csr_w)                               reg_w_sel_r = 3; // CSR read data path
     else if (is_fpu_w)                               reg_w_sel_r = 4; // FPU result
+    else if (is_MUL_DIV_w)                           reg_w_sel_r = 6;
     else                                             reg_w_sel_r = 0; // default PC+4
 end
 
