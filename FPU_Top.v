@@ -16,11 +16,7 @@ module FPU_Top (
     output reg [63:0] result_out,     // Result of the operation
 
     // --- Status Flags ---
-    output       flag_invalid,
-    output       flag_divbyzero,
-    output       flag_overflow,
-    output       flag_underflow,
-    output       flag_inexact
+    output [4:0] fflags         // invalid, divbyzero, overflow, underflow, inexact
 );
 
     // --- Opcode Definitions ---
@@ -87,7 +83,7 @@ module FPU_Top (
         .operand_a(operand_a[31:0]),
         .operand_b(operand_b[31:0]),
         .is_subtraction(func7[2]),
-        .rounding_mode(rouding_mode),
+        .rounding_mode(rounding_mode),
         .result(sp_adder_result),
         .flag_invalid(sp_adder_invalid), .flag_overflow(sp_adder_overflow),
         .flag_underflow(sp_adder_underflow), .flag_inexact(sp_adder_inexact)
@@ -96,7 +92,7 @@ module FPU_Top (
         .operand_a(operand_a),
         .operand_b(operand_b),
         .is_subtraction(func7[2]),
-        .rounding_mode(rouding_mode),
+        .rounding_mode(rounding_mode),
         .result(dp_adder_result),
         .flag_invalid(dp_adder_invalid), .flag_overflow(dp_adder_overflow),
         .flag_underflow(dp_adder_underflow), .flag_inexact(dp_adder_inexact)
@@ -118,7 +114,7 @@ module FPU_Top (
         .operand_in(operand_a[31:0]), 
         .input_type(convert_input_type),
         .output_type(convert_output_type),
-        .rounding_mode(rouding_mode),
+        .rounding_mode(rounding_mode),
         .result(sp_convert_result),
         .flag_invalid(sp_convert_invalid), .flag_overflow(sp_convert_overflow),
         .flag_underflow(sp_convert_underflow), .flag_inexact(sp_convert_inexact)
@@ -128,7 +124,7 @@ module FPU_Top (
         .operand_in(operand_a), 
         .input_type(convert_input_type),
         .output_type(convert_output_type),
-        .rounding_mode(rouding_mode),
+        .rounding_mode(rounding_mode),
         .result(dp_convert_result),
         .flag_invalid(dp_convert_invalid), .flag_overflow(dp_convert_overflow),
         .flag_underflow(dp_convert_underflow), .flag_inexact(dp_convert_inexact)
@@ -136,7 +132,7 @@ module FPU_Top (
 
     SP_Multiplier sp_multiplier_inst (
         .operand_a(operand_a[31:0]), .operand_b(operand_b[31:0]),
-        .rounding_mode(rouding_mode),
+        .rounding_mode(rounding_mode),
         .result(sp_multiplier_result),
         .flag_invalid(sp_multiplier_invalid), .flag_overflow(sp_multiplier_overflow),
         .flag_underflow(sp_multiplier_underflow), .flag_inexact(sp_multiplier_inexact)
@@ -144,7 +140,7 @@ module FPU_Top (
 
     DP_Multiplier dp_multiplier_inst (
         .operand_a(operand_a), .operand_b(operand_b),
-        .rounding_mode(rouding_mode),
+        .rounding_mode(rounding_mode),
         .result(dp_multiplier_result),
         .flag_invalid(dp_multiplier_invalid), .flag_overflow(dp_multiplier_overflow),
         .flag_underflow(dp_multiplier_underflow), .flag_inexact(dp_multiplier_inexact)
@@ -152,7 +148,7 @@ module FPU_Top (
 
     SP_Divider sp_divider_inst (
         .operand_a(operand_a[31:0]), .operand_b(operand_b[31:0]),
-        .rounding_mode(rouding_mode),
+        .rounding_mode(rounding_mode),
         .result(sp_divider_result),
         .flag_invalid(sp_divider_invalid), .flag_divbyzero(sp_divider_divbyzero),
         .flag_overflow(sp_divider_overflow), .flag_underflow(sp_divider_underflow), .flag_inexact(sp_divider_inexact)
@@ -160,7 +156,7 @@ module FPU_Top (
 
     DP_Divider dp_divider_inst (
         .operand_a(operand_a), .operand_b(operand_b),
-        .rounding_mode(rouding_mode),
+        .rounding_mode(rounding_mode),
         .result(dp_divider_result),
         .flag_invalid(dp_divider_invalid), .flag_divbyzero(dp_divider_divbyzero),
         .flag_overflow(dp_divider_overflow), .flag_underflow(dp_divider_underflow), .flag_inexact(dp_divider_inexact)
@@ -181,11 +177,7 @@ module FPU_Top (
     always @(*) begin
         // Default assignments to avoid latches
         result_out     = '0;
-        flag_invalid   = 1'b0;
-        flag_divbyzero = 1'b0;
-        flag_overflow  = 1'b0;
-        flag_underflow = 1'b0;
-        flag_inexact   = 1'b0;
+        fflags = '0;
 
         rounding_mode = (func3 == 3'b111) ? frm : func3;
         convert_input_type = '0;
@@ -195,23 +187,23 @@ module FPU_Top (
         case (func7)
             OP_FADD_S, OP_FSUB_S: begin
                 result_out = {32'b0, sp_adder_result};
-                {flag_invalid, flag_overflow, flag_underflow, flag_inexact} = {sp_adder_invalid, sp_adder_overflow, sp_adder_underflow, sp_adder_inexact};
+                {fflags[4], fflags[2], fflags[1], fflags[0]} = {sp_adder_invalid, sp_adder_overflow, sp_adder_underflow, sp_adder_inexact};
             end
             OP_FADD_D, OP_FSUB_D: begin
                 result_out = dp_adder_result;
-                {flag_invalid, flag_overflow, flag_underflow, flag_inexact} = {dp_adder_invalid, dp_adder_overflow, dp_adder_underflow, dp_adder_inexact};
+                {fflags[4], fflags[2], fflags[1], fflags[0]} = {dp_adder_invalid, dp_adder_overflow, dp_adder_underflow, dp_adder_inexact};
             end
             OP_FCMP_S: begin
                 result_out = {63'b0, sp_cmp};
-                flag_invalid = sp_cmp_invalid;
+                fflags[4] = sp_cmp_invalid;
             end
             OP_FCMP_D: begin
                 result_out = {63'b0, dp_cmp};
-                flag_invalid = dp_cmp_invalid;
+                fflags[4] = dp_cmp_invalid;
             end
             OP_FCVT_D_S, OP_FCVT_W_S, OP_FCVT_D_W: begin
                 result_out = sp_convert_result;
-                {flag_invalid, flag_overflow, flag_underflow, flag_inexact} = {sp_convert_invalid, sp_convert_overflow, sp_convert_underflow, sp_convert_inexact};
+                {fflags[4], fflags[2], fflags[1], fflags[0]} = {sp_convert_invalid, sp_convert_overflow, sp_convert_underflow, sp_convert_inexact};
                 case (func7)
                     OP_FCVT_D_S: begin convert_input_type = FP32; convert_output_type = FP64; end
                     OP_FCVT_W_S: begin convert_input_type = FP32; convert_output_type = (rs2[0]) ? UINT32 : INT32; end
@@ -221,7 +213,7 @@ module FPU_Top (
             end
             OP_FCVT_S_D, OP_FCVT_W_D, OP_FCVT_S_W: begin
                 result_out = {32'b0, dp_convert_result};
-                {flag_invalid, flag_overflow, flag_underflow, flag_inexact} = {dp_convert_invalid, dp_convert_overflow, dp_convert_underflow, dp_convert_inexact};
+                {fflags[4], fflags[2], fflags[1], fflags[0]} = {dp_convert_invalid, dp_convert_overflow, dp_convert_underflow, dp_convert_inexact};
                 case (func7)
                     OP_FCVT_S_D: begin convert_input_type = FP64; convert_output_type = FP32; end
                     OP_FCVT_W_D: begin convert_input_type = FP64; convert_output_type = (rs2[0]) ? UINT32 : INT32; end
@@ -231,77 +223,30 @@ module FPU_Top (
             end
             OP_FMUL_S: begin
                 result_out = {32'b0, sp_multiplier_result};
-                {flag_invalid, flag_overflow, flag_underflow, flag_inexact} = {sp_multiplier_invalid, sp_multiplier_overflow, sp_multiplier_underflow, sp_multiplier_inexact};
+                {fflags[4], fflags[2], fflags[1], fflags[0]} = {sp_multiplier_invalid, sp_multiplier_overflow, sp_multiplier_underflow, sp_multiplier_inexact};
             end
             OP_FMUL_D: begin
                 result_out = dp_multiplier_result;
-                {flag_invalid, flag_overflow, flag_underflow, flag_inexact} = {dp_multiplier_invalid, dp_multiplier_overflow, dp_multiplier_underflow, dp_multiplier_inexact};
+                {fflags[4], fflags[2], fflags[1], fflags[0]} = {dp_multiplier_invalid, dp_multiplier_overflow, dp_multiplier_underflow, dp_multiplier_inexact};
             end
             OP_FDIV_S: begin
                 result_out = {32'b0, sp_divider_result};
-                {flag_invalid, flag_divbyzero, flag_overflow, flag_underflow, flag_inexact} = {sp_divider_invalid, sp_divider_divbyzero, sp_divider_overflow, sp_divider_underflow, sp_divider_inexact};
+                {fflags[4], fflags[3], fflags[2], fflags[1], fflags[0]} = {sp_divider_invalid, sp_divider_divbyzero, sp_divider_overflow, sp_divider_underflow, sp_divider_inexact};
             end
             OP_FDIV_D: begin
                 result_out = dp_divider_result;
-                {flag_invalid, flag_divbyzero, flag_overflow, flag_underflow, flag_inexact} = {dp_divider_invalid, dp_divider_divbyzero, dp_divider_overflow, dp_divider_underflow, dp_divider_inexact};
+                {fflags[4], fflags[3], fflags[2], fflags[1], fflags[0]} = {dp_divider_invalid, dp_divider_divbyzero, dp_divider_overflow, dp_divider_underflow, dp_divider_inexact};
             end
-            // OP_FDIV_S, OP_FDIV_D: begin
-            //     is_double = opcode[0];
-            //     result_out = divider_result;
-            //     {flag_invalid, flag_overflow, flag_underflow, flag_inexact} = {divider_invalid, divider_overflow, divider_underflow, divider_inexact};
-            // end
             // OP_FSQRT_S, OP_FSQRT_D: begin
             //     is_double = opcode[0];
             //     result_out = sqrt_result;
             //     {flag_invalid, flag_overflow, flag_underflow, flag_inexact} = {sqrt_invalid, sqrt_overflow, sqrt_underflow, sqrt_inexact};
             // end
-            
-            // // --- Conversion Opcodes ---
-            // OP_FCVT_S_D: begin
-            //     convert_input_type = FP64;
-            //     convert_output_type = FP32;
-            //     result_out = convert_result;
-            //     {flag_invalid, flag_overflow, flag_underflow, flag_inexact} = {convert_invalid, convert_overflow, convert_underflow, convert_inexact};
-            // end
-            // OP_FCVT_D_S: begin
-            //     convert_input_type = FP32;
-            //     convert_output_type = FP64;
-            //     result_out = convert_result;
-            //     {flag_invalid, flag_overflow, flag_underflow, flag_inexact} = {convert_invalid, convert_overflow, convert_underflow, convert_inexact};
-            // end
-            // OP_FCVT_W_S: begin
-            //     is_double = 1'b0; // Op is on FP32
-            //     convert_input_type = FP32;
-            //     convert_output_type = INT32;
-            //     result_out = convert_result;
-            //     {flag_invalid, flag_overflow, flag_underflow, flag_inexact} = {convert_invalid, convert_overflow, convert_underflow, convert_inexact};
-            // end
-            // OP_FCVT_WU_S: begin
-            //     is_double = 1'b0; // Op is on FP32
-            //     convert_input_type = FP32;
-            //     convert_output_type = UINT32;
-            //     result_out = convert_result;
-            //     {flag_invalid, flag_overflow, flag_underflow, flag_inexact} = {convert_invalid, convert_overflow, convert_underflow, convert_inexact};
-            // end
-            // OP_FCVT_S_W: begin
-            //     is_double = 1'b0; // Result is FP32
-            //     convert_input_type = INT32;
-            //     convert_output_type = FP32;
-            //     result_out = convert_result;
-            //     {flag_invalid, flag_overflow, flag_underflow, flag_inexact} = {convert_invalid, convert_overflow, convert_underflow, convert_inexact};
-            // end
-            // OP_FCVT_S_WU: begin
-            //     is_double = 1'b0; // Result is FP32
-            //     convert_input_type = UINT32;
-            //     convert_output_type = FP32;
-            //     result_out = convert_result;
-            //     {flag_invalid, flag_overflow, flag_underflow, flag_inexact} = {convert_invalid, convert_overflow, convert_underflow, convert_inexact};
-            // end
 
             default: begin
                 // Default to an invalid operation, return QNaN
                 result_out     = 64'h7FF8_0000_0000_0000; // Default QNaN
-                flag_invalid   = 1'b1;
+                fflags[4]      = 1'b1;
             end
         endcase
     end
