@@ -2,6 +2,7 @@ module DIV_Reg (
     input wire clk,
     input wire rst_n,
     input wire start_i,
+    input wire [31:0] r_i,
     input wire [33:0] d_i,
     input wire [33:0] neg_d_i,
     input wire [65:0] r_1_i,
@@ -15,6 +16,7 @@ module DIV_Reg (
     input wire rem_i,
 
     output wire start_o,
+    output wire [31:0] r_o,
     output wire [33:0] d_o,
     output wire [33:0] neg_d_o,
     output wire [65:0] r_1_o,
@@ -29,6 +31,7 @@ module DIV_Reg (
 );
 
     PipelineRegister #(.WIDTH( 1)) reg_start    (.clk(clk), .rst_n(rst_n), .clear(1'b0), .en(1'b1), .data_i(start_i),    .data_o(start_o));
+    PipelineRegister #(.WIDTH(32)) reg_r        (.clk(clk), .rst_n(rst_n), .clear(1'b0), .en(1'b1), .data_i(r_i),        .data_o(r_o));
     PipelineRegister #(.WIDTH(34)) reg_d        (.clk(clk), .rst_n(rst_n), .clear(1'b0), .en(1'b1), .data_i(d_i),        .data_o(d_o));
     PipelineRegister #(.WIDTH(34)) reg_neg_d    (.clk(clk), .rst_n(rst_n), .clear(1'b0), .en(1'b1), .data_i(neg_d_i),    .data_o(neg_d_o));
     PipelineRegister #(.WIDTH(66)) reg_r_1      (.clk(clk), .rst_n(rst_n), .clear(1'b0), .en(1'b1), .data_i(r_1_i),      .data_o(r_1_o));

@@ -46,23 +46,26 @@ module SRTDivider (
     wire [31:0] q;
     wire [65:0] r;
 
-    assign q = r_pos_q_o[16] - r_neg_q_o[16]; // for restoration
-    assign r = r_r_1_o[16] + r_r_2_o[16]; // for restoration
+    assign q = r_pos_q_o[16] - r_neg_q_o[16]; // for restoration (18)
+    assign r = r_r_1_o[16] + r_r_2_o[16]; // for restoration (18)
 
-    wire [31:0] q_out;
-    wire [33:0] r_out;
+    wire [31:0] q_out; // final process (19)
+    wire [33:0] r_out; // final process (19)
+    wire d_zero;
 
     assign q_out = r_pos_q_o[17] - r_neg_q_o[17];
     assign r_out = (r_r_1_o[17][65:32] + r_r_2_o[17][65:32]) >>> r_shift_o[17];
+    assign d_zero = ~(|r_d_o[17]);
 
-    assign quotient = (r_r_sign_o[17] ^ r_d_sign_o[17]) & (~r_unsign_o[17]) ? -q_out : q_out;
-    assign remain = r_r_sign_o[17] & (~r_unsign_o[17]) ? -r_out[31:0] : r_out[31:0];
+    assign quotient = d_zero ? -1 : (r_r_sign_o[17] ^ r_d_sign_o[17]) & (~r_unsign_o[17]) ? -q_out : q_out; // divide by 0: q = -1
+    assign remain = d_zero ? r_r_o[17] : r_r_sign_o[17] & (~r_unsign_o[17]) ? -r_out[31:0] : r_out[31:0]; // divide by 0: r = r_input
 
     assign DIV_out = r_rem_o[17] ? remain : quotient;
     assign DIV_done = r_start_o[17];
 
     // reg
     wire r_start_o[17:0]; // 19 clks, 18 regs
+    wire [31:0] r_r_o [17:0]; 
     wire [33:0] r_d_o [17:0]; 
     wire [33:0] r_neg_d_o [17:0];
     wire [65:0] r_r_1_o [17:0];
@@ -88,6 +91,7 @@ module SRTDivider (
         .clk(clk),
         .rst_n(rst_n),
         .start_i(start),
+        .r_i(remainder),
         .d_i(d_o),
         .neg_d_i(-d_o),
         .r_1_i(r_o),
@@ -101,6 +105,7 @@ module SRTDivider (
         .rem_i(rem),
 
         .start_o(r_start_o[0]),
+        .r_o(r_r_o[0]),
         .d_o(r_d_o[0]),
         .neg_d_o(r_neg_d_o[0]),
         .r_1_o(r_r_1_o[0]),
@@ -136,6 +141,7 @@ module SRTDivider (
                 .clk(clk),
                 .rst_n(rst_n),
                 .start_i(r_start_o[g_i]),
+                .r_i(r_r_o[g_i]),
                 .d_i(r_d_o[g_i]),
                 .neg_d_i(r_neg_d_o[g_i]),
                 .r_1_i(r_1[g_i]), // last QS
@@ -149,6 +155,7 @@ module SRTDivider (
                 .rem_i(r_rem_o[g_i]),
 
                 .start_o(r_start_o[g_i + 1]),
+                .r_o(r_r_o[g_i + 1]),
                 .d_o(r_d_o[g_i + 1]),
                 .neg_d_o(r_neg_d_o[g_i + 1]),
                 .r_1_o(r_r_1_o[g_i + 1]),
@@ -168,6 +175,7 @@ module SRTDivider (
         .clk(clk),
         .rst_n(rst_n),
         .start_i(r_start_o[16]),
+        .r_i(r_r_o[16]),
         .d_i(r_d_o[16]),
         .neg_d_i(r_neg_d_o[16]),
         .r_1_i(r), // remainder 1&2 is added to know if the r is pos or neg 
@@ -181,6 +189,7 @@ module SRTDivider (
         .rem_i(r_rem_o[16]),
 
         .start_o(r_start_o[17]),
+        .r_o(r_r_o[17]),
         .d_o(r_d_o[17]),
         .neg_d_o(r_neg_d_o[17]),
         .r_1_o(r_r_1_o[17]),
