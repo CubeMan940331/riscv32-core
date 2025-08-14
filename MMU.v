@@ -70,27 +70,6 @@ localparam PAGE_GLOBAL          = 5;
 localparam PAGE_ACCESS          = 6;
 localparam PAGE_DIRTY           = 7;
 
-//DEBUG
-localparam DEBUG_MODE   = 0;
-localparam I_FAKE_ADDR  = 20'h80001;
-localparam I_FAKE_ENTRY = 32'h01010409;
-localparam D_FAKE_ADDR  = 20'h00401 ;
-localparam D_FAKE_ENTRY = 32'h01010803;
-
-// ---------------------------------------
-// Dcache
-// --------------------------------------- 
-
-// reg dcache_valid;
-
-// always @(posedge clk_i or negedge rst_i)begin
-//     if(!rst_i)begin
-//         dcache_valid <= 1;
-//     end else begin
-//         dcache_valid <= dcache_in_valid_i;
-//     end
-// end
-
 // ---------------------------------------
 // Wire & Register
 // --------------------------------------- 
@@ -130,18 +109,35 @@ assign dcache_addr_error = !((dcache_addr_r >= ADDR_MIN) && (dcache_addr_r <= AD
 // Output Control
 //----------------------------------------
 
+wire dcache_rd_c = ((lsu_in_rd_i && dtlb_hit) || is_pte) && ~dcache_addr_error;
+wire dcache_wr_c = (|lsu_in_wr_i) && ~is_pte && dtlb_hit && ~dcache_addr_error;
+wire dcache_valid;
+
+Dcache_Ctrl u_Dcache_Ctrl(
+    .clk_i                  (clk_i                  ),
+    .rst_i                  (rst_i                  ),
+    .mmu_dcache_rd_i        (dcache_rd_c        ),
+    .mmu_dcache_wr_i        (dcache_wr_c        ),
+    .dcache_mmu_available_i (dcache_in_valid_i ),
+    .mmu_dcache_rd_o        (dcache_rd_o        ),
+    .mmu_dcache_wr_o        (dcache_wr_o        ),
+    .dcache_valid_o         (dcache_valid         )
+);
+
+
+
 assign fetch_out_value_o    = icache_in_value_i;
 assign fetch_out_valid_o    = icache_in_valid_i && itlb_hit;
 assign lsu_out_value_o      = dcache_in_value_i;
-assign lsu_out_valid_o      = dcache_in_valid_i && dtlb_hit;
+assign lsu_out_valid_o      = dcache_valid && dtlb_hit;
 
 assign icache_addr_o    = {itlb_entry_o[29:10],fetch_pc_i[11:0]};
 assign icache_valid_o   = fetch_rd_i && itlb_hit && ~icache_addr_error;
 
 assign dcache_addr_o    = dcache_addr_r;
 assign dcache_value_o   = lsu_in_data_i;
-assign dcache_rd_o      = (lsu_in_rd_i && dtlb_hit || is_pte) && ~dcache_addr_error;
-assign dcache_wr_o      = (|lsu_in_wr_i) && ~is_pte && dtlb_hit && ~dcache_addr_error;
+// assign dcache_rd_o      = ((lsu_in_rd_i && dtlb_hit) || is_pte) && ~dcache_addr_error;
+// assign dcache_wr_o      = (|lsu_in_wr_i) && ~is_pte && dtlb_hit && ~dcache_addr_error;
 assign dcache_mask_o    = dcache_mask_r;
 
 always @(*)begin
@@ -181,10 +177,7 @@ reg [19:0] itlb_vpn_i;
 reg [19:0] dtlb_vpn_i;
 
 TLB #(
-    .PPN_SIZE(PPN_SIZE),
-    .DEBUG_MODE(DEBUG_MODE),
-    .FAKE_ADDR(I_FAKE_ADDR),
-    .FAKE_ENTRY(I_FAKE_ENTRY)
+    .PPN_SIZE(PPN_SIZE)
 )ITLB(
     .clk_i    (clk_i),
     .rst_i    (rst_i),
@@ -197,10 +190,7 @@ TLB #(
 );
 
 TLB #(
-    .PPN_SIZE(PPN_SIZE),
-    .DEBUG_MODE(DEBUG_MODE),
-    .FAKE_ADDR(D_FAKE_ADDR),
-    .FAKE_ENTRY(D_FAKE_ENTRY)
+    .PPN_SIZE(PPN_SIZE)
 )DTLB(
     .clk_i    (clk_i),
     .rst_i    (rst_i),
@@ -244,7 +234,7 @@ end
 reg  [31:0] ptw_req_addr_r;
 
 wire [31:0] ptw_resp_data_i  = dcache_in_value_i;
-wire        ptw_resp_valid_i = dcache_in_valid_i;
+wire        ptw_resp_valid_i = dcache_valid;
 wire        ptw_req_valid_i  = (itlb_req && ~itlb_hit) || (dtlb_req && ~dtlb_hit);
 wire [31:0] ptw_req_addr_i   = ptw_req_addr_r;
 wire        ptw_error_i      = dcache_addr_error && dcache_rd_o; 

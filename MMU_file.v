@@ -4,12 +4,7 @@
 
 module TLB
 #(
-    parameter PPN_SIZE = 20,
-
-    //Debug
-    parameter DEBUG_MODE = 0,
-    parameter FAKE_ADDR  = 20'h80001,
-    parameter FAKE_ENTRY = 32'h1010400
+    parameter PPN_SIZE = 20
 )
 (
      input                  clk_i
@@ -32,12 +27,6 @@ assign entry_o = entry_q;
 
 always @(posedge clk_i or negedge  rst_i)begin
     if(~rst_i)begin
-        if(DEBUG_MODE)begin
-            vpn_q       <= FAKE_ADDR;
-            entry_q     <= FAKE_ENTRY;
-            tlb_valid_r <= 1;
-        end
-        else
         begin
             vpn_q       <= 20'b0;
             entry_q     <= 32'b0; 
@@ -121,7 +110,8 @@ assign pte_value_o  = pte_value_r;
 assign pte_fault_o  = pte_fault_r;
 
 reg ptw_work_r;
-assign ptw_work_o = ptw_work_r;
+// assign ptw_work_o = ptw_work_r;
+assign ptw_work_o = (fsm_state == STATE_LEVEL_FIRST) || (fsm_state == STATE_LEVEL_SECOND);
 
 always @(posedge clk_i or negedge rst_i)begin
     if(~rst_i)
@@ -147,8 +137,9 @@ always @(posedge clk_i or negedge rst_i)begin
             else
             begin
                 fsm_state <= STATE_IDLE;
+                pte_addr_r  <= 32'b0;
                 pte_value_r <= 32'b0;
-                pte_addr_r  <= 32'b0;  
+                req_addr_r  <= 32'b0;  
                 pte_fault_r <= 0;
                 ptw_work_r  <= 0;
             end
@@ -208,25 +199,32 @@ end
 endmodule
 
 // Dcache Signal Control
-module Dcache_ctrl(
+module Dcache_Ctrl(
      input clk_i
     ,input rst_i
-    ,input dcache_available
-    ,output action_finished 
+    ,input mmu_dcache_rd_i
+    ,input mmu_dcache_wr_i
+    ,input dcache_mmu_available_i
+    ,output mmu_dcache_rd_o
+    ,output mmu_dcache_wr_o
+    ,output dcache_valid_o
 );
 
-// reg       pre_data;
-// assign  action_finished = ({pre_data, dcache_available} == 2'b01);
+reg dcache_mmu_available_pre;
+reg dcache_valid_r;
 
-reg [1:0] pre_data;
-assign action_finished = (pre_data == 2'b01);
+assign dcache_valid_o  = dcache_valid_r && dcache_mmu_available_i;
+assign mmu_dcache_rd_o = mmu_dcache_rd_i && dcache_mmu_available_pre;
+assign mmu_dcache_wr_o = mmu_dcache_wr_i && dcache_mmu_available_pre;
 
-always @(posedge clk_i) begin
-    if(!rst_i)
-        pre_data <= 0;
-    else
-        // pre_data <= dcache_available;
-        pre_data <= {pre_data[0],dcache_available};
+always @(posedge clk_i or negedge rst_i)begin
+    if(!rst_i)begin
+        dcache_mmu_available_pre <= 1;
+        dcache_valid_r <= 0;
+    end else begin
+        dcache_mmu_available_pre <= dcache_mmu_available_i;
+        dcache_valid_r <= (mmu_dcache_rd_i || mmu_dcache_wr_i) && dcache_mmu_available_i;
+    end
 end
 
 endmodule 

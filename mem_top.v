@@ -77,7 +77,6 @@ wire [ 5:0] mmu_exception_o;
 
 // Dcache
 wire [31:0] dcache_mmu_data;
-// wire        dcache_stall_cpu;
 wire        dcache_mmu_available;
 
 // Output
@@ -106,7 +105,7 @@ mmu #(
     .lsu_in_invalidate_i (lsu_mmu_dinvalidafte ),
     .lsu_in_writeback_i  (lsu_mmu_writeback  ),
     .dcache_in_value_i   (dcache_mmu_data   ),
-    .dcache_in_valid_i   (dcache_valid),
+    .dcache_in_valid_i   (dcache_mmu_available),
     .icache_in_value_i   (icache_mmu_value   ),
     .icache_in_valid_i   (icache_mmu_valid      ),
     .fetch_out_value_o   (mmu_fetch_value   ),
@@ -155,49 +154,17 @@ lsu u_lsu(
     .exception_o       (lsu_exception_o       )
 );
 
-reg [31:0] dcache_in_addr_r;
-reg [31:0] dcache_in_value_r;
-reg        dcache_wr_r;
-reg        dcache_rd_r;
-reg        pre_available;
-wire       dcache_valid;
-
-wire debug_w;
-assign debug_w = !(dcache_mmu_data == 32'h0);
-assign dcache_valid = (pre_available)?(dcache_mmu_available && dcache_rd_r):0;
-
-always @(posedge clk_i or negedge rst_i) begin
-    if(!rst_i)begin
-        dcache_in_value_r  <= 32'h0;
-        dcache_wr_r        <= 0;
-        dcache_rd_r        <= 0;
-        pre_available      <= 1;
-
-    end else begin
-        dcache_in_addr_r   <= mmu_dcache_addr;
-        dcache_in_value_r  <= mmu_dcache_data;
-        dcache_wr_r        <= mmu_dcache_wr;
-        pre_available <= dcache_mmu_available;
-
-        if(dcache_rd_r && dcache_mmu_available)
-            dcache_rd_r        <= (dcache_mmu_available && debug_w)?mmu_dcache_rd:dcache_rd_r;
-        else
-            dcache_rd_r        <= (dcache_mmu_available)?mmu_dcache_rd:dcache_rd_r;
-    end 
-end
-
 dcache_top u_dcache_top(
     .clk             (clk_i             ),
     .rst_n           (rst_i           ),
-    .tag_i           (dcache_in_addr_r[31:TAG_START]           ),
-    .idx_i           (dcache_in_addr_r[TAG_START-1:IDX_START]           ),
-    .word_offset_i   (dcache_in_addr_r[IDX_START-1:OFFSET_START]   ),
+    .tag_i           (mmu_dcache_addr[31:TAG_START]           ),
+    .idx_i           (mmu_dcache_addr[TAG_START-1:IDX_START]           ),
+    .word_offset_i   (mmu_dcache_addr[IDX_START-1:OFFSET_START]   ),
     .mask            (mmu_dcache_mask      ),
-    .data_i          (dcache_in_value_r          ),
-    .req_wr          (dcache_wr_r          ),
-    .req_rd          (dcache_rd_r),
+    .data_i          (mmu_dcache_data          ),
+    .req_wr          (mmu_dcache_wr),
+    .req_rd          (mmu_dcache_rd),
     .data_o          (dcache_mmu_data          ),
-    // .stall_cpu       (dcache_stall_cpu       ),
     .cache_available (dcache_mmu_available )
 );
 

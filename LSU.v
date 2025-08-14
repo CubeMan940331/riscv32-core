@@ -124,16 +124,16 @@ end
 //  Opcode 
 // --------------------------------------------
 
-assign ld_inst = opcode_valid_i && (lb_inst || lh_inst || lw_inst);
-assign st_inst = opcode_valid_i && (sb_inst || sh_inst || sw_inst);
+assign ld_inst = (lb_inst || lh_inst || lw_inst);
+assign st_inst = (sb_inst || sh_inst || sw_inst);
 
-assign lb_inst = ((opcode_opcode_i & `INST_LB_MASK) == `INST_LB) || ((opcode_opcode_i & `INST_LBU_MASK) == `INST_LBU);
-assign lh_inst = ((opcode_opcode_i & `INST_LH_MASK) == `INST_LH) || ((opcode_opcode_i & `INST_LBU_MASK) == `INST_LHU);
-assign lw_inst = ((opcode_opcode_i & `INST_LW_MASK) == `INST_LW) || ((opcode_opcode_i & `INST_LBU_MASK) == `INST_LWU);
+assign lb_inst = opcode_valid_i && (((opcode_opcode_i & `INST_LB_MASK) == `INST_LB) || ((opcode_opcode_i & `INST_LBU_MASK) == `INST_LBU));
+assign lh_inst = opcode_valid_i && (((opcode_opcode_i & `INST_LH_MASK) == `INST_LH) || ((opcode_opcode_i & `INST_LBU_MASK) == `INST_LHU));
+assign lw_inst = opcode_valid_i && (((opcode_opcode_i & `INST_LW_MASK) == `INST_LW) || ((opcode_opcode_i & `INST_LBU_MASK) == `INST_LWU));
 
-assign sb_inst = ((opcode_opcode_i & `INST_LB_MASK) == `INST_SB);
-assign sh_inst = ((opcode_opcode_i & `INST_LH_MASK) == `INST_SH);
-assign sw_inst = ((opcode_opcode_i & `INST_LW_MASK) == `INST_SW);
+assign sb_inst = opcode_valid_i && ((opcode_opcode_i & `INST_LB_MASK) == `INST_SB);
+assign sh_inst = opcode_valid_i && ((opcode_opcode_i & `INST_LH_MASK) == `INST_SH);
+assign sw_inst = opcode_valid_i && ((opcode_opcode_i & `INST_LW_MASK) == `INST_SW);
 
 assign sign_inst = ((opcode_opcode_i & `INST_LB_MASK) == `INST_LB) ||
                    ((opcode_opcode_i & `INST_LH_MASK) == `INST_LH) ||
@@ -154,7 +154,7 @@ assign mmu_dinvalidate_o = dinvalidate && csrrw_inst;
 
 // --------------------------------------------
 //  MMU
-// --------------------------------------------
+// -------------------------------------------- 
 
 assign mmu_addr_o   = resp_addr;
 assign mmu_data_o   = resp_data;
@@ -278,7 +278,7 @@ assign stall_o = (~resp_accept_o && (ld_inst || st_inst)) || (dwriteback || dinv
 reg [31:0] writeback_value_r;
 
 assign writeback_value_o = writeback_value_r;
-assign writeback_valid_o = mmu_valid_i;
+assign writeback_valid_o = mmu_valid_i && resp_is_load;
 assign writeback_rd_o    = resp_rd;
 
 always @(*)begin
