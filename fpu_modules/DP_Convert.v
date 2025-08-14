@@ -152,7 +152,8 @@ module DP_Convert (
             else if ((input_type == FP_TYPE_FP64) && (output_type == FP_TYPE_UINT32)) begin
                 if (sign_a_dec) begin // negative
                     result_int_32 = '0;
-                    flag_invalid = 1;
+                    if (((rounding_mode == 3'b001) || (rounding_mode == 3'b011)) && (exp_a_dec < 1023)) begin flag_inexact = 1; end
+                    else begin flag_invalid = 1; end
                 end else if (exp_a_dec < 1023) begin // 0.xx
                     result_int_32 = '0;
                     flag_inexact = |mant_a_dec[52:0];

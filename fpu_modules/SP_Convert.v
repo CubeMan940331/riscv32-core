@@ -65,7 +65,7 @@ module SP_Convert (
 
                 normal_path_enable = 0;
                 flag_invalid = 1; // NV
-                if (output_type == FP_TYPE_INT32) begin result_int = INT32_MIN_VAL; end // int32
+                if (output_type == FP_TYPE_INT32) begin result_int = INT32_MIN_VAL-1; end // int32 // don't know why it is 0x7fffffff, bc the default conversion of c++ output 0x80000000
                 else if (output_type == FP_TYPE_UINT32) begin result_int = UINT32_MAX_VAL; end // uint32
                 else begin final_sign = 0; final_exp = '1; final_mant = FP64_QNAN_MANT; end // double (NaN)
 
@@ -114,7 +114,8 @@ module SP_Convert (
             else if ((input_type == FP_TYPE_FP32) && (output_type == FP_TYPE_UINT32)) begin
                 if (sign_a_dec) begin // negative
                     result_int = '0;
-                    flag_invalid = 1;
+                    if (((rounding_mode == 3'b001) || (rounding_mode == 3'b011)) && (exp_a_dec < 127)) begin flag_inexact = 1; end
+                    else begin flag_invalid = 1; end
                 end else if (exp_a_dec < 127) begin // 0.xx
                     result_int = '0;
                     flag_inexact = |mant_a_dec[23:0];
@@ -172,8 +173,6 @@ module SP_Convert (
                     if (sign_a_dec && (exp_a_dec == 158) && (mant_a_dec == {1'b1, 23'b0})) begin result_int = INT32_MIN_VAL; end
                     else begin
                         flag_invalid = 1;
-                        flag_overflow = 1;
-                        flag_inexact = 1;
                         result_int = (sign_a_dec) ? INT32_MIN_VAL : INT32_MAX_VAL;
                     end
                 end else begin
@@ -181,10 +180,10 @@ module SP_Convert (
                     
                     if (shift_amt >= 0) begin
                         result_int = {40'b0, mant_a_dec} >> shift_amt;
-                        shifted_val = {40'b0, mant_a_dec} << (23 - shift_amt);
+                        shifted_val = {40'b0, mant_a_dec} << (24 - shift_amt);
                     end else begin
                         result_int = {40'b0, mant_a_dec} << -shift_amt;
-                        shifted_val = {40'b0, mant_a_dec} >> (shift_amt - 23);
+                        shifted_val = {40'b0, mant_a_dec} >> (shift_amt - 24);
                     end
 
                     // rounding
