@@ -252,9 +252,9 @@ module DP_Convert (
                 end
             end
 
-            // --- INT -> DP Conversion ---
+            // --- INT -> SP Conversion ---
             else begin
-                final_sign = (input_type == FP_TYPE_INT32) && operand_in[31];
+                final_sign = (input_type == FP_TYPE_INT32) & operand_in[31];
                 final_exp = 8'd158; // 2^31
                 result_int = (final_sign) ? {1'b0, -operand_in[31:0], 31'b0} : {1'b0, operand_in[31:0], 31'b0};
 
