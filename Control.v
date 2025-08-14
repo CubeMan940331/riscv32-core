@@ -175,6 +175,7 @@ wire is_impl_w =((inst&`INST_ADDI_MASK) == `INST_ADDI)   ||
                 ((inst&`INST_FCVT_W_S_MASK) == `INST_FCVT_W_S)   ||
                 ((inst&`INST_FCVT_WU_S_MASK) == `INST_FCVT_WU_S) ||
                 ((inst&`INST_FCVT_S_W_MASK) == `INST_FCVT_S_W)   ||
+                ((inst&`INST_FCVT_S_WU_MASK) == `INST_FCVT_S_WU) ||
                 ((inst&`INST_FMV_W_X_MASK) == `INST_FMV_W_X)     ||
                 ((inst&`INST_FMV_X_W_MASK) == `INST_FMV_X_W)     ||
                 // m priv
