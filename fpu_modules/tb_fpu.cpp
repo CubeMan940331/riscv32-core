@@ -66,6 +66,7 @@ const uint8_t RTZ = 0b001;
 const uint8_t RDN = 0b010;
 const uint8_t RUP = 0b011;
 const uint8_t RMM = 0b100;
+const uint8_t DYN = 0b111;
 
 // rs2
 const uint8_t CVT_NN = 0b00000;
@@ -460,6 +461,9 @@ int main(int argc, char** argv, char** env) {
             {"FSQRT.S: 4.0",                                 OP_FSQRT_S,     RTZ,       CVT_NN,    FP32,    f32_to_u32(4.0f),                  0,                                f32_to_u32(2.0f),                 0b00000},
             {"FSQRT.S: 0.25",                                OP_FSQRT_S,     RTZ,       CVT_NN,    FP32,    f32_to_u32(0.25f),                 0,                                f32_to_u32(0.5f),                 0b00000},
             {"FSQRT.S: 121.0",                               OP_FSQRT_S,     RTZ,       CVT_NN,    FP32,    f32_to_u32(121.0f),                0,                                f32_to_u32(11.0f),                0b00000},
+            {"FSQRT.S: 22.7",                               OP_FSQRT_S,     RTZ,       CVT_NN,    FP32,    f32_to_u32(22.7f),                0,                                f32_to_u32(11.0f),                0b00000},
+            {"FSQRT.S: 171.0",                               OP_FSQRT_S,     DYN,       CVT_NN,    FP32,    f32_to_u32(171.0f),                0,                                0x41513A26,                0b00000},
+            {"FSQRT.S: 10000.0",                               OP_FSQRT_S,     DYN,       CVT_NN,    FP32,    f32_to_u32(10000.0f),                0,                                f32_to_u32(100.0f),                0b00000},
     };
 
     // reset

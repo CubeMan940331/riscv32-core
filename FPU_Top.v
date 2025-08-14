@@ -179,7 +179,7 @@ module FPU_Top (
         result_out     = '0;
         fflags = '0;
 
-        rounding_mode = (func3 == 3'b111) ? frm : func3;
+        rounding_mode = (func3 == 3'b111) ? (func7 == OP_FSQRT_S) ? 3'b001 : frm : func3;
         convert_input_type = '0;
         convert_output_type = '0;
 

@@ -22,17 +22,19 @@ module SP_Sqrt (
     reg [31:0] mult_result_0, mult_result_1 [loops:0], mult_result_2 [loops:0], mult_result_3[loops+1:0];
     reg [31:0] sub_result [loops:0];
     reg [31:0] div_result;
+    reg [31:0] mult_check_result;
+    reg mult_check_inexact;
 
     // evil trick
-    SP_Multiplier mult0 ( .operand_a(operand_a), .operand_b(32'h3f000000), .rounding_mode(rounding_mode), .result(mult_result_0), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact() );
+    SP_Multiplier mult0 ( .operand_a(operand_a), .operand_b(32'h3f000000), .rounding_mode(3'b001), .result(mult_result_0), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact() );
 
     genvar i;
     generate
         for (i = 0 ; i < loops+1 ; i++) begin
-            SP_Multiplier mult1 ( .operand_a(mult_result_3[i]), .operand_b(mult_result_3[i]), .rounding_mode(rounding_mode), .result(mult_result_1[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact() );
-            SP_Multiplier mult2 ( .operand_a(mult_result_1[i]), .operand_b(mult_result_0), .rounding_mode(rounding_mode), .result(mult_result_2[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact() );
-            SP_Adder sub ( .operand_a(threehalfs), .operand_b(mult_result_2[i]), .is_subtraction(1'b1), .rounding_mode(rounding_mode), .result(sub_result[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact() );
-            SP_Multiplier mult3 ( .operand_a(mult_result_3[i]), .operand_b(sub_result[i]), .rounding_mode(rounding_mode), .result(mult_result_3[i+1]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact() );
+            SP_Multiplier mult1 ( .operand_a(mult_result_3[i]), .operand_b(mult_result_3[i]), .rounding_mode(3'b001), .result(mult_result_1[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact() );
+            SP_Multiplier mult2 ( .operand_a(mult_result_1[i]), .operand_b(mult_result_0), .rounding_mode(3'b001), .result(mult_result_2[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact() );
+            SP_Adder sub ( .operand_a(threehalfs), .operand_b(mult_result_2[i]), .is_subtraction(1'b1), .rounding_mode(3'b001), .result(sub_result[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact() );
+            SP_Multiplier mult3 ( .operand_a(mult_result_3[i]), .operand_b(sub_result[i]), .rounding_mode(3'b001), .result(mult_result_3[i+1]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact() );
         end
     endgenerate
 
@@ -40,6 +42,8 @@ module SP_Sqrt (
 
     // evil init
     assign mult_result_3[0] = 32'h5f3759df - (operand_a >> 1);
+
+    SP_Multiplier mult_check ( .operand_a(div_result), .operand_b(div_result), .rounding_mode(rounding_mode), .result(mult_check_result), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(mult_check_inexact) );
 
     always @(*) begin
         // --- Default assignments ---
@@ -56,6 +60,7 @@ module SP_Sqrt (
         // --- 2. Normal Path ---
         if (normal_path_enable) begin
             result = div_result;
+            flag_inexact = (operand_a != mult_check_result) | mult_check_inexact;
         end
     end
 endmodule
