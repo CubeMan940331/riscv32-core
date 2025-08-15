@@ -42,6 +42,7 @@ module FPU_Top (
     localparam OP_FCMP_S  = 7'b1010000; // FP32 Compare
     localparam OP_FCMP_D  = 7'b1010001; // FP64 Compare
     localparam OP_FMIN_FMAX_S  = 7'b0010100; // FP32 Min Max
+    localparam OP_FCLASS_S  = 7'b1110000; // FP32 f.class
 
     localparam OP_FCVT_D_S  = 7'b0100001; // FP32 -> FP64
     localparam OP_FCVT_W_S  = 7'b1100000; // FP32 -> INT32 // UINT32 same
@@ -88,6 +89,8 @@ module FPU_Top (
 
     reg [31:0] sp_fused_result;
     reg sp_fused_invalid, sp_fused_overflow, sp_fused_underflow, sp_fused_inexact;
+
+    reg [9:0]  sp_class_result;
 
     // --- Sub-module control signals ---
     reg [2:0]  rounding_mode;
@@ -208,6 +211,10 @@ module FPU_Top (
         .flag_underflow(sp_fused_underflow), .flag_inexact(sp_fused_inexact)
     );
 
+    SP_Classifier sp_class_inst (
+        .fp_in(operand_a[31:0]),
+        .result(sp_class_result)
+    );
 
     // --- Main Combinational Logic: Opcode Decoding and Output Muxing ---
     always @(*) begin
@@ -286,6 +293,9 @@ module FPU_Top (
                     OP_FMIN_FMAX_S: begin
                         result_out = {32'b0, sp_min_max_result};
                         fflags[4] = sp_min_max_invalid;
+                    end
+                    OP_FCLASS_S: begin
+                        result_out = {54'b0, sp_class_result};
                     end
 
                     default: begin
