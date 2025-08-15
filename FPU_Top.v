@@ -32,6 +32,7 @@ module FPU_Top (
     // localparam OP_FSQRT_D = 7'b0101101; // FP64 Square Root
     localparam OP_FCMP_S  = 7'b1010000; // FP32 Compare
     localparam OP_FCMP_D  = 7'b1010001; // FP64 Compare
+    localparam OP_FMIN_FMAX_S  = 7'b0010100; // FP32 Min Max
 
     localparam OP_FCVT_D_S  = 7'b0100001; // FP32 -> FP64
     localparam OP_FCVT_W_S  = 7'b1100000; // FP32 -> INT32 // UINT32 same
@@ -72,6 +73,9 @@ module FPU_Top (
 
     reg [31:0] sp_sqrt_result;
     reg sp_sqrt_invalid, sp_sqrt_inexact;
+
+    reg [31:0] sp_min_max_result;
+    reg sp_min_max_invalid;
 
     // --- Sub-module control signals ---
     reg [2:0]  rounding_mode;
@@ -172,6 +176,14 @@ module FPU_Top (
         .flag_invalid(sp_sqrt_invalid), .flag_inexact(sp_sqrt_inexact)
     );
 
+    SP_Min_Max sp_min_max_inst (
+        .operand_a(operand_a[31:0]),
+        .operand_b(operand_b[31:0]),
+        .func3(func3),
+        .result(sp_min_max_result),
+        .flag_invalid(sp_min_max_invalid)
+    );
+
 
     // --- Main Combinational Logic: Opcode Decoding and Output Muxing ---
     always @(*) begin
@@ -240,6 +252,10 @@ module FPU_Top (
             OP_FSQRT_S: begin
                 result_out = {32'b0, sp_sqrt_result};
                 {fflags[4], fflags[0]} = {sp_sqrt_invalid, sp_sqrt_inexact};
+            end
+            OP_FMIN_FMAX_S: begin
+                result_out = {32'b0, sp_min_max_result};
+                fflags[4] = sp_min_max_invalid;
             end
 
             default: begin
