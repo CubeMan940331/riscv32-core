@@ -43,6 +43,7 @@ wire [6:0]    decode_funct7;
 
 wire [4:0]    decode_rs1;
 wire [4:0]    decode_rs2;
+wire [4:0]    decode_rs3;
 wire [4:0]    decode_rd;
 
 wire [11:0]   decode_csr_addr;
@@ -88,6 +89,7 @@ wire [31:0] reg_data2_out;
 
 wire [31:0] freg_data1_out;
 wire [31:0] freg_data2_out;
+wire [31:0] freg_data3_out;
 
 // EX_Reg =====================
 wire EX_en;
@@ -103,11 +105,13 @@ wire [31:0] EX_reg_rd_data1_out;
 wire [31:0] EX_reg_rd_data2_out;
 wire [31:0] EX_freg_rd_data1_out;
 wire [31:0] EX_freg_rd_data2_out;
+wire [31:0] EX_freg_rd_data3_out;
 wire [31:0] EX_imm_out;
 // reg addr
 wire [4:0]  EX_rd_out;
 wire [4:0]  EX_rs1_out;
 wire [4:0]  EX_rs2_out;
+wire [4:0]  EX_rs3_out;
 // WB stage
 wire EX_reg_wr_en_out;
 wire EX_freg_wr_en_out;
@@ -197,8 +201,10 @@ wire EX_fwd1_sel;
 wire EX_fwd2_sel;
 wire EX_freg_fwd_sel1;
 wire EX_freg_fwd_sel2;
+wire EX_freg_fwd_sel3;
 wire [31:0] EX_fwd_data1;
 wire [31:0] EX_fwd_data2;
+wire [31:0] EX_fwd_data3;
 
 // Hazerd =====================
 wire [3:0] stall;
@@ -222,6 +228,7 @@ PipelineCtrl m_PipelineCtrl(
 ForwardUnit m_Forward(
     .EX_rs1(EX_rs1_out),
     .EX_rs2(EX_rs2_out),
+    .EX_rs3(EX_rs3_out),
     
     .WB_rd(WB_rd_out),
     .WB_reg_wr_en(WB_reg_wr_en_out),
@@ -230,7 +237,8 @@ ForwardUnit m_Forward(
     .EX_fwd_sel1(EX_fwd1_sel),
     .EX_fwd_sel2(EX_fwd2_sel),
     .EX_freg_fwd_sel1(EX_freg_fwd_sel1),
-    .EX_freg_fwd_sel2(EX_freg_fwd_sel2)
+    .EX_freg_fwd_sel2(EX_freg_fwd_sel2),
+    .EX_freg_fwd_sel3(EX_freg_fwd_sel3)
 );
 
 // ================================
@@ -298,12 +306,14 @@ FRegister m_FRegister(
 
     .rs1(decode_rs1),//addr
     .rs2(decode_rs2),//addr
+    .rs3(decode_rs3),//addr
     
     .rd(WB_rd_out),//addr
     .data_i(wb_data_in),
     
     .rd_data1_o(freg_data1_out),
-    .rd_data2_o(freg_data2_out)
+    .rd_data2_o(freg_data2_out),
+    .rd_data3_o(freg_data3_out)
 );
 
 DecodeUnit m_DecodeUnit(
@@ -315,6 +325,7 @@ DecodeUnit m_DecodeUnit(
     .funct7(decode_funct7),
     .rs1(decode_rs1),
     .rs2(decode_rs2),
+    .rs3(decode_rs3),
     .rd(decode_rd),
     .imm(decode_imm),
 
@@ -372,11 +383,13 @@ EX_Reg m_EX_Reg(
     .reg_rd_data2_i(reg_data2_out),
     .freg_rd_data1_i(freg_data1_out),
     .freg_rd_data2_i(freg_data2_out),
+    .freg_rd_data3_i(freg_data3_out),
     .imm_i(decode_imm),
     // reg addr
     .rd_i(decode_rd),
     .rs1_i(decode_rs1),
     .rs2_i(decode_rs2),
+    .rs3_i(decode_rs3),
     // WB stage
     .reg_wr_en_i(reg_wr_en),
     .freg_wr_en_i(freg_wr_en),
@@ -421,11 +434,13 @@ EX_Reg m_EX_Reg(
     .reg_rd_data2_o(EX_reg_rd_data2_out),
     .freg_rd_data1_o(EX_freg_rd_data1_out),
     .freg_rd_data2_o(EX_freg_rd_data2_out),
+    .freg_rd_data3_o(EX_freg_rd_data3_out),
     .imm_o(EX_imm_out),
     // reg addr
     .rd_o(EX_rd_out),
     .rs1_o(EX_rs1_out),
     .rs2_o(EX_rs2_out),
+    .rs3_o(EX_rs3_out),
     // WB stage
     .reg_wr_en_o(EX_reg_wr_en_out),
     .freg_wr_en_o(EX_freg_wr_en_out),
@@ -515,6 +530,7 @@ Mux2to1 #(.size(32)) m_EX_fwd2_MUX(
 );
 wire [31:0] EX_freg_fwd_data1;
 wire [31:0] EX_freg_fwd_data2;
+wire [31:0] EX_freg_fwd_data3;
 Mux2to1 #(.size(32)) m_EX_freg_fwd1_MUX(
     .sel(EX_freg_fwd_sel1),
     .s0(wb_data_in),
@@ -526,6 +542,12 @@ Mux2to1 #(.size(32)) m_EX_freg_fwd2_MUX(
     .s0(wb_data_in),
     .s1(EX_freg_rd_data2_out),
     .out(EX_freg_fwd_data2)
+);
+Mux2to1 #(.size(32)) m_EX_freg_fwd3_MUX(
+    .sel(EX_freg_fwd_sel3),
+    .s0(wb_data_in),
+    .s1(EX_freg_rd_data3_out),
+    .out(EX_freg_fwd_data3)
 );
 
 // BypassUnit ==================
@@ -587,12 +609,14 @@ Mux2to1 #(.size(32)) m_FPU_SRC1_MUX(
 FPU_Top m_FPU(
     .clk(clk),
     .rst_n(rst_n),
-    .frm(csr_rd_data[2:0]),
+    .opcode(EX_inst_out[6:0]),
     .func7(EX_inst_out[31:25]),         // Operation code to select the function
     .func3(EX_inst_out[14:12]),         // Rounding mode for arithmetic operations
+    .frm(csr_rd_data[2:0]),
     .rs2(EX_inst_out[24:20]),           // For selecting convert type
     .operand_a({32'h0,FPU_in1}),      // Operand A (can be FP64, FP32, INT32, UINT32)
     .operand_b({32'h0,EX_freg_fwd_data2}),      // Operand B (can be FP64, FP32)
+    .operand_c({32'h0,EX_freg_fwd_data3}),      // Operand C
     .result_out(FPU_out),     // Result of the operation
     .fflags(FPU_flags)
 );

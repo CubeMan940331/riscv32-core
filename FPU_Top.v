@@ -3,6 +3,7 @@ module FPU_Top (
     input rst_n,
 
     // --- Control Signals ---
+    input [6:0]  opcode,
     input [6:0]  func7,         // func7 code to select the function
     input [2:0]  func3,         // Rounding mode for arithmetic operations (if 111 swap to frm)
     input [2:0]  frm,           // Rounding mode (dynamic from frm)
@@ -11,6 +12,7 @@ module FPU_Top (
     // --- Data Inputs ---
     input [63:0] operand_a,      // Operand A (can be FP64, FP32, INT32, UINT32)
     input [63:0] operand_b,      // Operand B (can be FP64, FP32)
+    input [63:0] operand_c,
 
     // --- Data Outputs ---
     output reg [63:0] result_out,     // Result of the operation
@@ -20,6 +22,13 @@ module FPU_Top (
 );
 
     // --- Opcode Definitions ---
+    // opcode
+    localparam OP_FMADD_S  = 7'b1000011;
+    localparam OP_FMSUB_S  = 7'b1000111;
+    localparam OP_FNMSUB_S = 7'b1001011;
+    localparam OP_FNMADD_S = 7'b1001111;
+
+    // func7
     localparam OP_FADD_S  = 7'b0000000; // FP32 Add
     localparam OP_FADD_D  = 7'b0000001; // FP64 Add
     localparam OP_FSUB_S  = 7'b0000100; // FP32 Subtract
@@ -76,6 +85,9 @@ module FPU_Top (
 
     reg [31:0] sp_min_max_result;
     reg sp_min_max_invalid;
+
+    reg [31:0] sp_fused_result;
+    reg sp_fused_invalid, sp_fused_overflow, sp_fused_underflow, sp_fused_inexact;
 
     // --- Sub-module control signals ---
     reg [2:0]  rounding_mode;
@@ -184,6 +196,18 @@ module FPU_Top (
         .flag_invalid(sp_min_max_invalid)
     );
 
+    SP_Fused sp_fused_inst (
+        .operand_a(operand_a[31:0]),
+        .operand_b(operand_b[31:0]),
+        .operand_c(operand_c[31:0]),
+        .is_subtraction(opcode[2]),
+        .is_negative(opcode[3]),
+        .rounding_mode(rounding_mode),
+        .result(sp_fused_result),
+        .flag_invalid(sp_fused_invalid), .flag_overflow(sp_fused_overflow),
+        .flag_underflow(sp_fused_underflow), .flag_inexact(sp_fused_inexact)
+    );
+
 
     // --- Main Combinational Logic: Opcode Decoding and Output Muxing ---
     always @(*) begin
@@ -196,72 +220,80 @@ module FPU_Top (
         convert_output_type = '0;
 
         // Decode opcode to select operation and drive outputs
-        case (func7)
-            OP_FADD_S, OP_FSUB_S: begin
-                result_out = {32'b0, sp_adder_result};
-                {fflags[4], fflags[2], fflags[1], fflags[0]} = {sp_adder_invalid, sp_adder_overflow, sp_adder_underflow, sp_adder_inexact};
+        case (opcode)
+            OP_FMADD_S, OP_FMSUB_S, OP_FNMSUB_S, OP_FNMADD_S: begin
+                result_out = {32'b0, sp_fused_result};
+                {fflags[4], fflags[2], fflags[1], fflags[0]} = {sp_fused_invalid, sp_fused_overflow, sp_fused_underflow, sp_fused_inexact};
             end
-            OP_FADD_D, OP_FSUB_D: begin
-                result_out = dp_adder_result;
-                {fflags[4], fflags[2], fflags[1], fflags[0]} = {dp_adder_invalid, dp_adder_overflow, dp_adder_underflow, dp_adder_inexact};
-            end
-            OP_FCMP_S: begin
-                result_out = {63'b0, sp_cmp};
-                fflags[4] = sp_cmp_invalid;
-            end
-            OP_FCMP_D: begin
-                result_out = {63'b0, dp_cmp};
-                fflags[4] = dp_cmp_invalid;
-            end
-            OP_FCVT_D_S, OP_FCVT_W_S, OP_FCVT_D_W: begin
-                result_out = sp_convert_result;
-                {fflags[4], fflags[2], fflags[1], fflags[0]} = {sp_convert_invalid, sp_convert_overflow, sp_convert_underflow, sp_convert_inexact};
-                case (func7)
-                    OP_FCVT_D_S: begin convert_input_type = FP32; convert_output_type = FP64; end
-                    OP_FCVT_W_S: begin convert_input_type = FP32; convert_output_type = (rs2[0]) ? UINT32 : INT32; end
-                    OP_FCVT_D_W: begin convert_input_type = (rs2[0]) ? UINT32 : INT32; convert_output_type = FP64; end
-                    default: begin convert_input_type = FP32; convert_output_type = FP64; end
-                endcase
-            end
-            OP_FCVT_S_D, OP_FCVT_W_D, OP_FCVT_S_W: begin
-                result_out = {32'b0, dp_convert_result};
-                {fflags[4], fflags[2], fflags[1], fflags[0]} = {dp_convert_invalid, dp_convert_overflow, dp_convert_underflow, dp_convert_inexact};
-                case (func7)
-                    OP_FCVT_S_D: begin convert_input_type = FP64; convert_output_type = FP32; end
-                    OP_FCVT_W_D: begin convert_input_type = FP64; convert_output_type = (rs2[0]) ? UINT32 : INT32; end
-                    OP_FCVT_S_W: begin convert_input_type = (rs2[0]) ? UINT32 : INT32; convert_output_type = FP32; end
-                    default: begin convert_input_type = FP64; convert_output_type = FP32; end
-                endcase
-            end
-            OP_FMUL_S: begin
-                result_out = {32'b0, sp_multiplier_result};
-                {fflags[4], fflags[2], fflags[1], fflags[0]} = {sp_multiplier_invalid, sp_multiplier_overflow, sp_multiplier_underflow, sp_multiplier_inexact};
-            end
-            OP_FMUL_D: begin
-                result_out = dp_multiplier_result;
-                {fflags[4], fflags[2], fflags[1], fflags[0]} = {dp_multiplier_invalid, dp_multiplier_overflow, dp_multiplier_underflow, dp_multiplier_inexact};
-            end
-            OP_FDIV_S: begin
-                result_out = {32'b0, sp_divider_result};
-                {fflags[4], fflags[3], fflags[2], fflags[1], fflags[0]} = {sp_divider_invalid, sp_divider_divbyzero, sp_divider_overflow, sp_divider_underflow, sp_divider_inexact};
-            end
-            OP_FDIV_D: begin
-                result_out = dp_divider_result;
-                {fflags[4], fflags[3], fflags[2], fflags[1], fflags[0]} = {dp_divider_invalid, dp_divider_divbyzero, dp_divider_overflow, dp_divider_underflow, dp_divider_inexact};
-            end
-            OP_FSQRT_S: begin
-                result_out = {32'b0, sp_sqrt_result};
-                {fflags[4], fflags[0]} = {sp_sqrt_invalid, sp_sqrt_inexact};
-            end
-            OP_FMIN_FMAX_S: begin
-                result_out = {32'b0, sp_min_max_result};
-                fflags[4] = sp_min_max_invalid;
-            end
-
             default: begin
-                // Default to an invalid operation, return QNaN
-                result_out     = 64'h7FF8_0000_0000_0000; // Default QNaN
-                fflags[4]      = 1'b1;
+                case (func7)
+                    OP_FADD_S, OP_FSUB_S: begin
+                        result_out = {32'b0, sp_adder_result};
+                        {fflags[4], fflags[2], fflags[1], fflags[0]} = {sp_adder_invalid, sp_adder_overflow, sp_adder_underflow, sp_adder_inexact};
+                    end
+                    OP_FADD_D, OP_FSUB_D: begin
+                        result_out = dp_adder_result;
+                        {fflags[4], fflags[2], fflags[1], fflags[0]} = {dp_adder_invalid, dp_adder_overflow, dp_adder_underflow, dp_adder_inexact};
+                    end
+                    OP_FCMP_S: begin
+                        result_out = {63'b0, sp_cmp};
+                        fflags[4] = sp_cmp_invalid;
+                    end
+                    OP_FCMP_D: begin
+                        result_out = {63'b0, dp_cmp};
+                        fflags[4] = dp_cmp_invalid;
+                    end
+                    OP_FCVT_D_S, OP_FCVT_W_S, OP_FCVT_D_W: begin
+                        result_out = sp_convert_result;
+                        {fflags[4], fflags[2], fflags[1], fflags[0]} = {sp_convert_invalid, sp_convert_overflow, sp_convert_underflow, sp_convert_inexact};
+                        case (func7)
+                            OP_FCVT_D_S: begin convert_input_type = FP32; convert_output_type = FP64; end
+                            OP_FCVT_W_S: begin convert_input_type = FP32; convert_output_type = (rs2[0]) ? UINT32 : INT32; end
+                            OP_FCVT_D_W: begin convert_input_type = (rs2[0]) ? UINT32 : INT32; convert_output_type = FP64; end
+                            default: begin convert_input_type = FP32; convert_output_type = FP64; end
+                        endcase
+                    end
+                    OP_FCVT_S_D, OP_FCVT_W_D, OP_FCVT_S_W: begin
+                        result_out = {32'b0, dp_convert_result};
+                        {fflags[4], fflags[2], fflags[1], fflags[0]} = {dp_convert_invalid, dp_convert_overflow, dp_convert_underflow, dp_convert_inexact};
+                        case (func7)
+                            OP_FCVT_S_D: begin convert_input_type = FP64; convert_output_type = FP32; end
+                            OP_FCVT_W_D: begin convert_input_type = FP64; convert_output_type = (rs2[0]) ? UINT32 : INT32; end
+                            OP_FCVT_S_W: begin convert_input_type = (rs2[0]) ? UINT32 : INT32; convert_output_type = FP32; end
+                            default: begin convert_input_type = FP64; convert_output_type = FP32; end
+                        endcase
+                    end
+                    OP_FMUL_S: begin
+                        result_out = {32'b0, sp_multiplier_result};
+                        {fflags[4], fflags[2], fflags[1], fflags[0]} = {sp_multiplier_invalid, sp_multiplier_overflow, sp_multiplier_underflow, sp_multiplier_inexact};
+                    end
+                    OP_FMUL_D: begin
+                        result_out = dp_multiplier_result;
+                        {fflags[4], fflags[2], fflags[1], fflags[0]} = {dp_multiplier_invalid, dp_multiplier_overflow, dp_multiplier_underflow, dp_multiplier_inexact};
+                    end
+                    OP_FDIV_S: begin
+                        result_out = {32'b0, sp_divider_result};
+                        {fflags[4], fflags[3], fflags[2], fflags[1], fflags[0]} = {sp_divider_invalid, sp_divider_divbyzero, sp_divider_overflow, sp_divider_underflow, sp_divider_inexact};
+                    end
+                    OP_FDIV_D: begin
+                        result_out = dp_divider_result;
+                        {fflags[4], fflags[3], fflags[2], fflags[1], fflags[0]} = {dp_divider_invalid, dp_divider_divbyzero, dp_divider_overflow, dp_divider_underflow, dp_divider_inexact};
+                    end
+                    OP_FSQRT_S: begin
+                        result_out = {32'b0, sp_sqrt_result};
+                        {fflags[4], fflags[0]} = {sp_sqrt_invalid, sp_sqrt_inexact};
+                    end
+                    OP_FMIN_FMAX_S: begin
+                        result_out = {32'b0, sp_min_max_result};
+                        fflags[4] = sp_min_max_invalid;
+                    end
+
+                    default: begin
+                        // Default to an invalid operation, return QNaN
+                        result_out     = 64'h7FF8_0000_0000_0000; // Default QNaN
+                        fflags[4]      = 1'b1;
+                    end
+                endcase
             end
         endcase
     end

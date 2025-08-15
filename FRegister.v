@@ -4,18 +4,21 @@ module FRegister #(parameter FLEN = 32)(
 
     input [4:0] rs1,
     input [4:0] rs2,
+    input [4:0] rs3,
 
     input wr_en,
     input [4:0] rd,
     input [FLEN-1:0] data_i,         // 32-bit for RVF/D
     
     output [FLEN-1:0] rd_data1_o,
-    output [FLEN-1:0] rd_data2_o
+    output [FLEN-1:0] rd_data2_o,
+    output [FLEN-1:0] rd_data3_o
 );
     reg [FLEN-1:0] fregs [0:31];     // Floating-point registers f0..f31
 
     assign rd_data1_o = fregs[rs1];
     assign rd_data2_o = fregs[rs2];
+    assign rd_data3_o = fregs[rs3];
 
     always @(negedge clk, negedge rst_n) begin
         if (~rst_n) begin
