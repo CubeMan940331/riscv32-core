@@ -106,17 +106,17 @@ assign exception_o = (addr_unaligned && mem_rd_r)?`EXCEPTION_MISALIGNED_LOAD:
                      (addr_unaligned && (|mem_wr_r))?`EXCEPTION_MISALIGNED_STORE:
                      (resp_is_load && mmu_load_fault)?`EXCEPTION_FAULT_LOAD:
                      ((|resp_wr) && mmu_store_fault)?`EXCEPTION_FAULT_STORE:
-                     5'h0;
+                     6'h0;
 
 always @(*)begin
-    unaligned_r = 32'b0;
+    unaligned_r = 0;
 
     if(opcode_valid_i && (lw_inst || sw_inst))
         unaligned_r = (mem_addr_r[1:0] != 2'b0);
     else if (opcode_valid_i && (lh_inst || sh_inst))
         unaligned_r = mem_addr_r[0];
     else 
-        unaligned_r = 1'b0;
+        unaligned_r = 0;
 end
 
 

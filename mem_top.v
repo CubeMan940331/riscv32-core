@@ -1,5 +1,9 @@
+`timescale 1ns / 1ps
+
 `include "LSU.v"
 `include "MMU.v"
+`include "Dcache/dcache_top.v"
+// `include "Icache/icache_top.v"
 
 module mem_top(
      input          clk_i
@@ -37,13 +41,6 @@ wire        fetch_mmu_rd;
 assign fetch_mmu_pc = 32'h0;
 assign fetch_mmu_rd = 0;
 
-// Icache
-wire [31:0] icache_mmu_value;
-wire        icache_mmu_valid;
-
-assign icache_mmu_value = 32'h0;
-assign icache_mmu_valid = 0;
-
 // LSU
 wire [31:0] lsu_mmu_addr;
 wire [31:0] lsu_mmu_data;
@@ -72,12 +69,15 @@ wire        mmu_dcache_flush;
 wire        mmu_dcache_writeback;
 wire        mmu_dcache_invalidate;
 wire [31:0] mmu_icache_addr;
-wire        mmu_icache_valid;
+wire        mmu_icache_rd;
 wire [ 5:0] mmu_exception_o;
 
-// Dcache
+// Cache
 wire [31:0] dcache_mmu_data;
 wire        dcache_mmu_available;
+wire [31:0] icache_mmu_value;
+wire        icache_mmu_valid;
+wire [ 5:0] icache_exception_o;
 
 // Output
 assign exception_o = (lsu_exception_o != 6'b0)?lsu_exception_o:
@@ -121,7 +121,7 @@ mmu #(
     .dcache_invalidate_o (mmu_dcache_invalidate ),
     .dcache_writeback_o  (mmu_dcache_writeback  ),
     .icache_addr_o       (mmu_icache_addr       ),
-    .icache_valid_o      (mmu_icache_valid      ),
+    .icache_rd_o         (mmu_icache_rd      ),
     .load_fault_o        (mmu_lsu_load_fault        ),
     .store_fault_o       (mmu_lsu_store_fault       ),
     .inst_fault_o        (mmu_inst_fault        ),
@@ -155,8 +155,8 @@ lsu u_lsu(
 );
 
 dcache_top u_dcache_top(
-    .clk             (clk_i             ),
-    .rst_n           (rst_i           ),
+    .clk             (clk_i),
+    .rst_n           (rst_i),
     .tag_i           (mmu_dcache_addr[31:TAG_START]           ),
     .idx_i           (mmu_dcache_addr[TAG_START-1:IDX_START]           ),
     .word_offset_i   (mmu_dcache_addr[IDX_START-1:OFFSET_START]   ),
@@ -168,6 +168,18 @@ dcache_top u_dcache_top(
     .cache_available (dcache_mmu_available )
 );
 
+// icache_top u_icache_top(
+//     .clk       (clk_i     ),
+//     .rst_n     (rst_i     ),
+//     .tag_i     (mmu_icache_addr[31:TAG_START]   ),
+//     .idx_i     (mmu_icache_addr[TAG_START-1:IDX_START]     ),
+//     .ofs_i     (mmu_icache_addr[IDX_START-1:OFFSET_START]     ),
+//     .inst_o    (icache_mmu_value    ),
+//     // .stall_cpu (stall_cpu ),
+//     .exception (icache_exception_o )
+// );
 
+assign icache_mmu_value = 32'h0;
+assign icache_mmu_valid = 0;
 
 endmodule

@@ -46,7 +46,7 @@ module mmu
     ,output         dcache_invalidate_o
     ,output         dcache_writeback_o
     ,output [31:0]  icache_addr_o
-    ,output         icache_valid_o
+    ,output         icache_rd_o
 
     ,output         load_fault_o
     ,output         store_fault_o
@@ -86,8 +86,8 @@ reg  [31:0] update_entry;
 wire        is_pte;
 wire        is_update;
 
-// wire        vm_enable   = satp_i[`SATP_MODE_R];
-// wire        vm_asid     - satp_i[`SATP_ASID_R];
+wire        vm_enable   = satp_i[`SATP_MODE_R];
+// wire        vm_asid     = satp_i[`SATP_ASID_R];
 // wire [31:0] vm_ppn      = {satp_i[`SATP_PPN_R],12'b0};
 
 wire [31:0] ptw_pte_addr_o;
@@ -109,11 +109,13 @@ assign dcache_addr_error = !((dcache_addr_r >= ADDR_MIN) && (dcache_addr_r <= AD
 // Output Control
 //----------------------------------------
 
-wire dcache_rd_c = ((lsu_in_rd_i && dtlb_hit) || is_pte) && ~dcache_addr_error;
+wire dcache_rd_c = ((lsu_in_rd_i && (dtlb_hit)) || is_pte) && ~dcache_addr_error;
 wire dcache_wr_c = (|lsu_in_wr_i) && ~is_pte && dtlb_hit && ~dcache_addr_error;
 wire dcache_valid;
+wire icache_rd_c = fetch_rd_i && itlb_hit && ~icache_addr_error;
+wire icache_valid;
 
-Dcache_Ctrl u_Dcache_Ctrl(
+Cache_Ctrl u_Cache_Ctrl(
     .clk_i                  (clk_i                  ),
     .rst_i                  (rst_i                  ),
     .mmu_dcache_rd_i        (dcache_rd_c        ),
@@ -121,18 +123,20 @@ Dcache_Ctrl u_Dcache_Ctrl(
     .dcache_mmu_available_i (dcache_in_valid_i ),
     .mmu_dcache_rd_o        (dcache_rd_o        ),
     .mmu_dcache_wr_o        (dcache_wr_o        ),
-    .dcache_valid_o         (dcache_valid         )
+    .dcache_valid_o         (dcache_valid         ),
+    .mmu_icache_rd_i        (icache_rd_c),
+    .icache_mmu_available_i (icache_in_valid_i),
+    .mmu_icache_rd_o        (icache_rd_o),
+    .icache_valid_o         (icache_valid)
 );
-
-
 
 assign fetch_out_value_o    = icache_in_value_i;
 assign fetch_out_valid_o    = icache_in_valid_i && itlb_hit;
 assign lsu_out_value_o      = dcache_in_value_i;
 assign lsu_out_valid_o      = dcache_valid && dtlb_hit;
 
-assign icache_addr_o    = {itlb_entry_o[29:10],fetch_pc_i[11:0]};
-assign icache_valid_o   = fetch_rd_i && itlb_hit && ~icache_addr_error;
+assign icache_addr_o        = {itlb_entry_o[29:10],fetch_pc_i[11:0]};
+// assign icache_rd_o          = fetch_rd_i && itlb_hit && ~icache_addr_error;
 
 assign dcache_addr_o    = dcache_addr_r;
 assign dcache_value_o   = lsu_in_data_i;
@@ -203,8 +207,8 @@ TLB #(
 );
 
 always @(*)begin
-    itlb_vpn_i      = 32'b0;
-    dtlb_vpn_i      = 32'b0;
+    itlb_vpn_i      = 20'b0;
+    dtlb_vpn_i      = 20'b0;
     update_entry    = 32'b0;
 
     if(is_update)
