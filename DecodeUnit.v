@@ -9,6 +9,7 @@ module DecodeUnit(
     
     output [4:0]    rs1,
     output [4:0]    rs2,
+    output [4:0]    rs3,
     output [4:0]    rd,
 
     output reg signed [31:0]   imm,
@@ -24,6 +25,7 @@ assign funct7 = inst_i[31:25];
 
 assign rs1 = inst_i[19:15];
 assign rs2 = inst_i[24:20];
+assign rs3 = inst_i[31:27];
 assign rd  = inst_i[11:07];
 
 always @(*)begin
