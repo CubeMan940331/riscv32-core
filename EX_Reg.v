@@ -42,6 +42,10 @@ module EX_Reg (
     // cmp
     input wire [2:0]  cmp_op_i,
     
+    // MUL/DIV
+    input wire is_MUL_DIV_i,
+    input wire [2:0] MUL_DIV_ctrl_i,
+
     // csr
     input wire [11:0] csr_addr_i,
 
@@ -96,6 +100,11 @@ module EX_Reg (
     output wire [3:0]  ALU_ctrl_o,
     // cmp
     output wire [2:0]  cmp_op_o,
+
+    // MUL/DIV
+    output wire is_MUL_DIV_o,
+    output wire [2:0] MUL_DIV_ctrl_o,
+
     // csr
     output wire [11:0] csr_addr_o,
 
@@ -148,6 +157,9 @@ module EX_Reg (
     PipelineRegister #(.WIDTH(4))  reg_ALU_ctrl  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(ALU_ctrl_i), .data_o(ALU_ctrl_o));
     // cmp
     PipelineRegister #(.WIDTH(3))  reg_cmp_op    (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(cmp_op_i), .data_o(cmp_op_o));
+    // MUL/DIV
+    PipelineRegister #(.WIDTH(1))  reg_is_MUL_DIV (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(is_MUL_DIV_i), .data_o(is_MUL_DIV_o));
+    PipelineRegister #(.WIDTH(3))  reg_MUL_DIV_ctrl (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(MUL_DIV_ctrl_i), .data_o(MUL_DIV_ctrl_o));
     // csr
     PipelineRegister #(.WIDTH(12)) reg_csr_addr  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(csr_addr_i), .data_o(csr_addr_o));
     PipelineRegister #(.WIDTH(1))  reg_is_csr    (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(is_csr_i), .data_o(is_csr_o));

@@ -13,6 +13,7 @@ module WB_Reg (
     
     input  wire [31:0] bypass_i,
     input  wire [31:0] ALU_i,
+    input  wire [31:0] MUL_DIV_i,
     input  wire [31:0] FPU_i,
     input  wire [31:0] mem_data_i,
     input  wire [31:0] csr_rd_data_i,
@@ -30,6 +31,7 @@ module WB_Reg (
     
     output wire [31:0] bypass_o,
     output wire [31:0] ALU_o,
+    output wire [31:0] MUL_DIV_o,
     output wire [31:0] FPU_o,
     output wire [31:0] mem_data_o,
     output wire [31:0] csr_rd_data_o,
@@ -46,6 +48,7 @@ module WB_Reg (
     
     PipelineRegister #(.WIDTH(32)) reg_bypass    (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(bypass_i),   .data_o(bypass_o));
     PipelineRegister #(.WIDTH(32)) reg_alu       (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(ALU_i),  .data_o(ALU_o));
+    PipelineRegister #(.WIDTH(32)) reg_mul_div   (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(MUL_DIV_i),  .data_o(MUL_DIV_o));
     PipelineRegister #(.WIDTH(32)) reg_fpu       (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(FPU_i),  .data_o(FPU_o));
     PipelineRegister #(.WIDTH(32)) reg_mem_data  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(mem_data_i), .data_o(mem_data_o));
     PipelineRegister #(.WIDTH(32)) csr_rd_data   (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(csr_rd_data_i), .data_o(csr_rd_data_o));
