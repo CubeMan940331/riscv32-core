@@ -446,8 +446,8 @@ always @(*) begin
         else if ((inst&`INST_SH_MASK) == `INST_SH)   mem_ctrl_r = 4'b0010; // SH
         else if ((inst&`INST_SW_MASK) == `INST_SW)   mem_ctrl_r = 4'b0100; // SW
 
-        else if ((inst&`INST_FLW_MASK) == `INST_FLW)   mem_ctrl_r = 4'b0100; // FLW
-        else if ((inst&`INST_FSW_MASK) == `INST_FSW)   mem_ctrl_r = 4'b0100; // FSW
+        else if ((inst&`INST_FLW_MASK) == `INST_FLW) mem_ctrl_r = 4'b0100; // FLW
+        else if ((inst&`INST_FSW_MASK) == `INST_FSW) mem_ctrl_r = 4'b1100; // FSW
         else mem_ctrl_r = 4'b0000;                                         // undefined
     end
 

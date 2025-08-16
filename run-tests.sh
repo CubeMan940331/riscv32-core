@@ -30,10 +30,11 @@ for mem_file in "$file_dir"*.mem; do
         ext=${BASH_REMATCH[1]}
         ext=${ext^^}
     else
-        ext="UNKNOWN"
+        ext="Zicsr"
     fi
 
     pass_pc=$(grep '<pass>:' "$file_dir$test_name.dump" | cut -c 2-8)
+    pass_pc=$(grep '<write_tohost>:' "$file_dir$test_name.dump" | cut -c 2-8)
     if [ -n "$pass_pc" ]; then
         pass_pc=$(printf "%d" "0x$pass_pc")
     fi
@@ -44,7 +45,7 @@ for mem_file in "$file_dir"*.mem; do
         ext_results[$ext]=1  # assume pass until proven fail
     fi
 
-    if [[ "$output" != "yes" && "$output" != "done" ]]; then
+    if [[ "$output" != "Yes" && "$output" != "Done" ]]; then
         ext_results[$ext]=0
         ext_details[$ext]+=$(printf "%-30s %-16s %s\n" "$test_name" "pass_pc=$pass_pc" "$output\n")
     fi

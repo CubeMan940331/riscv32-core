@@ -674,7 +674,7 @@ always @(posedge clk or negedge rst_n) begin
         MEM_mem_rd_en_out <= EX_mem_rd_en_out;
         MEM_mem_ctrl_out <= EX_mem_ctrl_out;
         MEM_mem_addr_out <= (EX_fwd_data1 + EX_imm_out);
-        MEM_mem_wr_data_out <= EX_fwd_data2;
+        MEM_mem_wr_data_out <= (EX_mem_ctrl_out[3] & EX_mem_wr_en_out) ? EX_freg_fwd_data2 : EX_fwd_data2;
         MEM_stage_reg <= 1;
     end
     else begin

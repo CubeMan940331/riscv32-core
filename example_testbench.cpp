@@ -18,7 +18,7 @@ using namespace std;
 #include "VComputer_PipelineCPU.h"
 #include "verilated.h"
 
-#define MAX_CYCLE 5000
+#define MAX_CYCLE 2500
 void load_inst_mem(VComputer_InstructionMemory *ptr, ifstream in){
     constexpr size_t INST_SIZE = 65536;
     if(INST_SIZE%4){
