@@ -18,7 +18,7 @@ using namespace std;
 #include "VComputer_PipelineCPU.h"
 #include "verilated.h"
 
-#define MAX_CYCLE 2500
+#define MAX_CYCLE 5000
 void load_inst_mem(VComputer_InstructionMemory *ptr, ifstream in){
     constexpr size_t INST_SIZE = 65536;
     if(INST_SIZE%4){
@@ -123,6 +123,15 @@ int main(int argc, char **argv){
         }
         catch(...){}
     }
+    bool is_set_stop_pc=false;
+    int stop_pc;
+    if(argc>3){
+        try{
+            stop_pc=stoi(argv[3]);
+            is_set_stop_pc=true;
+        }
+        catch(...){}
+    }
     
     VerilatedContext *contextp = new VerilatedContext;
     VerilatedVcdC *m_trace = new VerilatedVcdC;
@@ -154,6 +163,11 @@ int main(int argc, char **argv){
             is_reach_end_pc=true;
             break;
         }
+        if(
+            is_set_stop_pc &&
+            top->Computer->m_core0->WB_pc_valid_out &&
+            top->Computer->m_core0->WB_pc_out==stop_pc
+        ) break;
         do_cycle(contextp, m_trace, top);
     }
 
@@ -169,8 +183,3 @@ int main(int argc, char **argv){
 
     return 0;
 }
-
-/*
-Contents of section .data:
- 80002000 ff00ff00 00ff00ff f00ff00f 0ff00ff0  ................
-*/
