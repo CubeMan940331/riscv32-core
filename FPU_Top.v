@@ -43,6 +43,7 @@ module FPU_Top (
     localparam OP_FCMP_D  = 7'b1010001; // FP64 Compare
     localparam OP_FMIN_FMAX_S  = 7'b0010100; // FP32 Min Max
     localparam OP_FCLASS_S  = 7'b1110000; // FP32 f.class
+    localparam OP_FSGNJ_S  = 7'b0010000; // FP32 fsgnj.s fsgnjn.s fsgnjx.s
 
     localparam OP_FCVT_D_S  = 7'b0100001; // FP32 -> FP64
     localparam OP_FCVT_W_S  = 7'b1100000; // FP32 -> INT32 // UINT32 same
@@ -91,6 +92,8 @@ module FPU_Top (
     reg sp_fused_invalid, sp_fused_overflow, sp_fused_underflow, sp_fused_inexact;
 
     reg [9:0]  sp_class_result;
+
+    reg [31:0] sp_fsgnj_result;
 
     // --- Sub-module control signals ---
     reg [2:0]  rounding_mode;
@@ -216,6 +219,13 @@ module FPU_Top (
         .result(sp_class_result)
     );
 
+    SP_Fsgnj sp_fsgnj_inst (
+        .operand_a(operand_a[31:0]),
+        .operand_b(operand_b[31:0]),
+        .func3(func3),
+        .result(sp_fsgnj_result)
+    );
+
     // --- Main Combinational Logic: Opcode Decoding and Output Muxing ---
     always @(*) begin
         // Default assignments to avoid latches
@@ -296,6 +306,9 @@ module FPU_Top (
                     end
                     OP_FCLASS_S: begin
                         result_out = {54'b0, sp_class_result};
+                    end
+                    OP_FSGNJ_S: begin
+                        result_out = {32'b0, sp_fsgnj_result};
                     end
 
                     default: begin
