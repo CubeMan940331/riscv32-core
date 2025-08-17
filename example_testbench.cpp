@@ -79,12 +79,22 @@ int main(int argc, char **argv){
         dump_file=mem_file.substr(0,sep_pos)+".vcd";
     }
     
+    bool is_set_stop_pc=false;
+    int stop_pc;
+    if(argc>2){
+        try{
+            stop_pc=stoi(argv[2]);
+            is_set_stop_pc=true;
+        }
+        catch(...){}
+    }
+    
     bool is_set_pass_pc=false;
     bool is_reach_pass_pc=false;
     int pass_pc;
-    if(argc>2){
+    if(argc>3){
         try{
-            pass_pc=stoi(argv[2]);
+            pass_pc=stoi(argv[3]);
             is_set_pass_pc=true;
         }
         catch(...){}
@@ -93,20 +103,10 @@ int main(int argc, char **argv){
     bool is_set_fail_pc=false;
     bool is_reach_fail_pc=false;
     int fail_pc;
-    if(argc>3){
-        try{
-            fail_pc=stoi(argv[3]);
-            is_set_fail_pc=true;
-        }
-        catch(...){}
-    }
-    
-    bool is_set_stop_pc=false;
-    int stop_pc;
     if(argc>4){
         try{
-            stop_pc=stoi(argv[4]);
-            is_set_stop_pc=true;
+            fail_pc=stoi(argv[4]);
+            is_set_fail_pc=true;
         }
         catch(...){}
     }
