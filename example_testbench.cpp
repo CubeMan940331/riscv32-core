@@ -19,41 +19,6 @@ using namespace std;
 #include "verilated.h"
 
 #define MAX_CYCLE 5000
-void load_inst_mem(VComputer_InstructionMemory *ptr, ifstream in){
-    constexpr size_t INST_SIZE = 65536;
-    if(INST_SIZE%4){
-        // expect size of InstructionMemory is align
-        throw runtime_error("size of InstructionMemory is misalign");
-    }
-    unsigned long long i=0;
-    string str;
-    CData byte_to_wr;
-    while(in>>str){
-        if(i>=INST_SIZE){
-            throw runtime_error("InstructionMemory not big enough");
-        }
-        // expect `str` to be a byte in 0/1 string
-        if(str.size()!=8){
-            throw runtime_error(".mem file format error");
-        }
-        byte_to_wr=0;
-        for(auto &a:str){
-            if(a!='0' && a!='1'){
-                throw runtime_error(".mem file format error");
-            }
-            byte_to_wr<<=1;
-            byte_to_wr|=(a=='1');
-        }
-        ptr->insts[i++]=byte_to_wr;
-    }
-    for(;i<INST_SIZE;i+=4){
-        // set to nop
-        ptr->insts[i+3] = 0x00;
-        ptr->insts[i+2] = 0x00;
-        ptr->insts[i+1] = 0x00;
-        ptr->insts[i+0] = 0x13;
-    }
-}
 void load_data_mem(VComputer_DataMemory *ptr, ifstream in){
     constexpr size_t INST_SIZE = 65536;
     if(INST_SIZE%4){
@@ -161,7 +126,6 @@ int main(int argc, char **argv){
     do_cycle(contextp, m_trace, top);
 
     if(mem_file.size()){
-        load_inst_mem(top->Computer->m_InstMem, ifstream(mem_file));
         load_data_mem(top->Computer->m_DataMemory, ifstream(mem_file));
     }
     do_cycle(contextp, m_trace, top);

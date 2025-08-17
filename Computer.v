@@ -14,19 +14,18 @@ wire [31:0] d_mem_wr_data;
 wire [31:0] d_mem_rd_data;
 
 DataMemory m_DataMemory(
-    .rst_n      (rst_n),
-    .clk        (clk),
-    .wr_en      (d_mem_wr_en),
-    .rd_en      (d_mem_rd_en),
-    .ctrl       (d_mem_ctrl),
-    .address    (d_mem_addr),
-    .data_i     (d_mem_wr_data),
-    .data_o     (d_mem_rd_data)
-);
-
-InstructionMemory m_InstMem(
-    .address(i_mem_addr),
-    .inst(inst)
+    .rst_n(rst_n),
+    .clk(clk),
+    
+    .i_addr(i_mem_addr),
+    .inst(inst),
+    
+    .wr_en(d_mem_wr_en),
+    .rd_en(d_mem_rd_en),
+    .ctrl(d_mem_ctrl),
+    .address(d_mem_addr),
+    .data_i(d_mem_wr_data),
+    .data_o(d_mem_rd_data)
 );
 
 PipelineCPU m_core0(
