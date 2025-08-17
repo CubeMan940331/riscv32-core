@@ -278,7 +278,7 @@ assign stall_o = (~resp_accept_o && (ld_inst || st_inst)) || (dwriteback || dinv
 reg [31:0] writeback_value_r;
 
 assign writeback_value_o = writeback_value_r;
-assign writeback_valid_o = mmu_valid_i && resp_is_load;
+assign writeback_valid_o = mmu_valid_i;
 assign writeback_rd_o    = resp_rd;
 
 always @(*)begin
@@ -388,4 +388,3 @@ always @(posedge clk_i or negedge rst_i) begin
 end
 
 endmodule
-
