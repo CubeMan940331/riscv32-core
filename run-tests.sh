@@ -34,16 +34,21 @@ for mem_file in "$file_dir"*.mem; do
     fi
 
     pass_pc=$(grep '<pass>:' "$file_dir$test_name.dump" | cut -c 2-8)
-    stop_pc=$(grep '<write_tohost>:' "$file_dir$test_name.dump" | cut -c 2-8)
     if [ -n "$pass_pc" ]; then
         pass_pc=$(printf "%d" "0x$pass_pc")
     fi
 
+    fail_pc=$(grep '<fail>:' "$file_dir$test_name.dump" | cut -c 2-8)
+    if [ -n "$fail_pc" ]; then
+        fail_pc=$(printf "%d" "0x$fail_pc")
+    fi
+
+    stop_pc=$(grep '<write_tohost>:' "$file_dir$test_name.dump" | cut -c 2-8)
     if [ -n "$stop_pc" ]; then
         stop_pc=$(printf "%d" "0x$stop_pc")
     fi
 
-    output=$(./obj_dir/VComputer "$mem_file" "$pass_pc" "$stop_pc")
+    output=$(./obj_dir/VComputer "$mem_file" "$pass_pc" "$fail_pc" "$stop_pc")
 
     if [ -z "${ext_results[$ext]}" ]; then
         ext_results[$ext]=1  # assume pass until proven fail

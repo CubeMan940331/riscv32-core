@@ -113,21 +113,34 @@ int main(int argc, char **argv){
 
         dump_file=mem_file.substr(0,sep_pos)+".vcd";
     }
-    bool is_set_end_pc=false;
-    bool is_reach_end_pc=false;
-    int end_pc;
+    
+    bool is_set_pass_pc=false;
+    bool is_reach_pass_pc=false;
+    int pass_pc;
     if(argc>2){
         try{
-            end_pc=stoi(argv[2]);
-            is_set_end_pc=true;
+            pass_pc=stoi(argv[2]);
+            is_set_pass_pc=true;
         }
         catch(...){}
     }
-    bool is_set_stop_pc=false;
-    int stop_pc;
+    
+    bool is_set_fail_pc=false;
+    bool is_reach_fail_pc=false;
+    int fail_pc;
     if(argc>3){
         try{
-            stop_pc=stoi(argv[3]);
+            fail_pc=stoi(argv[3]);
+            is_set_fail_pc=true;
+        }
+        catch(...){}
+    }
+    
+    bool is_set_stop_pc=false;
+    int stop_pc;
+    if(argc>4){
+        try{
+            stop_pc=stoi(argv[4]);
             is_set_stop_pc=true;
         }
         catch(...){}
@@ -156,14 +169,22 @@ int main(int argc, char **argv){
     top->rst_n = 1;
     for(int i=0; i<MAX_CYCLE; ++i){
         if(
-            is_set_end_pc &&
+            is_set_fail_pc &&
             top->Computer->m_core0->WB_pc_valid_out &&
-            top->Computer->m_core0->WB_pc_out==end_pc
+            top->Computer->m_core0->WB_pc_out==fail_pc
         ){
-            is_reach_end_pc=true;
+            is_reach_fail_pc=true;
             break;
         }
-        if(
+        else if(
+            is_set_pass_pc &&
+            top->Computer->m_core0->WB_pc_valid_out &&
+            top->Computer->m_core0->WB_pc_out==pass_pc
+        ){
+            is_reach_pass_pc=true;
+            break;
+        }
+        else if(
             is_set_stop_pc &&
             top->Computer->m_core0->WB_pc_valid_out &&
             top->Computer->m_core0->WB_pc_out==stop_pc
@@ -175,10 +196,8 @@ int main(int argc, char **argv){
     top->final();
     m_trace->close();
 
-    if(is_set_end_pc){
-        if(is_reach_end_pc) cout<<"Yes"<<endl;
-        else cout<<"No"<<endl;
-    }
+    if(is_reach_pass_pc) cout<<"Yes\n";
+    else if(is_reach_fail_pc) cout<<"No\n";
     else cout<<"Done\n";
 
     return 0;
