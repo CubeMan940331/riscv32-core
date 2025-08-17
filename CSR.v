@@ -77,11 +77,9 @@ always @(*) begin
         csr_exception_r = `EXCEPTION_FPU;
     else if (!inst_valid || csr_fault_w)
         csr_exception_r = `EXCEPTION_ILLEGAL_INSTRUCTION;
-        // Fence / MMU settings cause a pipeline flush
-        // else if (satp_update_w || ifence_w || sfence_w)
-        //     csr_exception_q <= `EXCEPTION_FENCE;
-        // else
-        //     csr_exception_q <= `EXCEPTION_W'b0;
+        // Fence / MMU settings cause a pipeline flush TODO: SATP_update_w
+    else if ((inst & `INST_IFENCE_MASK) == `INST_IFENCE)
+        csr_exception_r = `EXCEPTION_FENCE;
     else
         csr_exception_r = `EXCEPTION_W'b0; // no exception
     

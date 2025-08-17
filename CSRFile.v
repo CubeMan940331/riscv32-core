@@ -521,6 +521,11 @@ always @(*) begin
         csr_branch_r = 1'b1;
         csr_target_r = csr_mtvec_q;
     end
+    // Fence / SATP register writes cause pipeline flushes
+    else if (exception_i == `EXCEPTION_FENCE) begin
+        csr_branch_r = 1'b1;
+        csr_target_r = exception_pc_i + 32'd4;
+    end
 end
 
 assign csr_branch_o = csr_branch_r;

@@ -59,6 +59,8 @@ module EX_Reg (
 
     input wire [1:0] bypass_sel_i,
 
+    input wire fetch_invalid_i,
+
     input wire [2:0]  funct3_i,
     input wire        funct7_i,
 //=================================
@@ -118,6 +120,8 @@ module EX_Reg (
 
     output wire [1:0] bypass_sel_o,
 
+    output wire fetch_invalid_o,
+
     output wire [2:0]  funct3_o,
     output wire        funct7_o
 );
@@ -170,6 +174,8 @@ module EX_Reg (
     PipelineRegister #(.WIDTH(1))  reg_FPU_sel1  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(FPU_sel1_i), .data_o(FPU_sel1_o));
     // bypass
     PipelineRegister #(.WIDTH(2))  reg_bypass_sel (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(bypass_sel_i), .data_o(bypass_sel_o));
+    // Fence
+    PipelineRegister #(.WIDTH(1))  reg_fetch_invalid (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(fetch_invalid_i), .data_o(fetch_invalid_o));
 
     // funct3 and funct7
     PipelineRegister #(.WIDTH(3))  reg_funct3    (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(funct3_i), .data_o(funct3_o));

@@ -38,6 +38,9 @@ module Control (
     // Bypass
     output reg [1:0] bypass_sel_o,
 
+    // Fence
+    output reg fetch_invalid_o,
+
     output is_impl_o
 );
 
@@ -68,6 +71,7 @@ assign is_fpu_o = is_fpu_w;
 assign FPU_sel1_o = FPU_sel1_w;
 assign freg_wr_en_o = freg_wr_en_w;
 assign bypass_sel_o = bypass_sel_r;
+assign fetch_invalid_o = fetch_invalid_w;
 
 // 0: PC, 1: rs1
 wire alu_sel1_w = ((inst&`INST_ADDI_MASK) == `INST_ADDI)   ||
@@ -391,6 +395,10 @@ wire is_fpu_w = ((inst&`INST_FMADD_MASK) == `INST_FMADD)         ||
 
 wire FPU_sel1_w = ((inst&`INST_FCVT_S_W_MASK) == `INST_FCVT_S_W)   ||
                   ((inst&`INST_FCVT_S_WU_MASK) == `INST_FCVT_S_WU) ;
+
+wire fetch_invalid_w = ((inst&`INST_FENCE_MASK) == `INST_FENCE)   ||
+                       ((inst&`INST_IFENCE_MASK) == `INST_IFENCE) ||
+                       ((inst&`INST_SFENCE_MASK) == `INST_IFENCE) ;
 
 wire [2:0] MUL_DIV_ctrl_w = {3{is_MUL_DIV_w}} & funct3;
 wire [2:0] csr_op_w = {3{is_csr_w}} & funct3;

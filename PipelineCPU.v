@@ -86,6 +86,9 @@ wire FPU_sel1; // 0: freg_rd_data1, 1: reg_rd_data1
 // ByPass
 wire [1:0] bypass_sel;
 
+// Fence
+wire fetch_invalid;
+
 // Register File ==============
 wire [31:0] wb_data_in;
 wire [31:0] reg_data1_out;
@@ -145,6 +148,8 @@ wire EX_is_fpu_out;
 wire EX_FPU_sel1_out;
 // ByPass
 wire [1:0] EX_bypass_sel_out;
+// Fence
+wire EX_fetch_invalid_out;
 
 wire EX_start, EX_done;
 // ALU ========================
@@ -374,7 +379,9 @@ Control m_Control(
     .is_fpu_o(is_fpu),
     .FPU_sel1_o(FPU_sel1), // 0: freg_rd_data1, 1: reg_rd_data1
 
-    .bypass_sel_o(bypass_sel)
+    .bypass_sel_o(bypass_sel),
+
+    .fetch_invalid_o(fetch_invalid)
 );
 
 // ================================
@@ -439,6 +446,9 @@ EX_Reg m_EX_Reg(
 
     .bypass_sel_i(bypass_sel),
 
+    // Fence
+    .fetch_invalid_i(fetch_invalid),
+
     .funct3_i(),
     .funct7_i(),
 // outputs =====================
@@ -494,6 +504,8 @@ EX_Reg m_EX_Reg(
 
     // bypass
     .bypass_sel_o(EX_bypass_sel_out),
+
+    .fetch_invalid_o(EX_fetch_invalid_out),
 
     .funct3_o(),
     .funct7_o()
