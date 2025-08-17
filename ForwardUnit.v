@@ -27,15 +27,15 @@ always @(*) begin
     // FRegister
     // RS1
     EX_freg_fwd_sel1 = 1;
-    if (WB_freg_wr_en && (WB_rd != 5'd0) && (WB_rd == EX_rs1))
+    if (WB_freg_wr_en && (WB_rd == EX_rs1))
         EX_freg_fwd_sel1 = 0;
     // RS2
     EX_freg_fwd_sel2 = 1;
-    if (WB_freg_wr_en && (WB_rd != 5'd0) && (WB_rd == EX_rs2))
+    if (WB_freg_wr_en && (WB_rd == EX_rs2))
         EX_freg_fwd_sel2 = 0;
     // RS3
     EX_freg_fwd_sel3 = 1;
-    if (WB_freg_wr_en && (WB_rd != 5'd0) && (WB_rd == EX_rs3))
+    if (WB_freg_wr_en && (WB_rd == EX_rs3))
         EX_freg_fwd_sel3 = 0;
 end
 
