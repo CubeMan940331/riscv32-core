@@ -61,8 +61,6 @@ module EX_Reg (
 
     input wire fetch_invalid_i,
 
-    input wire [2:0]  funct3_i,
-    input wire        funct7_i,
 //=================================
     // output
     // data
@@ -122,8 +120,6 @@ module EX_Reg (
 
     output wire fetch_invalid_o,
 
-    output wire [2:0]  funct3_o,
-    output wire        funct7_o
 );
     // data
     PipelineRegister #(.WIDTH( 1)) reg_is_impl   (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(is_impl_i),   .data_o(is_impl_o));
@@ -177,7 +173,4 @@ module EX_Reg (
     // Fence
     PipelineRegister #(.WIDTH(1))  reg_fetch_invalid (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(fetch_invalid_i), .data_o(fetch_invalid_o));
 
-    // funct3 and funct7
-    PipelineRegister #(.WIDTH(3))  reg_funct3    (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(funct3_i), .data_o(funct3_o));
-    PipelineRegister #(.WIDTH(1))  reg_funct7    (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(funct7_i), .data_o(funct7_o));
 endmodule

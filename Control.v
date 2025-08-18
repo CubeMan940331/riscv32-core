@@ -1,5 +1,4 @@
 `include "riscv_defs.v"
-/* verilator lint_off UNUSEDSIGNAL */
 module Control (
     input [31:0] inst,
     // WB stage
@@ -45,10 +44,7 @@ module Control (
 );
 
 // decode
-wire [6:0] opcode = inst[6:0];
 wire [2:0] funct3 = inst[14:12];
-wire [6:0] funct7 = inst[31:25];
-wire [11:0] imm12 = inst[31:20];
 
 assign is_impl_o = is_impl_w;
 assign reg_wr_en_o = reg_wr_en_w;
