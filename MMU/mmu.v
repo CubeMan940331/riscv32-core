@@ -3,9 +3,6 @@
 //-----------------------------------------------------------------
 
 `include "riscv_defs.v"
-`include "mmu_cache_ctrl.v"
-`include "mmu_tlb.v"
-`include "mmu_ptw.v"
 
 module mmu
 #(
@@ -53,7 +50,6 @@ module mmu
     ,output         load_fault_o
     ,output         store_fault_o
     ,output         inst_fault_o
-    ,output [ 5:0]  mmu_exception_o
 );
 
 
@@ -99,7 +95,7 @@ wire req_d_wr = (|lsu_in_wr_i) && ~dcache_addr_error;
 wire req_i_rd = fetch_rd_i && ~icache_addr_error;
 
 wire vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte) && ~dcache_addr_error;
-wire vm_d_wr = (|lsu_in_wr_i) && ~is_pte && dtlb_hit && ~dcache_addr_error;
+wire vm_d_wr = (|lsu_in_wr_i) && dtlb_hit && ~dcache_addr_error;
 wire vm_i_rd = fetch_rd_i && itlb_hit && ~icache_addr_error;
 
 wire dcache_rd_c = (vm_enable)? vm_d_rd : req_d_rd;
@@ -109,7 +105,7 @@ wire icache_rd_c = (vm_enable)? vm_i_rd : req_i_rd;
 wire icache_valid;
 wire dcache_valid;
 
-mmu_cache_ctrl u_Cache_Ctrl(
+mmu_cache_ctrl u_mmu_cache_ctrl(
     .clk_i                  (clk_i),
     .rst_i                  (rst_i),
     .mmu_dcache_rd_i        (dcache_rd_c),
@@ -125,9 +121,9 @@ mmu_cache_ctrl u_Cache_Ctrl(
 );
 
 assign fetch_out_value_o    = icache_in_value_i;
-assign fetch_out_valid_o    = (vm_enable)?(icache_valid && itlb_hit):(icache_valid);
+assign fetch_out_valid_o    = (vm_enable)?(icache_valid && itlb_hit && itlb_req):(icache_valid && itlb_req);
 assign lsu_out_value_o      = dcache_in_value_i;
-assign lsu_out_valid_o      = (vm_enable)?(dcache_valid && dtlb_hit):(dcache_valid);
+assign lsu_out_valid_o      = (vm_enable)?(dcache_valid && dtlb_hit && dtlb_req):(dcache_valid && dtlb_req);
 
 assign icache_addr_o        = icache_addr_r;
 assign dcache_addr_o        = dcache_addr_r;
@@ -160,13 +156,9 @@ always @(*)begin
         dcache_mask_r = 4'h0;
 end
 
-assign load_fault_o     = lsu_in_rd_i && !dtlb_entry_o[`PAGE_READ] && dtlb_hit;
-assign store_fault_o    =  (|lsu_in_wr_i) && !dtlb_entry_o[`PAGE_WRITE] && dtlb_hit;
-assign inst_fault_o     = fetch_rd_i && !itlb_entry_o[`PAGE_EXEC] && itlb_hit;
-
-assign mmu_exception_o  = (ptw_pte_fault_o && fetch_rd_i)?`EXCEPTION_PAGE_FAULT_INST:
-                          (ptw_pte_fault_o && lsu_in_rd_i)?`EXCEPTION_PAGE_FAULT_LOAD:
-                          (ptw_pte_fault_o && (|lsu_in_wr_i))?`EXCEPTION_PAGE_FAULT_STORE:6'h0;
+assign load_fault_o     = lsu_in_rd_i   && ( ptw_pte_fault_o || (!dtlb_entry_o[`PAGE_READ]  && dtlb_hit));
+assign store_fault_o    =(|lsu_in_wr_i) && ( ptw_pte_fault_o || (!dtlb_entry_o[`PAGE_WRITE] && dtlb_hit));
+assign inst_fault_o     = fetch_rd_i    && ( ptw_pte_fault_o || (!itlb_entry_o[`PAGE_EXEC]  && itlb_hit));
 
 assign dcache_invalidate_o  = lsu_in_invalidate_i;
 assign dcache_flush_o       = lsu_in_flush_i;

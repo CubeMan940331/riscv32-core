@@ -104,8 +104,8 @@ assign addr_unaligned = unaligned_r;
 
 assign exception_o = (addr_unaligned && mem_rd_r)?`EXCEPTION_MISALIGNED_LOAD: 
                      (addr_unaligned && (|mem_wr_r))?`EXCEPTION_MISALIGNED_STORE:
-                     (resp_is_load && mmu_load_fault)?`EXCEPTION_FAULT_LOAD:
-                     ((|resp_wr) && mmu_store_fault)?`EXCEPTION_FAULT_STORE:
+                     (resp_is_load && mmu_load_fault)?`EXCEPTION_PAGE_FAULT_LOAD:
+                     ((|resp_wr) && mmu_store_fault)?`EXCEPTION_PAGE_FAULT_STORE:
                      6'h0;
 
 always @(*)begin
