@@ -2,7 +2,7 @@
 // MMU
 //-----------------------------------------------------------------
 
-`include "riscv_defs.v"
+`include "../riscv_defs.v"
 
 module mmu
 #(

@@ -2,7 +2,7 @@
 // Page Table Walker (PTW)
 // -----------------------------------------------
 
-`include "riscv_defs.v"
+`include "../riscv_defs.v"
 
 module mmu_ptw(
      input          clk_i
@@ -36,7 +36,7 @@ reg [31:0] req_addr_r;
 reg        pte_fault_r;
 
 wire        vm_enable   = satp_i[`SATP_MODE_R];
-wire        vm_asid     = satp_i[`SATP_ASID_R];
+wire [ 8:0] vm_asid     = satp_i[`SATP_ASID_R];
 wire [31:0] vm_ppn      = {satp_i[`SATP_PPN_R],12'b0};
 
 wire [31:0] ppn_data    = {resp_data_i[29:10],12'b0};
