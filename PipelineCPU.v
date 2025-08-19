@@ -148,11 +148,60 @@ wire br_taken; // indicate any branch happen (trigger by inst, csr unit)
 
 // LSU =========================
 wire LSU_start, LSU_done;
-assign d_mem_ctrl = MEM_mem_ctrl_out;
-assign d_mem_wr_en = MEM_mem_wr_en_out;
-assign d_mem_rd_en = MEM_mem_rd_en_out;
-assign d_mem_addr = MEM_mem_addr_out;
-assign d_mem_wr_data = MEM_mem_wr_data_out;
+
+wire [31:0] lsu_opcode_in;
+wire        lsu_opcode_valid_in;
+wire [31:0] lsu_opcode_ra_in;
+wire [31:0] lsu_opcode_rb_in;
+wire [ 4:0] lsu_opcode_rd_in; 
+
+wire [31:0] lsu_mmu_addr;
+wire [31:0] lsu_mmu_data;
+wire        lsu_mmu_rd;
+wire [ 3:0] lsu_mmu_wr;
+wire        lsu_mmu_dflush;
+wire        lsu_mmu_dinvalidafte;
+wire        lsu_mmu_dwriteback;
+wire [31:0] lsu_writeback_value_o;
+wire        lsu_writeback_valid_o;
+wire [ 4:0] lsu_writeback_rd_o;
+wire        lsu_stall_o;
+wire [ 5:0] lsu_exception_o;
+
+assign lsu_opcode_valid_in = LSU_start;
+assign LSU_done = lsu_writeback_valid_o;
+
+// MMU =========================
+wire [31:0] mmu_fetch_value;
+wire        mmu_fetch_valid;
+wire        mmu_inst_fault;
+wire [31:0] mmu_lsu_data;
+wire        mmu_lsu_valid;
+wire        mmu_lsu_load_fault;
+wire        mmu_lsu_store_fault;
+wire [31:0] mmu_dcache_addr;
+wire [31:0] mmu_dcache_data;
+wire        mmu_dcache_rd;
+wire        mmu_dcache_wr;
+wire [ 3:0] mmu_dcache_mask;
+wire        mmu_dcache_flush;
+wire        mmu_dcache_writeback;
+wire        mmu_dcache_invalidate;
+wire [31:0] mmu_icache_addr;
+wire        mmu_icache_rd;
+
+wire [31:0] icache_mmu_inst_in;
+wire        icache_mmu_valid_in;
+
+assign icache_mmu_inst_in = inst;
+assign icache_mmu_valid_in = 0;
+// assign i_mem_addr = mmu_icache_addr;
+
+assign d_mem_ctrl = mmu_dcache_mask;
+assign d_mem_wr_en = mmu_dcache_wr;
+assign d_mem_rd_en = mmu_dcache_rd;
+assign d_mem_addr = mmu_dcache_addr;
+assign d_mem_wr_data = mmu_dcache_data;
 
 // CSR =========================
 wire SYS_start, SYS_done;
@@ -598,32 +647,74 @@ FPU_Top m_FPU(
 );
 
 // LSU =========================
-// not implemented yet, a simple one is used
-reg MEM_mem_wr_en_out;
-reg MEM_mem_rd_en_out;
-reg [3:0] MEM_mem_ctrl_out;
-reg [31:0] MEM_mem_addr_out;
-reg [31:0] MEM_mem_wr_data_out;
-reg MEM_stage_reg;
-always @(posedge clk or negedge rst_n) begin
-    if(LSU_start) begin
-        MEM_mem_wr_en_out <= EX_mem_wr_en_out;
-        MEM_mem_rd_en_out <= EX_mem_rd_en_out;
-        MEM_mem_ctrl_out <= EX_mem_ctrl_out;
-        MEM_mem_addr_out <= (EX_fwd_data1 + EX_imm_out);
-        MEM_mem_wr_data_out <= EX_fwd_data2;
-        MEM_stage_reg <= 1;
-    end
-    else begin
-        MEM_mem_wr_en_out <= 0;
-        MEM_mem_rd_en_out <= 0;
-        MEM_mem_ctrl_out <= 0;
-        MEM_mem_addr_out <= 0;
-        MEM_mem_wr_data_out <= 0;
-        MEM_stage_reg <= 0;
-    end
-end
-assign LSU_done = MEM_stage_reg;
+lsu u_lsu(
+    .clk_i             (clk),
+    .rst_i             (rst_n),
+    .opcode_opcode_i   (EX_inst_out),
+    .opcode_rd_i       (decode_rd),
+    .opcode_ra_data_i  (EX_reg_rd_data1_out),
+    .opcode_rb_data_i  (EX_reg_rd_data2_out),
+    .opcode_valid_i    (LSU_start), //
+    .mmu_value_i       (mmu_lsu_data),
+    .mmu_valid_i       (mmu_lsu_valid),
+    .mmu_load_fault    (mmu_lsu_load_fault),
+    .mmu_store_fault   (mmu_lsu_store_fault),
+    .mmu_addr_o        (lsu_mmu_addr),
+    .mmu_data_o        (lsu_mmu_data),
+    .mmu_rd_o          (lsu_mmu_rd),
+    .mmu_wr_o          (lsu_mmu_wr),
+    .mmu_dflush_o      (lsu_mmu_dflush),
+    .mmu_dinvalidate_o (lsu_mmu_dinvalidafte),
+    .mmu_dwriteback_o  (lsu_mmu_dwriteback),
+    .writeback_value_o (lsu_writeback_value_o),
+    .writeback_rd_o    (lsu_writeback_rd_o),
+    .writeback_valid_o (lsu_writeback_valid_o),
+    .stall_o           (lsu_stall_o),
+    .exception_o       (lsu_exception_o)
+);
+
+// MMU =========================
+wire dcache_valid_i_f = 1;
+wire icache_valid_i_f = 0;
+wire fetch_rd_f = 0;
+wire [31:0] satp_i_f = 32'h0;
+
+mmu u_mmu(
+    .clk_i               (clk),
+    .rst_i               (rst_n),
+    .satp_i              (satp_i_f), //
+    .fetch_pc_i          (pc_out),
+    .fetch_rd_i          (fetch_rd_f), //
+    .lsu_in_addr_i       (lsu_mmu_addr),
+    .lsu_in_data_i       (lsu_mmu_data),
+    .lsu_in_rd_i         (lsu_mmu_rd),
+    .lsu_in_wr_i         (lsu_mmu_wr),
+    .lsu_in_flush_i      (lsu_mmu_dflush),
+    .lsu_in_invalidate_i (lsu_mmu_dinvalidafte),
+    .lsu_in_writeback_i  (lsu_mmu_dwriteback),
+    .dcache_in_value_i   (d_mem_rd_data),
+    .dcache_in_valid_i   (dcache_valid_i_f), //
+    .icache_in_value_i   (icache_mmu_inst_in),
+    .icache_in_valid_i   (icache_mmu_valid_in),
+    .fetch_out_value_o   (mmu_fetch_value),
+    .fetch_out_valid_o   (mmu_fetch_valid),
+    .lsu_out_value_o     (mmu_lsu_data),
+    .lsu_out_valid_o     (mmu_lsu_valid),
+    .dcache_addr_o       (mmu_dcache_addr),
+    .dcache_value_o      (mmu_dcache_data),
+    .dcache_rd_o         (mmu_dcache_rd),
+    .dcache_wr_o         (mmu_dcache_wr),
+    .dcache_mask_o       (mmu_dcache_mask),
+    .dcache_flush_o      (mmu_dcache_flush),
+    .dcache_invalidate_o (mmu_dcache_invalidate),
+    .dcache_writeback_o  (mmu_dcache_writeback),
+    .icache_addr_o       (mmu_icache_addr),
+    .icache_rd_o         (mmu_icache_rd),
+    .load_fault_o        (mmu_lsu_load_fault),
+    .store_fault_o       (mmu_lsu_store_fault),
+    .inst_fault_o        (mmu_inst_fault)
+);
+
 
 // CSR =========================
 wire [31:0] csr_rd_data_xtval;
@@ -691,7 +782,7 @@ WB_Reg m_MEM_WB_Reg(
     .bypass_i(bypass_out),
     .ALU_i(ALU_out),
     .FPU_i(FPU_out[31:0]),
-    .mem_data_i(d_mem_rd_data),
+    .mem_data_i(lsu_writeback_value_o),
     .csr_rd_data_i(csr_rd_data),
     
     // control_in

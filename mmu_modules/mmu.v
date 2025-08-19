@@ -68,7 +68,7 @@ wire        is_pte;
 wire        is_update;
 
 wire        vm_enable   = satp_i[`SATP_MODE_R];
-wire        vm_asid     = satp_i[`SATP_ASID_R];
+wire [ 8:0] vm_asid     = satp_i[`SATP_ASID_R];
 wire [31:0] vm_ppn      = {satp_i[`SATP_PPN_R],12'b0};
 
 wire [31:0] ptw_pte_addr_o;
