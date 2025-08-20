@@ -173,7 +173,7 @@ assign interrupt_o = irq_masked_r;
 
 reg csr_mip_upd_q;
 always @ (posedge clk or negedge rst_n) begin
-    if (rst_n) csr_mip_upd_q <= 1'b0;
+    if (!rst_n) csr_mip_upd_q <= 1'b0;
     else if (csr_rd_addr_i == `CSR_MIP) csr_mip_upd_q <= 1'b1;
     else if (csr_wr_addr_i == `CSR_MIP || (|exception_i)) csr_mip_upd_q <= 1'b0;
 end

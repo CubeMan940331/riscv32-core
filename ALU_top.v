@@ -9,10 +9,10 @@ module ALU_top(
 
 reg [2:0]  Oper;
 reg        invB;
-reg [31:0] ALU_out;
-reg        Overflow;
-reg        Zero;
-reg        Sign;
+wire [31:0] ALU_out;
+wire        Overflow;
+wire        Zero;
+reg         Sign;
 
 ALU m_ALU(
     .InA(a),
