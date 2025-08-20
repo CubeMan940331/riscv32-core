@@ -118,7 +118,7 @@ module EX_Reg (
 
     output wire [1:0] bypass_sel_o,
 
-    output wire fetch_invalid_o,
+    output wire fetch_invalid_o
 
 );
     // data
