@@ -164,12 +164,12 @@ module FPU_Top (
     // --- Main Combinational Logic: Opcode Decoding and Output Muxing ---
     always @(*) begin
         // Default assignments to avoid latches
-        result_out     = '0;
-        fflags = '0;
+        result_out     = 0;
+        fflags = 0;
 
         rounding_mode = (func3 == 3'b111) ? (func7 == OP_FSQRT_S) ? 3'b001 : frm : func3;
-        convert_input_type = '0;
-        convert_output_type = '0;
+        convert_input_type = 0;
+        convert_output_type = 0;
 
         // Decode opcode to select operation and drive outputs
         case (opcode)

@@ -44,7 +44,7 @@ module SP_Convert (
 
     reg normal_path_enable;
     reg lsb, g_bit, r_bit, s_bit, round_up;
-    int shift_amt;
+    integer shift_amt;
 
     always @(*) begin
 
@@ -52,9 +52,9 @@ module SP_Convert (
         flag_invalid = 0; flag_overflow = 0; flag_underflow = 0; flag_inexact = 0;
         normal_path_enable = 1;
 
-        final_sign=0; final_exp='0; final_mant='0;
-        shifted_val = '0;
-        result_int = '0;
+        final_sign=0; final_exp=0; final_mant=0;
+        shifted_val = 0;
+        result_int = 0;
         lsb = 0; g_bit = 0; r_bit = 0; s_bit = 0; round_up = 0;
         shift_amt = 0;
 
@@ -76,14 +76,14 @@ module SP_Convert (
             end else if (is_a_zero) begin
 
                 normal_path_enable = 0;
-                if (output_type == FP_TYPE_INT32 || output_type == FP_TYPE_UINT32) begin result_int = '0; end // 0
+                if (output_type == FP_TYPE_INT32 || output_type == FP_TYPE_UINT32) begin result_int = 0; end // 0
 
             end
 
         end else if (operand_in[31:0] == 0) begin
 
             normal_path_enable = 0;
-            final_sign = 0; final_exp = '0; final_mant = '0; // 0
+            final_sign = 0; final_exp = 0; final_mant = 0; // 0
 
         end
 
@@ -92,11 +92,11 @@ module SP_Convert (
             // --- SP -> UINT Conversion ---
             if ((input_type == FP_TYPE_FP32) && (output_type == FP_TYPE_UINT32)) begin
                 if (sign_a_dec) begin // negative
-                    result_int = '0;
+                    result_int = 0;
                     if (((rounding_mode == 3'b001) || (rounding_mode == 3'b011)) && (exp_a_dec < 127)) begin flag_inexact = 1; end
                     else begin flag_invalid = 1; end
                 end else if (exp_a_dec < 127) begin // 0.xx
-                    result_int = '0;
+                    result_int = 0;
                     flag_inexact = |mant_a_dec[23:0];
                     if (flag_inexact && (rounding_mode == RUP)) begin
                         result_int = 64'd1;
@@ -131,7 +131,7 @@ module SP_Convert (
                         3'b100: round_up = flag_inexact; //RMM
                         default: round_up = 1'b0;
                     endcase
-                    result_int += {63'b0, round_up};
+                    result_int = result_int + {63'b0, round_up};
 
                     if (result_int[63:32] != 0) begin
                         flag_invalid=1; flag_inexact=1; result_int=UINT32_MAX_VAL;
@@ -139,10 +139,10 @@ module SP_Convert (
                 end
             end
 
-            // --- SP -> INT Conversion ---
+            // --- SP -> integer Conversion ---
             else if ((input_type == FP_TYPE_FP32) && (output_type == FP_TYPE_INT32)) begin
                 if (exp_a_dec < 127) begin // 0.xx
-                    result_int = '0;
+                    result_int = 0;
                     flag_inexact = |mant_a_dec[23:0];
                     if (flag_inexact) begin
                         if (!sign_a_dec && (rounding_mode == RUP)) begin result_int = 64'd1; end // 1
@@ -179,7 +179,7 @@ module SP_Convert (
                         3'b100: round_up = flag_inexact; //RMM
                         default: round_up = 1'b0;
                     endcase
-                    result_int += {63'b0, round_up};
+                    result_int = result_int + {63'b0, round_up};
 
                     if (result_int[31:0] == {1'b1, 31'b0}) begin
                         if (sign_a_dec) begin result_int = INT32_MIN_VAL; end
@@ -190,14 +190,14 @@ module SP_Convert (
                 end
             end
 
-            // --- INT -> SP Conversion ---
+            // --- integer -> SP Conversion ---
             else begin
                 final_sign = (input_type == FP_TYPE_INT32) & operand_in[31];
                 final_exp = 8'd158; // 2^31
                 result_int = (final_sign) ? {1'b0, -operand_in[31:0], 31'b0} : {1'b0, operand_in[31:0], 31'b0};
 
-                for(int i = 31 ; i >= 0 ; i--) begin
-                    if (!result_int[62]) begin final_exp -= 1; result_int <<= 1; end
+                for(integer i = 31 ; i >= 0 ; i = i - 1) begin
+                    if (!result_int[62]) begin final_exp = final_exp - 1; result_int = result_int << 1; end
                     else begin i = 0; end
                 end
 
@@ -214,8 +214,8 @@ module SP_Convert (
                     3'b100: round_up = flag_inexact; //RMM
                     default: round_up = 1'b0;
                 endcase
-                if (round_up) begin result_int += {24'b0, 1'b1, 39'b0}; end
-                if (result_int[63]) begin final_exp += 1; result_int >>= 1; end
+                if (round_up) begin result_int = result_int + {24'b0, 1'b1, 39'b0}; end
+                if (result_int[63]) begin final_exp = final_exp + 1; result_int = result_int >> 1; end
 
                 final_mant = result_int[62:39];
             end

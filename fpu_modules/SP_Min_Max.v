@@ -34,7 +34,7 @@ module SP_Min_Max (
 
     always @(*) begin
         // init
-        result = '0;
+        result = 0;
         flag_invalid = 0;
         temp_eq=0; temp_gt=0; temp_lt=0; flag_eq=0; flag_gt=0; flag_lt=0;
         normal_path_enable = 1;

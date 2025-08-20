@@ -6,7 +6,7 @@ module SP_Fsgnj (
 );
 
     always @(*) begin
-        result = '0;
+        result = 0;
 
         case (func3)
             3'b000: result = {operand_b[31], operand_a[30:0]};

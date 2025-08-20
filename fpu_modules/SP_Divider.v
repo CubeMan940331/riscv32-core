@@ -34,7 +34,7 @@ module SP_Divider (
     // local variables
     reg normal_path_enable;
 
-    int exp_diff;
+    integer exp_diff;
     reg [23:0] mant_a_div;
     reg [23:0] mant_b_div;
 
@@ -49,47 +49,47 @@ module SP_Divider (
         // init
         flag_invalid=0; flag_divbyzero=0; flag_overflow=0; flag_underflow=0; flag_inexact=0;
         normal_path_enable = 1;
-        final_exp = '0; final_mant = '0;
+        final_exp = 0; final_mant = 0;
 
         // --- 1. Special Value Handling ---
         final_sign = sign_a_dec ^ sign_b_dec;
         if ((is_a_nan || is_b_nan) || (is_a_infinity && is_b_infinity) || (is_a_zero && is_b_zero)) begin
-            normal_path_enable = 0; flag_invalid = 1; final_exp = '1; final_mant = {2'b11, 22'b0}; // NAN
+            normal_path_enable = 0; flag_invalid = 1; final_exp = 8'hFF; final_mant = {2'b11, 22'b0}; // NAN
         end else if (is_b_zero) begin
-            normal_path_enable = 0; flag_divbyzero = 1; final_exp = '1; final_mant = '0; // Inf
+            normal_path_enable = 0; flag_divbyzero = 1; final_exp = 8'hFF; final_mant = 0; // Inf
         end else if (is_a_infinity) begin
-            normal_path_enable = 0; final_exp = '1; final_mant = '0; // Inf
+            normal_path_enable = 0; final_exp = 8'hFF; final_mant = 0; // Inf
         end else if (is_a_zero) begin
-            normal_path_enable = 0; final_exp = '0; final_mant = '0; // zero
+            normal_path_enable = 0; final_exp = 0; final_mant = 0; // zero
         end else if (is_b_infinity) begin
-            normal_path_enable = 0; final_exp = '0; final_mant = '0; // zero
+            normal_path_enable = 0; final_exp = 0; final_mant = 0; // zero
         end
 
         // init
         exp_diff = 127;
         mant_a_div = mant_a_dec; mant_b_div = mant_b_dec;
-        dividend = '0; divisor = '0; quotient = '0;
+        dividend = 0; divisor = 0; quotient = 0;
         lsb = 0; g_bit = 0; r_bit = 0; s_bit = 0; round_up = 0;
 
         // --- 2. Normal Path ---
         if (normal_path_enable) begin
             // --- 2a. Exponent ---
-            exp_diff += ($signed({24'b0, exp_a_dec}) - 127) - ($signed({24'b0, exp_b_dec}) - 127);
+            exp_diff = exp_diff + ($signed({24'b0, exp_a_dec}) - 127) - ($signed({24'b0, exp_b_dec}) - 127);
                 // denormal
                 if (is_a_denormal) begin
-                    for (int i = 23 ; i > 0 ; i--) begin
-                        if (!mant_a_div[23]) begin exp_diff -= 1; mant_a_div <<= 1; end
+                    for (integer i = 23 ; i > 0 ; i = i - 1) begin
+                        if (!mant_a_div[23]) begin exp_diff = exp_diff - 1; mant_a_div = mant_a_div << 1; end
                         else begin i = 0; end
                     end
                 end
                 if (is_b_denormal) begin
-                    for (int i = 23 ; i > 0 ; i--) begin
-                        if (!mant_b_div[23]) begin exp_diff += 1; mant_b_div <<= 1; end
+                    for (integer i = 23 ; i > 0 ; i = i - 1) begin
+                        if (!mant_b_div[23]) begin exp_diff = exp_diff + 1; mant_b_div = mant_b_div << 1; end
                         else begin i = 0; end
                     end
                 end
             
-            if (mant_a_div < mant_b_div) begin exp_diff -= 1; end // carry
+            if (mant_a_div < mant_b_div) begin exp_diff = exp_diff - 1; end // carry
 
             // --- 2b. Division ---
             dividend = {mant_a_div, {div_precision{1'b0}}};
@@ -98,7 +98,7 @@ module SP_Divider (
 
             // --- 2c. Post-Division leading zero ---
             for (;!quotient[div_precision + 23];) begin
-                quotient <<= 1;
+                quotient = quotient << 1;
             end
             
             // --- 2d. Rounding Logic ---
@@ -115,10 +115,10 @@ module SP_Divider (
                 3'b100: round_up = flag_inexact; //RMM
                 default: round_up = 1'b0;
             endcase
-            if (round_up) begin quotient += {24'b0, 1'b1, {div_precision{1'b0}}}; end
+            if (round_up) begin quotient = quotient + {24'b0, 1'b1, {div_precision{1'b0}}}; end
             if (quotient[div_precision + 24]) begin
-                quotient >>= 1;
-                exp_diff += 1;
+                quotient = quotient >> 1;
+                exp_diff = exp_diff + 1;
             end
 
             // OF / UF
@@ -126,18 +126,18 @@ module SP_Divider (
                 normal_path_enable = 0;
                 flag_underflow = 1;
                 flag_inexact = 1;
-                final_exp = '0; final_mant = '0; // 0
+                final_exp = 0; final_mant = 0; // 0
             end
             else if (exp_diff > 254) begin
                 normal_path_enable = 0;
                 flag_overflow = 1;
                 flag_inexact = 1;
-                final_exp = '1; final_mant = '0; // Inf
+                final_exp = 8'hFF; final_mant = 0; // Inf
             end
 
             if (normal_path_enable) begin
                 // put denormal back
-                for (; exp_diff < 0 ; exp_diff++) begin quotient >>= 1; end
+                for (; exp_diff < 0 ; exp_diff = exp_diff + 1) begin quotient = quotient >> 1; end
 
                 // result
                 final_exp = exp_diff[7:0];

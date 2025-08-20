@@ -19,7 +19,7 @@ module SP_Sqrt (
     // reg for evil trick
     localparam loops = 5;
     localparam threehalfs = 32'h3fc00000; // 1.5
-    reg [31:0] mult_result_0, mult_result_1 [loops:0], mult_result_2 [loops:0], mult_result_3[loops+1:0];
+    wire [31:0] mult_result_0, mult_result_1 [loops:0], mult_result_2 [loops:0], mult_result_3[loops+1:0];
     reg [31:0] sub_result [loops:0];
     reg [31:0] div_result;
     reg [31:0] mult_check_result;
@@ -30,7 +30,7 @@ module SP_Sqrt (
 
     genvar i;
     generate
-        for (i = 0 ; i < loops+1 ; i++) begin
+        for (i = 0 ; i < loops+1 ; i = i + 1) begin
             SP_Multiplier mult1 ( .operand_a(mult_result_3[i]), .operand_b(mult_result_3[i]), .rounding_mode(3'b001), .result(mult_result_1[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact() );
             SP_Multiplier mult2 ( .operand_a(mult_result_1[i]), .operand_b(mult_result_0), .rounding_mode(3'b001), .result(mult_result_2[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact() );
             SP_Adder sub ( .operand_a(threehalfs), .operand_b(mult_result_2[i]), .is_subtraction(1'b1), .rounding_mode(3'b001), .result(sub_result[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact() );
@@ -49,7 +49,7 @@ module SP_Sqrt (
         // --- Default assignments ---
         flag_invalid=0; flag_inexact=0;
         normal_path_enable = 1;
-        result = '0;
+        result = 0;
 
         // --- 1. Special Value Handling ---
         if (is_a_nan) begin normal_path_enable = 0; flag_invalid = 1; result = 32'h7fc00000; end // NAN
