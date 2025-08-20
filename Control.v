@@ -46,29 +46,6 @@ module Control (
 // decode
 wire [2:0] funct3 = inst[14:12];
 
-assign is_impl_o = is_impl_w;
-assign reg_wr_en_o = reg_wr_en_w;
-assign mem_wr_en_o = mem_wr_en_w;
-assign mem_rd_en_o = mem_rd_en_w;
-assign mem_ctrl_o = mem_ctrl_r;
-assign is_j_o = is_j_w;
-assign is_br_o = is_br_w;
-assign ALU_ctrl_o = alu_ctrl_r;
-assign is_MUL_DIV_o = is_MUL_DIV_w;
-assign MUL_DIV_ctrl_o = MUL_DIV_ctrl_w;
-assign cmp_op_o = cmp_op_r;
-assign is_csr_o = is_csr_w;
-assign csr_op_o = csr_op_w;
-assign is_csr_imm_o = is_csr_imm_w;
-assign ALU_sel1_o = alu_sel1_w;
-assign ALU_sel2_o = alu_sel2_w;
-assign reg_w_sel_o = reg_w_sel_r;
-assign is_fpu_o = is_fpu_w;
-assign FPU_sel1_o = FPU_sel1_w;
-assign freg_wr_en_o = freg_wr_en_w;
-assign bypass_sel_o = bypass_sel_r;
-assign fetch_invalid_o = fetch_invalid_w;
-
 // 0: PC, 1: rs1
 wire alu_sel1_w = ((inst&`INST_ADDI_MASK) == `INST_ADDI)   ||
                   ((inst&`INST_SLTI_MASK) == `INST_SLTI)   ||
@@ -398,6 +375,29 @@ wire fetch_invalid_w = ((inst&`INST_FENCE_MASK) == `INST_FENCE)   ||
 
 wire [2:0] MUL_DIV_ctrl_w = {3{is_MUL_DIV_w}} & funct3;
 wire [2:0] csr_op_w = {3{is_csr_w}} & funct3;
+
+assign is_impl_o = is_impl_w;
+assign reg_wr_en_o = reg_wr_en_w;
+assign mem_wr_en_o = mem_wr_en_w;
+assign mem_rd_en_o = mem_rd_en_w;
+assign mem_ctrl_o = mem_ctrl_r;
+assign is_j_o = is_j_w;
+assign is_br_o = is_br_w;
+assign ALU_ctrl_o = alu_ctrl_r;
+assign is_MUL_DIV_o = is_MUL_DIV_w;
+assign MUL_DIV_ctrl_o = MUL_DIV_ctrl_w;
+assign cmp_op_o = cmp_op_r;
+assign is_csr_o = is_csr_w;
+assign csr_op_o = csr_op_w;
+assign is_csr_imm_o = is_csr_imm_w;
+assign ALU_sel1_o = alu_sel1_w;
+assign ALU_sel2_o = alu_sel2_w;
+assign reg_w_sel_o = reg_w_sel_r;
+assign is_fpu_o = is_fpu_w;
+assign FPU_sel1_o = FPU_sel1_w;
+assign freg_wr_en_o = freg_wr_en_w;
+assign bypass_sel_o = bypass_sel_r;
+assign fetch_invalid_o = fetch_invalid_w;
 
 reg [3:0] alu_ctrl_r;
 reg [3:0] mem_ctrl_r;
