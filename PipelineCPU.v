@@ -167,11 +167,6 @@ wire [31:0] MUL_DIV_out;
 
 // LSU =========================
 wire LSU_start, LSU_done;
-assign d_mem_ctrl = MEM_mem_ctrl_out;
-assign d_mem_wr_en = MEM_mem_wr_en_out;
-assign d_mem_rd_en = MEM_mem_rd_en_out;
-assign d_mem_addr = MEM_mem_addr_out;
-assign d_mem_wr_data = MEM_mem_wr_data_out;
 
 // CSR =========================
 wire SYS_start, SYS_done;
@@ -565,6 +560,11 @@ assign FPU_done = FPU_start;
 // LSU =========================
 // not implemented yet, a simple one is used
 assign LSU_start = EX_start && (EX_mem_wr_en_out || EX_mem_rd_en_out);
+assign d_mem_ctrl = MEM_mem_ctrl_out;
+assign d_mem_wr_en = MEM_mem_wr_en_out;
+assign d_mem_rd_en = MEM_mem_rd_en_out;
+assign d_mem_addr = MEM_mem_addr_out;
+assign d_mem_wr_data = MEM_mem_wr_data_out;
 reg MEM_mem_wr_en_out;
 reg MEM_mem_rd_en_out;
 reg [3:0] MEM_mem_ctrl_out;
