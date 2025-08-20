@@ -186,7 +186,7 @@ wire [31:0] csr_mstatus;
 wire [31:0] csr_interrupt;
 // FPU =========================
 wire FPU_start, FPU_done;
-wire [63:0] FPU_out; // output of FPU
+wire [31:0] FPU_out; // output of FPU
 
 // ByPass ======================
 wire bypass_start, bypass_done;
@@ -550,14 +550,14 @@ FPU_Top m_FPU(
     .clk(clk),
     .rst_n(rst_n),
     .opcode(EX_inst_out[6:0]),
-    .func7(EX_inst_out[31:25]),         // Operation code to select the function
-    .func3(EX_inst_out[14:12]),         // Rounding mode for arithmetic operations
-    .frm(csr_rd_data[2:0]),
+    .func7(EX_inst_out[31:25]),         // func7 code to select the function
+    .func3(EX_inst_out[14:12]),         // Rounding mode for arithmetic operations (if 111 swap to frm)
+    .frm(csr_rd_data[2:0]),             // Rounding mode (dynamic from frm)
     .rs2(EX_inst_out[24:20]),           // For selecting convert type
-    .operand_a({32'h0,FPU_in1}),      // Operand A (can be FP64, FP32, INT32, UINT32)
-    .operand_b({32'h0,EX_freg_fwd_data2}),      // Operand B (can be FP64, FP32)
-    .operand_c({32'h0,EX_freg_fwd_data3}),      // Operand C
-    .result_out(FPU_out),     // Result of the operation
+    .operand_a(FPU_in1),                // Operand A 
+    .operand_b(EX_freg_fwd_data2),      // Operand B 
+    .operand_c(EX_freg_fwd_data3),      // Operand C
+    .result_out(FPU_out),               // Result of the operation
     .fflags(FPU_flags)
 );
 assign FPU_done = FPU_start;
@@ -657,7 +657,7 @@ Writeback m_WB(
     .bypass_i(bypass_out),
     .ALU_i(ALU_out),
     .MUL_DIV_i(MUL_DIV_out),
-    .FPU_i(FPU_out[31:0]),
+    .FPU_i(FPU_out),
     .mem_data_i(d_mem_rd_data),
     .csr_rd_data_i(csr_rd_data),
     

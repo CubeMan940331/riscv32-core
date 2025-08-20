@@ -3,7 +3,7 @@ module SP_Convert (
     input [1:0]     input_type,
     input [1:0]     output_type,
     input [2:0]     rounding_mode,
-    output reg [63:0]   result,
+    output reg [31:0]   result,
     output reg      flag_invalid,
     output reg      flag_overflow,
     output reg      flag_underflow,
@@ -12,7 +12,6 @@ module SP_Convert (
     // --- Type & Constant Definitions ---
     localparam FP_TYPE_FP32 = 2'b00, FP_TYPE_FP64 = 2'b01;
     localparam FP_TYPE_INT32 = 2'b10, FP_TYPE_UINT32 = 2'b11;
-    localparam FP64_QNAN_MANT = {1'b1, 52'h80000_00000000};
     localparam INT32_MAX_VAL = 64'h000000007FFFFFFF;
     localparam INT32_MIN_VAL = 64'h0000000080000000;
     localparam UINT32_MAX_VAL = 64'h00000000FFFFFFFF;
@@ -32,16 +31,16 @@ module SP_Convert (
 
     // result
     reg final_sign;
-    reg [10:0] final_exp;
-    reg [52:0] final_mant;
+    reg [7:0] final_exp;
+    reg [23:0] final_mant;
 
-    reg [63:0] result_dp;
+    reg [31:0] result_sp;
     reg [63:0] shifted_val;
     reg [63:0] result_int;
     
     // Decode / Encode
     SP_Decoder decoder_a ( .fp_in(operand_in), .sign_out(sign_a_dec), .exponent_out(exp_a_dec), .mantissa_out(mant_a_dec), .is_zero(is_a_zero), .is_infinity(is_a_infinity), .is_nan(is_a_nan), .is_denormal(is_a_denormal) );
-    DP_Encoder encoder ( .sign_in(final_sign), .exponent_in(final_exp), .mantissa_in(final_mant), .fp_out(result_dp) );
+    SP_Encoder encoder ( .sign_in(final_sign), .exponent_in(final_exp), .mantissa_in(final_mant), .fp_out(result_sp) );
 
     reg normal_path_enable;
     reg lsb, g_bit, r_bit, s_bit, round_up;
@@ -67,20 +66,17 @@ module SP_Convert (
                 flag_invalid = 1; // NV
                 if (output_type == FP_TYPE_INT32) begin result_int = INT32_MIN_VAL-1; end // int32 // don't know why it is 0x7fffffff, bc the default conversion of c++ output 0x80000000
                 else if (output_type == FP_TYPE_UINT32) begin result_int = UINT32_MAX_VAL; end // uint32
-                else begin final_sign = 0; final_exp = '1; final_mant = FP64_QNAN_MANT; end // double (NaN)
 
             end else if (is_a_infinity) begin
 
                 normal_path_enable = 0;
                 if (output_type == FP_TYPE_INT32) begin flag_invalid = 1; flag_overflow = 1; result_int = (sign_a_dec) ? INT32_MIN_VAL : INT32_MAX_VAL; end // int32 (NV, OF)
                 else if (output_type == FP_TYPE_UINT32) begin flag_invalid = 1; flag_overflow = !sign_a_dec; result_int = (sign_a_dec) ? UINT32_MIN_VAL : UINT32_MAX_VAL; end // uint32 (NV, OF(+))
-                else begin final_sign = sign_a_dec; final_exp = '1; final_mant = '0; end // double (inf)
 
             end else if (is_a_zero) begin
 
                 normal_path_enable = 0;
                 if (output_type == FP_TYPE_INT32 || output_type == FP_TYPE_UINT32) begin result_int = '0; end // 0
-                else begin final_sign = sign_a_dec; final_exp = '0; final_mant = '0; end // 0
 
             end
 
@@ -93,25 +89,8 @@ module SP_Convert (
 
         // --- 2. Normal Path ---
         if (normal_path_enable) begin
-            // --- SP -> DP Conversion ---
-            if ((input_type == FP_TYPE_FP32) && (output_type == FP_TYPE_FP64)) begin
-                final_sign = sign_a_dec; final_exp = {3'b0, exp_a_dec} + 11'd896; final_mant = {mant_a_dec, 29'b0}; // DP convert
-
-                // handle denormal
-                if (exp_a_dec == 8'b0) begin
-                    final_exp += 11'd1;
-                    for (int i = 52; i >= 29; i--) begin
-                        if (!final_mant[52]) begin
-                            final_mant <<= 1; final_exp -= 1;
-                        end else begin
-                            i = 0;
-                        end
-                    end
-                end
-            end
-
             // --- SP -> UINT Conversion ---
-            else if ((input_type == FP_TYPE_FP32) && (output_type == FP_TYPE_UINT32)) begin
+            if ((input_type == FP_TYPE_FP32) && (output_type == FP_TYPE_UINT32)) begin
                 if (sign_a_dec) begin // negative
                     result_int = '0;
                     if (((rounding_mode == 3'b001) || (rounding_mode == 3'b011)) && (exp_a_dec < 127)) begin flag_inexact = 1; end
@@ -211,10 +190,10 @@ module SP_Convert (
                 end
             end
 
-            // --- INT -> DP Conversion ---
+            // --- INT -> SP Conversion ---
             else begin
                 final_sign = (input_type == FP_TYPE_INT32) & operand_in[31];
-                final_exp = 11'd1054; // 2^31
+                final_exp = 8'd158; // 2^31
                 result_int = (final_sign) ? {1'b0, -operand_in[31:0], 31'b0} : {1'b0, operand_in[31:0], 31'b0};
 
                 for(int i = 31 ; i >= 0 ; i--) begin
@@ -222,10 +201,10 @@ module SP_Convert (
                     else begin i = 0; end
                 end
 
-                lsb = result_int[10];
-                g_bit = result_int[9];
-                r_bit = result_int[8];
-                s_bit = result_int[7];
+                lsb = result_int[39];
+                g_bit = result_int[38];
+                r_bit = result_int[37];
+                s_bit = result_int[36];
                 flag_inexact = g_bit | r_bit | s_bit;
                 case (rounding_mode)
                     3'b000: round_up = g_bit & (lsb | r_bit | s_bit); // RNE
@@ -235,16 +214,16 @@ module SP_Convert (
                     3'b100: round_up = flag_inexact; //RMM
                     default: round_up = 1'b0;
                 endcase
-                if (round_up) begin result_int += {53'b0, 1'b1, 10'b0}; end
+                if (round_up) begin result_int += {24'b0, 1'b1, 39'b0}; end
                 if (result_int[63]) begin final_exp += 1; result_int >>= 1; end
 
-                final_mant = result_int[62:10];
+                final_mant = result_int[62:39];
             end
         end
     end
 
     always @(*) begin
         // --- 3. Final Result Muxing ---
-        result = (output_type == FP_TYPE_FP64) ? result_dp : result_int;
+        result = (output_type == FP_TYPE_FP32) ? result_sp : result_int[31:0];
     end
 endmodule
