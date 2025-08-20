@@ -43,8 +43,13 @@ module Control (
     output is_impl_o
 );
 
-// decode
+// declare
 wire [2:0] funct3 = inst[14:12];
+reg  [3:0] alu_ctrl_r;
+reg  [3:0] mem_ctrl_r;
+reg  [2:0] cmp_op_r;
+reg  [2:0] reg_w_sel_r;
+reg  [1:0] bypass_sel_r;
 
 // 0: PC, 1: rs1
 wire alu_sel1_w = ((inst&`INST_ADDI_MASK) == `INST_ADDI)   ||
@@ -374,6 +379,7 @@ wire fetch_invalid_w = ((inst&`INST_FENCE_MASK) == `INST_FENCE)   ||
                        ((inst&`INST_SFENCE_MASK) == `INST_IFENCE) ;
 
 wire [2:0] MUL_DIV_ctrl_w = {3{is_MUL_DIV_w}} & funct3;
+
 wire [2:0] csr_op_w = {3{is_csr_w}} & funct3;
 
 assign is_impl_o = is_impl_w;
@@ -399,11 +405,6 @@ assign freg_wr_en_o = freg_wr_en_w;
 assign bypass_sel_o = bypass_sel_r;
 assign fetch_invalid_o = fetch_invalid_w;
 
-reg [3:0] alu_ctrl_r;
-reg [3:0] mem_ctrl_r;
-reg [2:0] cmp_op_r;
-reg [2:0] reg_w_sel_r;
-reg [1:0] bypass_sel_r;
 always @(*) begin
     alu_ctrl_r   = 4'b0000;
     mem_ctrl_r   = 4'b0000;
