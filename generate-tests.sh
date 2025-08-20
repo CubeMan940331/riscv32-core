@@ -1,4 +1,15 @@
 #!/bin/bash
+riscv_toolchain="riscv32-unknown-elf-"
+if [ $(riscv64-unknown-elf-gcc --print-multi-lib | grep rv32imaf) ];then
+    riscv_toolchain="riscv64-unknown-elf-"
+fi
+if [ ! $(which "${riscv_toolchain}gcc") ];then
+    echo "${riscv_toolchain}gcc not found"
+    echo "check if riscv gnu toolchain is properly installed"
+    exit 1
+fi
+echo "using ${riscv_toolchain}gcc"
+
 riscv_test_dir="/opt/riscv/target/share/riscv-tests"
 file_dir="./testing/"
 test_list="00_test_list.txt"
@@ -38,10 +49,10 @@ gen_test(){
     echo $test_name
     
     # objdump
-    riscv32-unknown-elf-objdump -d -s -x $1 > "$file_dir$test_name.dump"
+    "${riscv_toolchain}objdump" -d -s -x $1 > "$file_dir$test_name.dump"
     
     # objcopy
-    riscv32-unknown-elf-objcopy -O binary $1 "$file_dir$test_name.elfcopy"
+    "${riscv_toolchain}objcopy" -O binary $1 "$file_dir$test_name.elfcopy"
 
     # generate .mem file
     # source binary is little endian

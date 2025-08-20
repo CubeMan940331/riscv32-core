@@ -13,7 +13,6 @@ using namespace std;
 
 #include "VComputer.h"
 #include "VComputer_Computer.h"
-#include "VComputer_InstructionMemory.h"
 #include "VComputer_DataMemory.h"
 #include "VComputer_PipelineCPU.h"
 #include "verilated.h"
@@ -21,6 +20,7 @@ using namespace std;
 #define MAX_CYCLE 5000
 void load_data_mem(VComputer_DataMemory *ptr, ifstream in){
     constexpr size_t INST_SIZE = 65536;
+    sizeof(ptr->mem.m_storage);
     if(INST_SIZE%4){
         // expect size of DataMemory is align
         throw runtime_error("size of DataMemory is misalign");
