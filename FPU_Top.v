@@ -18,7 +18,7 @@ module FPU_Top (
     output reg [31:0] result_out,     // Result of the operation
 
     // --- Status Flags ---
-    output [4:0] fflags         // invalid, divbyzero, overflow, underflow, inexact
+    output reg [4:0] fflags         // invalid, divbyzero, overflow, underflow, inexact
 );
 
     // --- Opcode Definitions ---
