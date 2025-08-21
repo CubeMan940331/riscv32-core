@@ -44,32 +44,32 @@ module FPU_Top (
 
 
     // --- Internal Wires for connecting to sub-modules ---
-    reg [31:0] sp_adder_result;
-    reg sp_adder_invalid, sp_adder_overflow, sp_adder_underflow, sp_adder_inexact;
+    wire [31:0] sp_adder_result;
+    wire sp_adder_invalid, sp_adder_overflow, sp_adder_underflow, sp_adder_inexact;
 
-    reg sp_cmp, sp_cmp_invalid;
+    wire sp_cmp, sp_cmp_invalid;
 
-    reg [31:0] sp_convert_result;
-    reg sp_convert_invalid, sp_convert_overflow, sp_convert_underflow, sp_convert_inexact;
+    wire [31:0] sp_convert_result;
+    wire sp_convert_invalid, sp_convert_overflow, sp_convert_underflow, sp_convert_inexact;
 
-    reg [31:0] sp_multiplier_result;
-    reg sp_multiplier_invalid, sp_multiplier_overflow, sp_multiplier_underflow, sp_multiplier_inexact;
+    wire [31:0] sp_multiplier_result;
+    wire sp_multiplier_invalid, sp_multiplier_overflow, sp_multiplier_underflow, sp_multiplier_inexact;
 
-    reg [31:0] sp_divider_result;
-    reg sp_divider_invalid, sp_divider_divbyzero, sp_divider_overflow, sp_divider_underflow, sp_divider_inexact;
+    wire [31:0] sp_divider_result;
+    wire sp_divider_invalid, sp_divider_divbyzero, sp_divider_overflow, sp_divider_underflow, sp_divider_inexact;
 
-    reg [31:0] sp_sqrt_result;
-    reg sp_sqrt_invalid, sp_sqrt_inexact;
+    wire [31:0] sp_sqrt_result;
+    wire sp_sqrt_invalid, sp_sqrt_inexact;
 
-    reg [31:0] sp_min_max_result;
-    reg sp_min_max_invalid;
+    wire [31:0] sp_min_max_result;
+    wire sp_min_max_invalid;
 
-    reg [31:0] sp_fused_result;
-    reg sp_fused_invalid, sp_fused_overflow, sp_fused_underflow, sp_fused_inexact;
+    wire [31:0] sp_fused_result;
+    wire sp_fused_invalid, sp_fused_overflow, sp_fused_underflow, sp_fused_inexact;
 
-    reg [9:0]  sp_class_result;
+    wire [9:0]  sp_class_result;
 
-    reg [31:0] sp_fsgnj_result;
+    wire [31:0] sp_fsgnj_result;
 
     // --- Sub-module control signals ---
     reg [2:0]  rounding_mode;

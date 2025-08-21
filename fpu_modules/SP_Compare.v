@@ -6,16 +6,16 @@ module SP_Compare (
     output reg      flag_invalid
 );
     // operand a
-    reg sign_a_dec;
-    reg [7:0] exp_a_dec;
-    reg [23:0] mant_a_dec;
-    reg is_a_zero, is_a_infinity, is_a_nan, is_a_denormal;
+    wire sign_a_dec;
+    wire [7:0] exp_a_dec;
+    wire [23:0] mant_a_dec;
+    wire is_a_zero, is_a_infinity, is_a_nan, is_a_denormal;
 
     // operand b
-    reg sign_b_dec;
-    reg [7:0] exp_b_dec;
-    reg [23:0] mant_b_dec;
-    reg is_b_zero, is_b_infinity, is_b_nan, is_b_denormal;
+    wire sign_b_dec;
+    wire [7:0] exp_b_dec;
+    wire [23:0] mant_b_dec;
+    wire is_b_zero, is_b_infinity, is_b_nan, is_b_denormal;
 
     // Decode / Encode
     SP_Decoder decoder_a ( .fp_in(operand_a), .sign_out(sign_a_dec), .exponent_out(exp_a_dec), .mantissa_out(mant_a_dec), .is_zero(is_a_zero), .is_infinity(is_a_infinity), .is_nan(is_a_nan), .is_denormal(is_a_denormal) );

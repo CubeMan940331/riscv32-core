@@ -10,16 +10,16 @@ module SP_Adder (
     output reg      flag_inexact
 );
     // operand a
-    reg sign_a_dec;
-    reg [7:0] exp_a_dec;
-    reg [23:0] mant_a_dec;
-    reg is_a_zero, is_a_infinity, is_a_nan, is_a_denormal;
+    wire sign_a_dec;
+    wire [7:0] exp_a_dec;
+    wire [23:0] mant_a_dec;
+    wire is_a_zero, is_a_infinity, is_a_nan, is_a_denormal;
 
     // operand b
-    reg sign_b_dec;
-    reg [7:0] exp_b_dec;
-    reg [23:0] mant_b_dec;
-    reg is_b_zero, is_b_infinity, is_b_nan, is_b_denormal;
+    wire sign_b_dec;
+    wire [7:0] exp_b_dec;
+    wire [23:0] mant_b_dec;
+    wire is_b_zero, is_b_infinity, is_b_nan, is_b_denormal;
 
     // result
     reg final_sign;
@@ -111,11 +111,9 @@ module SP_Adder (
                 end
 
                 // Subtract clear leading zero for implicit bit 1
-                for (i = 26; i >= 3; i = i - 1) begin
+                for (i = 0; i < 24; i = i + 1) begin
                     if (!mant_sum[26]) begin
                         mant_sum  = mant_sum << 1; final_exp = final_exp - 1;
-                    end else begin
-                        i = 0;
                     end
                 end
                 

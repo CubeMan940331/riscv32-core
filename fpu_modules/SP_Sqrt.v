@@ -6,10 +6,10 @@ module SP_Sqrt (
     output reg       flag_inexact
 );
     // operand a
-    reg sign_a_dec;
-    reg [7:0] exp_a_dec;
-    reg [23:0] mant_a_dec;
-    reg is_a_zero, is_a_infinity, is_a_nan, is_a_denormal;
+    wire sign_a_dec;
+    wire [7:0] exp_a_dec;
+    wire [23:0] mant_a_dec;
+    wire is_a_zero, is_a_infinity, is_a_nan, is_a_denormal;
 
     // Decode / Encode
     SP_Decoder decoder_a ( .fp_in(operand_a), .sign_out(sign_a_dec), .exponent_out(exp_a_dec), .mantissa_out(mant_a_dec), .is_zero(is_a_zero), .is_infinity(is_a_infinity), .is_nan(is_a_nan), .is_denormal(is_a_denormal) );
@@ -20,10 +20,10 @@ module SP_Sqrt (
     localparam loops = 5;
     localparam threehalfs = 32'h3fc00000; // 1.5
     wire [31:0] mult_result_0, mult_result_1 [loops:0], mult_result_2 [loops:0], mult_result_3[loops+1:0];
-    reg [31:0] sub_result [loops:0];
-    reg [31:0] div_result;
-    reg [31:0] mult_check_result;
-    reg mult_check_inexact;
+    wire [31:0] sub_result [loops:0];
+    wire [31:0] div_result;
+    wire [31:0] mult_check_result;
+    wire mult_check_inexact;
 
     // evil trick
     SP_Multiplier mult0 ( .operand_a(operand_a), .operand_b(32'h3f000000), .rounding_mode(3'b001), .result(mult_result_0), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact() );

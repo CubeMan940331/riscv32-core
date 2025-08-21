@@ -2,7 +2,7 @@ module SP_Divider (
     input [31:0] operand_a,
     input [31:0] operand_b,
     input [2:0]  rounding_mode,
-    output reg [31:0] result,
+    output [31:0] result,
     output reg       flag_invalid,
     output reg       flag_divbyzero,
     output reg       flag_overflow,
@@ -10,16 +10,16 @@ module SP_Divider (
     output reg       flag_inexact
 );
     // operand a
-    reg sign_a_dec;
-    reg [7:0] exp_a_dec;
-    reg [23:0] mant_a_dec;
-    reg is_a_zero, is_a_infinity, is_a_nan, is_a_denormal;
+    wire sign_a_dec;
+    wire [7:0] exp_a_dec;
+    wire [23:0] mant_a_dec;
+    wire is_a_zero, is_a_infinity, is_a_nan, is_a_denormal;
 
     // operand b
-    reg sign_b_dec;
-    reg [7:0] exp_b_dec;
-    reg [23:0] mant_b_dec;
-    reg is_b_zero, is_b_infinity, is_b_nan, is_b_denormal;
+    wire sign_b_dec;
+    wire [7:0] exp_b_dec;
+    wire [23:0] mant_b_dec;
+    wire is_b_zero, is_b_infinity, is_b_nan, is_b_denormal;
 
     // result
     reg final_sign;
@@ -78,15 +78,13 @@ module SP_Divider (
             exp_diff = exp_diff + ($signed({24'b0, exp_a_dec}) - 127) - ($signed({24'b0, exp_b_dec}) - 127);
                 // denormal
                 if (is_a_denormal) begin
-                    for (i = 23 ; i > 0 ; i = i - 1) begin
+                    for (i = 0 ; i < 24 ; i = i + 1) begin
                         if (!mant_a_div[23]) begin exp_diff = exp_diff - 1; mant_a_div = mant_a_div << 1; end
-                        else begin i = 0; end
                     end
                 end
                 if (is_b_denormal) begin
-                    for (i = 23 ; i > 0 ; i = i - 1) begin
+                    for (i = 0 ; i < 24 ; i = i + 1) begin
                         if (!mant_b_div[23]) begin exp_diff = exp_diff + 1; mant_b_div = mant_b_div << 1; end
-                        else begin i = 0; end
                     end
                 end
             
@@ -98,8 +96,8 @@ module SP_Divider (
             quotient[div_precision + 23:0] = dividend / divisor;
 
             // --- 2c. Post-Division leading zero ---
-            for (;!quotient[div_precision + 23];) begin
-                quotient = quotient << 1;
+            for (i = 0 ; i < 24 ; i = i + 1) begin
+                if(!quotient[div_precision + 23]) begin quotient = quotient << 1; end
             end
             
             // --- 2d. Rounding Logic ---
@@ -138,7 +136,12 @@ module SP_Divider (
 
             if (normal_path_enable) begin
                 // put denormal back
-                for (; exp_diff < 0 ; exp_diff = exp_diff + 1) begin quotient = quotient >> 1; end
+                for (i = 0 ; i < 24 ; i = i + 1) begin
+                    if (exp_diff < 0) begin
+                        exp_diff = exp_diff + 1;
+                        quotient = quotient >> 1;
+                    end
+                end
 
                 // result
                 final_exp = exp_diff[7:0];

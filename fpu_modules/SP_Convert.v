@@ -24,17 +24,17 @@ module SP_Convert (
     localparam RMM = 3'b100;
 
     // operand a
-    reg sign_a_dec;
-    reg [7:0] exp_a_dec;
-    reg [23:0] mant_a_dec;
-    reg is_a_zero, is_a_infinity, is_a_nan, is_a_denormal;
+    wire sign_a_dec;
+    wire [7:0] exp_a_dec;
+    wire [23:0] mant_a_dec;
+    wire is_a_zero, is_a_infinity, is_a_nan, is_a_denormal;
 
     // result
     reg final_sign;
     reg [7:0] final_exp;
     reg [23:0] final_mant;
 
-    reg [31:0] result_sp;
+    wire [31:0] result_sp;
     reg [63:0] shifted_val;
     reg [63:0] result_int;
     
@@ -197,9 +197,8 @@ module SP_Convert (
                 final_exp = 8'd158; // 2^31
                 result_int = (final_sign) ? {1'b0, -operand_in[31:0], 31'b0} : {1'b0, operand_in[31:0], 31'b0};
 
-                for(i = 31 ; i >= 0 ; i = i - 1) begin
+                for(i = 0 ; i < 32 ; i = i + 1) begin
                     if (!result_int[62]) begin final_exp = final_exp - 1; result_int = result_int << 1; end
-                    else begin i = 0; end
                 end
 
                 lsb = result_int[39];

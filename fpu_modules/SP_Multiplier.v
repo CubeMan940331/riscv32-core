@@ -2,23 +2,23 @@ module SP_Multiplier (
     input [31:0] operand_a,
     input [31:0] operand_b,
     input [2:0]  rounding_mode,
-    output reg [31:0] result,
+    output [31:0] result,
     output reg       flag_invalid,
     output reg       flag_overflow,
     output reg       flag_underflow,
     output reg       flag_inexact
 );
     // operand a
-    reg sign_a_dec;
-    reg [7:0] exp_a_dec;
-    reg [23:0] mant_a_dec;
-    reg is_a_zero, is_a_infinity, is_a_nan, is_a_denormal;
+    wire sign_a_dec;
+    wire [7:0] exp_a_dec;
+    wire [23:0] mant_a_dec;
+    wire is_a_zero, is_a_infinity, is_a_nan, is_a_denormal;
 
     // operand b
-    reg sign_b_dec;
-    reg [7:0] exp_b_dec;
-    reg [23:0] mant_b_dec;
-    reg is_b_zero, is_b_infinity, is_b_nan, is_b_denormal;
+    wire sign_b_dec;
+    wire [7:0] exp_b_dec;
+    wire [23:0] mant_b_dec;
+    wire is_b_zero, is_b_infinity, is_b_nan, is_b_denormal;
 
     // result
     reg final_sign;
@@ -77,16 +77,14 @@ module SP_Multiplier (
                 // denormal handling
                 if (is_a_denormal) begin 
                     mant_a_mul = mant_a_mul << 1;
-                    for (i = 23 ; i > 0 ; i = i - 1) begin
+                    for (i = 0 ; i < 24 ; i = i + 1) begin
                         if (!mant_a_mul[23]) begin exp_diff = exp_diff - 1; mant_a_mul = mant_a_mul << 1; end
-                        else begin i = 0; end
                     end
                 end
                 if (is_b_denormal) begin 
                     mant_b_mul = mant_b_mul << 1;
-                    for (i = 23 ; i > 0 ; i = i - 1) begin
+                    for (i = 0 ; i < 24 ; i = i + 1) begin
                         if (!mant_b_mul[23]) begin exp_diff = exp_diff - 1; mant_b_mul = mant_b_mul << 1; end
-                        else begin i = 0; end
                     end
                 end
 
@@ -109,8 +107,11 @@ module SP_Multiplier (
 
                     // denormal put it back
                     if (exp_diff < 0) begin mul_mant = mul_mant >> 1; flag_underflow = 1; end
-                    for (; exp_diff < 0 ; exp_diff = exp_diff + 1) begin
-                        mul_mant = mul_mant >> 1;
+                    for (i = 0 ; i < 24 ; i = i + 1) begin
+                        if (exp_diff < 0) begin
+                            exp_diff = exp_diff + 1;
+                            mul_mant = mul_mant >> 1;
+                        end
                     end
 
                     // exponent fetch
