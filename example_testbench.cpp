@@ -136,18 +136,12 @@ int main(int argc, char **argv){
             is_set_fail_pc &&
             top->Computer->m_core0->WB_pc_valid_out &&
             top->Computer->m_core0->WB_pc_out==fail_pc
-        ){
-            is_reach_fail_pc=true;
-            break;
-        }
+        ) is_reach_fail_pc=true;
         else if(
             is_set_pass_pc &&
             top->Computer->m_core0->WB_pc_valid_out &&
             top->Computer->m_core0->WB_pc_out==pass_pc
-        ){
-            is_reach_pass_pc=true;
-            break;
-        }
+        ) is_reach_pass_pc=true;
         else if(
             is_set_stop_pc &&
             top->Computer->m_core0->WB_pc_valid_out &&

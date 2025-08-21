@@ -13,6 +13,7 @@ if ! make; then
 fi
 
 file_dir="./testing/"
+test_list="00_test_list.txt"
 result_list="00_test_result.txt"
 
 # Grouping results
@@ -21,9 +22,9 @@ declare -A ext_details   # failed case logs
 
 printf '' > "$file_dir$result_list"
 
-for mem_file in "$file_dir"*.mem; do
-    test_name=$(basename "$mem_file")
-    test_name=${test_name%.*}
+for target in $(tail -n +2 $file_dir$test_list); do
+    test_name=$(basename "$target")
+    mem_file="$file_dir$test_name.mem"
 
     # Extract extension (adjust regex if needed)
     if [[ $test_name =~ rv32u([a-z]) ]]; then

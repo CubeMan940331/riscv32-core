@@ -572,7 +572,7 @@ assign d_mem_rd_en = MEM_mem_rd_en_out;
 assign d_mem_addr = MEM_mem_addr_out;
 assign d_mem_wr_data = MEM_mem_wr_data_out;
 
-always @(posedge clk or negedge rst_n) begin
+always @(posedge clk) begin
     if(LSU_start) begin
         MEM_mem_wr_en_out <= EX_mem_wr_en_out;
         MEM_mem_rd_en_out <= EX_mem_rd_en_out;
