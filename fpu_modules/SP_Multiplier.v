@@ -32,7 +32,7 @@ module SP_Multiplier (
 
     // local variables
     reg normal_path_enable;
-    int exp_diff;
+    integer exp_diff;
     reg [23:0] mant_a_mul, mant_b_mul;
     reg [47:0] mul_mant;
     reg lsb, g_bit, r_bit, s_bit, round_up;
@@ -42,49 +42,49 @@ module SP_Multiplier (
         flag_invalid=0; flag_overflow=0; flag_underflow=0; flag_inexact=0;
         normal_path_enable = 1;
 
-        final_exp = '0; final_mant = '0;
+        final_exp = 0; final_mant = 0;
 
         // --- 1. Special Value Handling ---
         final_sign = sign_a_dec ^ sign_b_dec;
         if (is_a_nan || is_b_nan) begin 
             normal_path_enable = 0;
             flag_invalid = 1;
-            final_exp = '1; final_mant = {2'b11, 22'b0}; // NaN
+            final_exp = 8'hFF; final_mant = {2'b11, 22'b0}; // NaN
         end else if ((is_a_zero && is_b_infinity)||(is_a_infinity && is_b_zero)) begin 
             normal_path_enable = 0;
             flag_invalid = 1;
-            final_sign = 0; final_exp = '1; final_mant = {2'b11, 22'b0}; // NaN
+            final_sign = 0; final_exp = 8'hFF; final_mant = {2'b11, 22'b0}; // NaN
         end else if (is_a_zero || is_b_zero) begin 
             normal_path_enable = 0;
-            final_exp = '0; final_mant = '0; // 0
+            final_exp = 0; final_mant = 0; // 0
         end else if (is_a_infinity || is_b_infinity) begin 
             normal_path_enable = 0;
-            final_exp = '1; final_mant = '0; // Inf
+            final_exp = 8'hFF; final_mant = 0; // Inf
         end
         
         // init
         exp_diff = 127;
         mant_a_mul = mant_a_dec; mant_b_mul = mant_b_dec;
-        mul_mant = '0;
+        mul_mant = 0;
         lsb = 0; g_bit = 0; r_bit = 0; s_bit = 0; round_up = 0;
 
         // --- 2. Normal Path ---
         if (normal_path_enable) begin
             // exponent
-            exp_diff += ($signed({24'b0, exp_a_dec}) - 127) + ($signed({24'b0, exp_b_dec}) - 127);
+            exp_diff = exp_diff + ($signed({24'b0, exp_a_dec}) - 127) + ($signed({24'b0, exp_b_dec}) - 127);
 
                 // denormal handling
                 if (is_a_denormal) begin 
-                    mant_a_mul <<= 1;
-                    for (int i = 23 ; i > 0 ; i--) begin
-                        if (!mant_a_mul[23]) begin exp_diff -= 1; mant_a_mul <<= 1; end
+                    mant_a_mul = mant_a_mul << 1;
+                    for (integer i = 23 ; i > 0 ; i = i - 1) begin
+                        if (!mant_a_mul[23]) begin exp_diff = exp_diff - 1; mant_a_mul = mant_a_mul << 1; end
                         else begin i = 0; end
                     end
                 end
                 if (is_b_denormal) begin 
-                    mant_b_mul <<= 1;
-                    for (int i = 23 ; i > 0 ; i--) begin
-                        if (!mant_b_mul[23]) begin exp_diff -= 1; mant_b_mul <<= 1; end
+                    mant_b_mul = mant_b_mul << 1;
+                    for (integer i = 23 ; i > 0 ; i = i - 1) begin
+                        if (!mant_b_mul[23]) begin exp_diff = exp_diff - 1; mant_b_mul = mant_b_mul << 1; end
                         else begin i = 0; end
                     end
                 end
@@ -93,13 +93,13 @@ module SP_Multiplier (
                 normal_path_enable = 0;
                 flag_underflow = 1;
                 flag_inexact = 1;
-                final_exp = '0; final_mant = '0; // 0
+                final_exp = 0; final_mant = 0; // 0
             end
             else if (exp_diff > 254) begin
                 normal_path_enable = 0;
                 flag_overflow = 1;
                 flag_inexact = 1;
-                final_exp = '1; final_mant = '0; // Inf
+                final_exp = 8'hFF; final_mant = 0; // Inf
             end
 
             if(normal_path_enable) begin
@@ -107,16 +107,16 @@ module SP_Multiplier (
                 mul_mant = mant_a_mul * mant_b_mul;
 
                     // denormal put it back
-                    if (exp_diff < 0) begin mul_mant >>= 1; flag_underflow = 1; end
-                    for (; exp_diff < 0 ; exp_diff++) begin
-                        mul_mant >>= 1;
+                    if (exp_diff < 0) begin mul_mant = mul_mant >> 1; flag_underflow = 1; end
+                    for (; exp_diff < 0 ; exp_diff = exp_diff + 1) begin
+                        mul_mant = mul_mant >> 1;
                     end
 
                     // exponent fetch
                     final_exp = exp_diff[7:0];
 
-                if (mul_mant[47] == 1) begin final_exp += 1; mul_mant[47] = 0; end
-                else begin mul_mant <<= 1; end
+                if (mul_mant[47] == 1) begin final_exp = final_exp + 1; mul_mant[47] = 0; end
+                else begin mul_mant = mul_mant << 1; end
                 
                 // rounding
                 lsb = mul_mant[24];
@@ -132,7 +132,7 @@ module SP_Multiplier (
                     3'b100: round_up = flag_inexact; //RMM
                     default: round_up = 1'b0;
                 endcase
-                if (round_up) begin mul_mant += {24'b0, 1'b1, 23'b0}; end
+                if (round_up) begin mul_mant = mul_mant + {24'b0, 1'b1, 23'b0}; end
 
                 
                 final_mant = mul_mant[47:24];

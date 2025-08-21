@@ -173,7 +173,7 @@ assign interrupt_o = irq_masked_r;
 
 reg csr_mip_upd_q;
 always @ (posedge clk or negedge rst_n) begin
-    if (rst_n) csr_mip_upd_q <= 1'b0;
+    if (!rst_n) csr_mip_upd_q <= 1'b0;
     else if (csr_rd_addr_i == `CSR_MIP) csr_mip_upd_q <= 1'b1;
     else if (csr_wr_addr_i == `CSR_MIP || (|exception_i)) csr_mip_upd_q <= 1'b0;
 end
@@ -520,6 +520,11 @@ always @(*) begin
     else if((exception_i & `EXCEPTION_TYPE_MASK) == `EXCEPTION_EXCEPTION) begin
         csr_branch_r = 1'b1;
         csr_target_r = csr_mtvec_q;
+    end
+    // Fence / SATP register writes cause pipeline flushes
+    else if (exception_i == `EXCEPTION_FENCE) begin
+        csr_branch_r = 1'b1;
+        csr_target_r = exception_pc_i + 32'd4;
     end
 end
 

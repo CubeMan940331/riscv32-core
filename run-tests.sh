@@ -13,6 +13,7 @@ if ! make; then
 fi
 
 file_dir="./testing/"
+test_list="00_test_list.txt"
 result_list="00_test_result.txt"
 
 # Grouping results
@@ -21,16 +22,21 @@ declare -A ext_details   # failed case logs
 
 printf '' > "$file_dir$result_list"
 
-for mem_file in "$file_dir"*.mem; do
-    test_name=$(basename "$mem_file")
-    test_name=${test_name%.*}
+for target in $(tail -n +2 $file_dir$test_list); do
+    test_name=$(basename "$target")
+    mem_file="$file_dir$test_name.mem"
 
     # Extract extension (adjust regex if needed)
     if [[ $test_name =~ rv32u([a-z]) ]]; then
         ext=${BASH_REMATCH[1]}
         ext=${ext^^}
     else
-        ext="UNKNOWN"
+        ext="Zicsr"
+    fi
+
+    stop_pc=$(grep '<write_tohost>:' "$file_dir$test_name.dump" | cut -c 2-8)
+    if [ -n "$stop_pc" ]; then
+        stop_pc=$(printf "%d" "0x$stop_pc")
     fi
 
     pass_pc=$(grep '<pass>:' "$file_dir$test_name.dump" | cut -c 2-8)
@@ -38,13 +44,18 @@ for mem_file in "$file_dir"*.mem; do
         pass_pc=$(printf "%d" "0x$pass_pc")
     fi
 
-    output=$(./obj_dir/VComputer "$mem_file" "$pass_pc")
+    fail_pc=$(grep '<fail>:' "$file_dir$test_name.dump" | cut -c 2-8)
+    if [ -n "$fail_pc" ]; then
+        fail_pc=$(printf "%d" "0x$fail_pc")
+    fi
+
+    output=$(./obj_dir/VComputer "$mem_file" "$stop_pc" "$pass_pc" "$fail_pc")
 
     if [ -z "${ext_results[$ext]}" ]; then
         ext_results[$ext]=1  # assume pass until proven fail
     fi
 
-    if [[ "$output" != "yes" && "$output" != "done" ]]; then
+    if [[ "$output" != "Yes" ]]; then
         ext_results[$ext]=0
         ext_details[$ext]+=$(printf "%-30s %-16s %s\n" "$test_name" "pass_pc=$pass_pc" "$output\n")
     fi

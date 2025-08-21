@@ -22,12 +22,12 @@ module CSR (
 //-----------------------------------------------------------------
 // CSR handling
 //-----------------------------------------------------------------
-reg                     csr_rd_valid_r;
+reg                     csr_wr_valid_r;
 reg [31:0]              csr_rd_data_r;
 reg [31:0]              csr_wr_data_r;
 reg [`EXCEPTION_W-1:0]  csr_exception_r;
 reg [31:0]              wdata;
-wire csr_fault_w  = is_csr_i && inst_valid &&( // CSR op is valid
+wire csr_fault_w = is_csr_i && inst_valid &&( // CSR op is valid
     ((inst[31:30] == 2'd3) && 
     ((csr_op_i == 3'b01) && (inst[19:15] != 5'b0))) || // write on RO
     (cur_priv_i < inst[29:28]) // illegal privilege level
@@ -36,8 +36,7 @@ always @(*) begin
     wdata = csr_old_i;
     if(is_fpu_done_i) begin 
         wdata = {27'b0, fpu_flags_i}; // FPU flags write-in
-    end
-    else begin
+    end else begin
         case (csr_op_i[1:0])
             2'b01: begin          // CSRRW / CSRRWI
                 wdata = (is_csr_imm_i ? imm_i : reg_rd_data1_i);
@@ -60,7 +59,7 @@ end
 //-----------------------------------------------------------------
 always @(*) begin
     // CSR read
-    csr_rd_valid_r = !csr_fault_w; // valid if no fault
+    csr_wr_valid_r = !csr_fault_w && (inst[19:15] != 5'b0); // no fault and not RO
     if(!inst_valid || csr_fault_w) begin
         csr_rd_data_r = inst; // record for xtval?
     end else begin
@@ -78,11 +77,9 @@ always @(*) begin
         csr_exception_r = `EXCEPTION_FPU;
     else if (!inst_valid || csr_fault_w)
         csr_exception_r = `EXCEPTION_ILLEGAL_INSTRUCTION;
-        // Fence / MMU settings cause a pipeline flush
-        // else if (satp_update_w || ifence_w || sfence_w)
-        //     csr_exception_q <= `EXCEPTION_FENCE;
-        // else
-        //     csr_exception_q <= `EXCEPTION_W'b0;
+        // Fence / MMU settings cause a pipeline flush TODO: SATP_update_w
+    else if ((inst & `INST_IFENCE_MASK) == `INST_IFENCE)
+        csr_exception_r = `EXCEPTION_FENCE;
     else
         csr_exception_r = `EXCEPTION_W'b0; // no exception
     
@@ -96,7 +93,7 @@ end
 
 assign csr_wr_data_o    = csr_wr_data_r;
 assign csr_exception_o  = csr_exception_r;
-assign csr_wr_valid_o   = csr_rd_valid_r;
+assign csr_wr_valid_o   = csr_wr_valid_r;
 assign csr_rd_data_o    = csr_rd_data_r;
 
 endmodule

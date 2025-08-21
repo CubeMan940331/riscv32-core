@@ -16,12 +16,14 @@ module EX_Reg (
     input  wire [31:0] reg_rd_data2_i,
     input  wire [31:0] freg_rd_data1_i,
     input  wire [31:0] freg_rd_data2_i,
+    input  wire [31:0] freg_rd_data3_i,
     
     input  wire [31:0] imm_i,
     
     input  wire [4:0]  rd_i,
     input  wire [4:0]  rs1_i,
     input  wire [4:0]  rs2_i,
+    input  wire [4:0]  rs3_i,
     // reg
     input wire        reg_wr_en_i,
     input wire        freg_wr_en_i,
@@ -40,6 +42,10 @@ module EX_Reg (
     // cmp
     input wire [2:0]  cmp_op_i,
     
+    // MUL/DIV
+    input wire is_MUL_DIV_i,
+    input wire [2:0] MUL_DIV_ctrl_i,
+
     // csr
     input wire [11:0] csr_addr_i,
 
@@ -53,8 +59,8 @@ module EX_Reg (
 
     input wire [1:0] bypass_sel_i,
 
-    input wire [2:0]  funct3_i,
-    input wire        funct7_i,
+    input wire fetch_invalid_i,
+
 //=================================
     // output
     // data
@@ -68,12 +74,14 @@ module EX_Reg (
     output wire [31:0] reg_rd_data2_o,
     output wire [31:0] freg_rd_data1_o,
     output wire [31:0] freg_rd_data2_o,
+    output wire [31:0] freg_rd_data3_o,
     
     output wire [31:0] imm_o,
     
     output wire [4:0]  rd_o,
     output wire [4:0]  rs1_o,
     output wire [4:0]  rs2_o,
+    output wire [4:0]  rs3_o,
     
     // reg
     output wire        reg_wr_en_o,
@@ -92,6 +100,11 @@ module EX_Reg (
     output wire [3:0]  ALU_ctrl_o,
     // cmp
     output wire [2:0]  cmp_op_o,
+
+    // MUL/DIV
+    output wire is_MUL_DIV_o,
+    output wire [2:0] MUL_DIV_ctrl_o,
+
     // csr
     output wire [11:0] csr_addr_o,
 
@@ -105,8 +118,8 @@ module EX_Reg (
 
     output wire [1:0] bypass_sel_o,
 
-    output wire [2:0]  funct3_o,
-    output wire        funct7_o
+    output wire fetch_invalid_o
+
 );
     // data
     PipelineRegister #(.WIDTH( 1)) reg_is_impl   (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(is_impl_i),   .data_o(is_impl_o));
@@ -119,11 +132,13 @@ module EX_Reg (
     PipelineRegister #(.WIDTH(32)) reg_rd_data2  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(reg_rd_data2_i), .data_o(reg_rd_data2_o));
     PipelineRegister #(.WIDTH(32)) reg_frd_data1 (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(freg_rd_data1_i), .data_o(freg_rd_data1_o));
     PipelineRegister #(.WIDTH(32)) reg_frd_data2 (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(freg_rd_data2_i), .data_o(freg_rd_data2_o));
+    PipelineRegister #(.WIDTH(32)) reg_frd_data3 (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(freg_rd_data3_i), .data_o(freg_rd_data3_o));
     
     PipelineRegister #(.WIDTH(32)) reg_imm       (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(imm_i),      .data_o(imm_o));
     PipelineRegister #(.WIDTH(5))  reg_rd        (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(rd_i),       .data_o(rd_o));
     PipelineRegister #(.WIDTH(5))  reg_rs1       (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(rs1_i),      .data_o(rs1_o));
     PipelineRegister #(.WIDTH(5))  reg_rs2       (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(rs2_i),      .data_o(rs2_o));
+    PipelineRegister #(.WIDTH(5))  reg_rs3       (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(rs3_i),      .data_o(rs3_o));
 
     // control
     PipelineRegister #(.WIDTH(1))  reg_reg_wr_en (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(reg_wr_en_i), .data_o(reg_wr_en_o));
@@ -142,6 +157,9 @@ module EX_Reg (
     PipelineRegister #(.WIDTH(4))  reg_ALU_ctrl  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(ALU_ctrl_i), .data_o(ALU_ctrl_o));
     // cmp
     PipelineRegister #(.WIDTH(3))  reg_cmp_op    (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(cmp_op_i), .data_o(cmp_op_o));
+    // MUL/DIV
+    PipelineRegister #(.WIDTH(1))  reg_is_MUL_DIV (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(is_MUL_DIV_i), .data_o(is_MUL_DIV_o));
+    PipelineRegister #(.WIDTH(3))  reg_MUL_DIV_ctrl (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(MUL_DIV_ctrl_i), .data_o(MUL_DIV_ctrl_o));
     // csr
     PipelineRegister #(.WIDTH(12)) reg_csr_addr  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(csr_addr_i), .data_o(csr_addr_o));
     PipelineRegister #(.WIDTH(1))  reg_is_csr    (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(is_csr_i), .data_o(is_csr_o));
@@ -152,8 +170,7 @@ module EX_Reg (
     PipelineRegister #(.WIDTH(1))  reg_FPU_sel1  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(FPU_sel1_i), .data_o(FPU_sel1_o));
     // bypass
     PipelineRegister #(.WIDTH(2))  reg_bypass_sel (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(bypass_sel_i), .data_o(bypass_sel_o));
+    // Fence
+    PipelineRegister #(.WIDTH(1))  reg_fetch_invalid (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(fetch_invalid_i), .data_o(fetch_invalid_o));
 
-    // funct3 and funct7
-    PipelineRegister #(.WIDTH(3))  reg_funct3    (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(funct3_i), .data_o(funct3_o));
-    PipelineRegister #(.WIDTH(1))  reg_funct7    (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(funct7_i), .data_o(funct7_o));
 endmodule

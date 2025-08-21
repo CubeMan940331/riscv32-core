@@ -1,9 +1,9 @@
 module BypassUnit (
-    input [31:0] freg_data1,
-    input [31:0] reg_data1,
-    input [31:0] imm,
-    input     [1:0] bypass_sel,
-    output reg [31:0] result_o
+    input  [31:0] freg_data1,
+    input  [31:0] reg_data1,
+    input  [31:0] imm,
+    input  [1:0]  bypass_sel,
+    output [31:0] result_o
 );
 
 reg [31:0] result_r;

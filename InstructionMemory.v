@@ -10,7 +10,7 @@ module InstructionMemory #(parameter size = 65536)(
     };
 
     initial begin
-        for(i=0;i<size;++i) insts[i]=0;
+        for(i=0;i<size;i=i+1) insts[i]=0;
         $readmemb("TEST_INSTRUCTIONS.txt", insts);
     end
 

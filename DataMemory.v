@@ -3,6 +3,9 @@ module DataMemory
 (
     input  wire        rst_n,      // active-low asynchronous reset
     input  wire        clk,        // rising-edge clock
+
+	input  wire [31:0] i_addr,
+	output wire [31:0] inst,
     
 	input  wire        wr_en,   // 1 = store
     input  wire        rd_en,    // 1 = load
@@ -14,7 +17,7 @@ module DataMemory
 );
 
 reg [7:0] mem [0:SIZE-1] /* verilator public */;
-
+assign inst = i_addr<SIZE ? {mem[i_addr+3], mem[i_addr+2], mem[i_addr+1], mem[i_addr+0]}: 32'h0;
 always @(posedge clk) begin
     if (wr_en) begin
         // SW
