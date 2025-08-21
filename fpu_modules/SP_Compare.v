@@ -27,8 +27,8 @@ module SP_Compare (
     localparam CMP_LE = 3'b000;
 
     // Local variables
-    reg is_a_snan = is_a_nan & !mant_a_dec[22];
-    reg is_b_snan = is_b_nan & !mant_b_dec[22];
+    wire is_a_snan = is_a_nan & !mant_a_dec[22];
+    wire is_b_snan = is_b_nan & !mant_b_dec[22];
     reg temp_eq, temp_gt, temp_lt, flag_eq, flag_gt, flag_lt, flag_unordered;
 
     always @(*) begin

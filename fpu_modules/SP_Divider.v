@@ -32,6 +32,7 @@ module SP_Divider (
     SP_Encoder encoder ( .sign_in(final_sign), .exponent_in(final_exp), .mantissa_in(final_mant), .fp_out(result) );
 
     // local variables
+    integer i;
     reg normal_path_enable;
 
     integer exp_diff;
@@ -77,13 +78,13 @@ module SP_Divider (
             exp_diff = exp_diff + ($signed({24'b0, exp_a_dec}) - 127) - ($signed({24'b0, exp_b_dec}) - 127);
                 // denormal
                 if (is_a_denormal) begin
-                    for (integer i = 23 ; i > 0 ; i = i - 1) begin
+                    for (i = 23 ; i > 0 ; i = i - 1) begin
                         if (!mant_a_div[23]) begin exp_diff = exp_diff - 1; mant_a_div = mant_a_div << 1; end
                         else begin i = 0; end
                     end
                 end
                 if (is_b_denormal) begin
-                    for (integer i = 23 ; i > 0 ; i = i - 1) begin
+                    for (i = 23 ; i > 0 ; i = i - 1) begin
                         if (!mant_b_div[23]) begin exp_diff = exp_diff + 1; mant_b_div = mant_b_div << 1; end
                         else begin i = 0; end
                     end

@@ -29,8 +29,8 @@ module SP_Min_Max (
     reg normal_path_enable;
     reg temp_eq, temp_gt, temp_lt, flag_eq, flag_gt, flag_lt;
 
-    reg is_a_snan = is_a_nan & !mant_a_dec[22];
-    reg is_b_snan = is_b_nan & !mant_b_dec[22];
+    wire is_a_snan = is_a_nan & !mant_a_dec[22];
+    wire is_b_snan = is_b_nan & !mant_b_dec[22];
 
     always @(*) begin
         // init

@@ -42,6 +42,7 @@ module SP_Convert (
     SP_Decoder decoder_a ( .fp_in(operand_in), .sign_out(sign_a_dec), .exponent_out(exp_a_dec), .mantissa_out(mant_a_dec), .is_zero(is_a_zero), .is_infinity(is_a_infinity), .is_nan(is_a_nan), .is_denormal(is_a_denormal) );
     SP_Encoder encoder ( .sign_in(final_sign), .exponent_in(final_exp), .mantissa_in(final_mant), .fp_out(result_sp) );
 
+    integer i;
     reg normal_path_enable;
     reg lsb, g_bit, r_bit, s_bit, round_up;
     integer shift_amt;
@@ -196,7 +197,7 @@ module SP_Convert (
                 final_exp = 8'd158; // 2^31
                 result_int = (final_sign) ? {1'b0, -operand_in[31:0], 31'b0} : {1'b0, operand_in[31:0], 31'b0};
 
-                for(integer i = 31 ; i >= 0 ; i = i - 1) begin
+                for(i = 31 ; i >= 0 ; i = i - 1) begin
                     if (!result_int[62]) begin final_exp = final_exp - 1; result_int = result_int << 1; end
                     else begin i = 0; end
                 end

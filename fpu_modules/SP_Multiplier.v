@@ -31,6 +31,7 @@ module SP_Multiplier (
     SP_Encoder encoder ( .sign_in(final_sign), .exponent_in(final_exp), .mantissa_in(final_mant), .fp_out(result) );
 
     // local variables
+    integer i;
     reg normal_path_enable;
     integer exp_diff;
     reg [23:0] mant_a_mul, mant_b_mul;
@@ -76,14 +77,14 @@ module SP_Multiplier (
                 // denormal handling
                 if (is_a_denormal) begin 
                     mant_a_mul = mant_a_mul << 1;
-                    for (integer i = 23 ; i > 0 ; i = i - 1) begin
+                    for (i = 23 ; i > 0 ; i = i - 1) begin
                         if (!mant_a_mul[23]) begin exp_diff = exp_diff - 1; mant_a_mul = mant_a_mul << 1; end
                         else begin i = 0; end
                     end
                 end
                 if (is_b_denormal) begin 
                     mant_b_mul = mant_b_mul << 1;
-                    for (integer i = 23 ; i > 0 ; i = i - 1) begin
+                    for (i = 23 ; i > 0 ; i = i - 1) begin
                         if (!mant_b_mul[23]) begin exp_diff = exp_diff - 1; mant_b_mul = mant_b_mul << 1; end
                         else begin i = 0; end
                     end

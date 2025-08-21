@@ -32,6 +32,7 @@ module SP_Adder (
     SP_Encoder encoder ( .sign_in(final_sign), .exponent_in(final_exp), .mantissa_in(final_mant), .fp_out(result) );
     
     // --- 1. Special Value Handling ---
+    integer i;
     reg normal_path_enable;
     reg eff_sign_b;
 
@@ -110,7 +111,7 @@ module SP_Adder (
                 end
 
                 // Subtract clear leading zero for implicit bit 1
-                for (integer i = 26; i >= 3; i = i - 1) begin
+                for (i = 26; i >= 3; i = i - 1) begin
                     if (!mant_sum[26]) begin
                         mant_sum  = mant_sum << 1; final_exp = final_exp - 1;
                     end else begin
