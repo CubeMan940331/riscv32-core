@@ -5,12 +5,12 @@ module MUL_Reg #(
     input wire clk,
     input wire rst_n,
     input wire start_i,
-    input wire [63:0] partial_i [SIZE-1:0],
+    input wire [((64 * SIZE) - 1):0] partial_i,
     input wire [1:0] sign_i,
     input wire higher_i,
 
     output wire start_o,
-    output wire [63:0] partial_o [SIZE-1:0],
+    output wire [((64 * SIZE) - 1):0] partial_o,
     output wire [1:0] sign_o,
     output wire higher_o
 );
@@ -18,7 +18,7 @@ module MUL_Reg #(
     genvar g_i;
     generate
         for (g_i = 0; g_i < SIZE; g_i = g_i + 1) begin: reg_partial_products
-            PipelineRegister #(.WIDTH(64)) reg_partial (.clk(clk), .rst_n(rst_n), .clear(1'b0), .en(1'b1), .data_i(partial_i[g_i]), .data_o(partial_o[g_i]));
+            PipelineRegister #(.WIDTH(64)) reg_partial (.clk(clk), .rst_n(rst_n), .clear(1'b0), .en(1'b1), .data_i(partial_i[(64 * (g_i + 1) - 1):(64 * g_i)]), .data_o(partial_o[(64 * (g_i + 1) - 1):(64 * g_i)]));
         end
     endgenerate
 
