@@ -107,6 +107,8 @@ module FPU_Top (
 
     // --- Instantiate all functional units ---
     SP_Adder sp_adder_inst (
+        .clk(clk),
+        .rst_n(rst_n),
         .start(sp_adder_enable),
         .operand_a(operand_a),
         .operand_b(operand_b),
@@ -118,6 +120,8 @@ module FPU_Top (
     );
 
     SP_Compare sp_compare_inst (
+        .clk(clk),
+        .rst_n(rst_n),
         .start(sp_cmp_enable),
         .operand_a(operand_a), .operand_b(operand_b),
         .func3(func3),
@@ -126,6 +130,8 @@ module FPU_Top (
     );
 
     SP_Convert sp_convert_inst (
+        .clk(clk),
+        .rst_n(rst_n),
         .start(sp_convert_enable),
         .operand_in(operand_a), 
         .input_type(convert_input_type),
@@ -137,6 +143,8 @@ module FPU_Top (
     );
 
     SP_Multiplier sp_multiplier_inst (
+        .clk(clk),
+        .rst_n(rst_n),
         .start(sp_multiplier_enable),
         .operand_a(operand_a), .operand_b(operand_b),
         .rounding_mode(rounding_mode),
@@ -146,6 +154,8 @@ module FPU_Top (
     );
 
     SP_Divider sp_divider_inst (
+        .clk(clk),
+        .rst_n(rst_n),
         .start(sp_divider_enable),
         .operand_a(operand_a), .operand_b(operand_b),
         .rounding_mode(rounding_mode),
@@ -155,6 +165,8 @@ module FPU_Top (
     );
 
     SP_Sqrt sp_sqrt_inst (
+        .clk(clk),
+        .rst_n(rst_n),
         .start(sp_sqrt_enable),
         .operand_a(operand_a),
         .rounding_mode(rounding_mode),
@@ -164,6 +176,8 @@ module FPU_Top (
     );
 
     SP_Min_Max sp_min_max_inst (
+        .clk(clk),
+        .rst_n(rst_n),
         .start(sp_min_max_enable),
         .operand_a(operand_a),
         .operand_b(operand_b),
@@ -174,6 +188,8 @@ module FPU_Top (
     );
 
     SP_Fused sp_fused_inst (
+        .clk(clk),
+        .rst_n(rst_n),
         .start(sp_fused_enable),
         .operand_a(operand_a),
         .operand_b(operand_b),
@@ -187,6 +203,8 @@ module FPU_Top (
     );
 
     SP_Classifier sp_class_inst (
+        .clk(clk),
+        .rst_n(rst_n),
         .start(sp_class_enable),
         .fp_in(operand_a),
         .result(sp_class_result),
@@ -194,6 +212,8 @@ module FPU_Top (
     );
 
     SP_Fsgnj sp_fsgnj_inst (
+        .clk(clk),
+        .rst_n(rst_n),
         .start(sp_fsgnj_enable),
         .operand_a(operand_a),
         .operand_b(operand_b),

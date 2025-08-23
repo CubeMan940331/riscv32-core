@@ -1,4 +1,6 @@
 module SP_Convert (
+    input           clk,
+    input           rst_n,
     input               start,
     input [31:0]        operand_in,
     input [1:0]         input_type,

@@ -1,4 +1,6 @@
 module SP_Fused (
+    input           clk,
+    input           rst_n,
     input               start,
     input [31:0]        operand_a,
     input [31:0]        operand_b,
@@ -18,8 +20,8 @@ module SP_Fused (
     wire [31:0] adder_result;
     wire adder_invalid, adder_overflow, adder_underflow, adder_inexact;
 
-    SP_Multiplier multiplier ( .start(start), .operand_a(operand_a), .operand_b(operand_b), .rounding_mode(rounding_mode), .result(mult_result), .flag_invalid(mult_invalid), .flag_overflow(mult_overflow), .flag_underflow(mult_underflow), .flag_inexact(mult_inexact), .done() );
-    SP_Adder adder ( .start(start), .operand_a({(is_negative) ? ~mult_result[31] : mult_result[31], mult_result[30:0]}), .operand_b(operand_c), .is_subtraction(is_subtraction), .rounding_mode(rounding_mode), .result(adder_result), .flag_invalid(adder_invalid), .flag_overflow(adder_overflow), .flag_underflow(adder_underflow), .flag_inexact(adder_inexact), .done() );
+    SP_Multiplier multiplier ( .clk(clk), .rst_n(rst_n), .start(start), .operand_a(operand_a), .operand_b(operand_b), .rounding_mode(rounding_mode), .result(mult_result), .flag_invalid(mult_invalid), .flag_overflow(mult_overflow), .flag_underflow(mult_underflow), .flag_inexact(mult_inexact), .done() );
+    SP_Adder adder ( .clk(clk), .rst_n(rst_n), .start(start), .operand_a({(is_negative) ? ~mult_result[31] : mult_result[31], mult_result[30:0]}), .operand_b(operand_c), .is_subtraction(is_subtraction), .rounding_mode(rounding_mode), .result(adder_result), .flag_invalid(adder_invalid), .flag_overflow(adder_overflow), .flag_underflow(adder_underflow), .flag_inexact(adder_inexact), .done() );
 
     always @(*) begin
         flag_invalid = mult_invalid | adder_invalid;

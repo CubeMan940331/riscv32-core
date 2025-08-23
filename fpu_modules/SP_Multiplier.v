@@ -1,4 +1,6 @@
 module SP_Multiplier (
+    input           clk,
+    input           rst_n,
     input           start,
     input [31:0]    operand_a,
     input [31:0]    operand_b,

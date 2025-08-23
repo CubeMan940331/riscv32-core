@@ -1,4 +1,6 @@
 module SP_Adder (
+    input           clk,
+    input           rst_n,
     input           start,
     input [31:0]    operand_a,
     input [31:0]    operand_b,
@@ -36,7 +38,7 @@ module SP_Adder (
     // --- 1. Special Value Handling ---
     integer i;
     reg normal_path_enable;
-    reg eff_sign_b;
+    wire eff_sign_b = sign_b_dec ^ is_subtraction; // e.g. a-(-b) = a+b
 
     // --- 2. Normal Path ---
     reg [7:0] exp_diff;
@@ -50,7 +52,6 @@ module SP_Adder (
         normal_path_enable=1;
 
         // --- 1. Special Value Handling ---
-        eff_sign_b = sign_b_dec ^ is_subtraction; // e.g. a-(-b) = a+b
         if (is_a_nan || is_b_nan) begin
             normal_path_enable = 0;
             flag_invalid = 1;
@@ -102,47 +103,41 @@ module SP_Adder (
 
             eff_sub = (sign_a_dec != eff_sign_b);
             if (eff_sub) mant_sum = mant_larger - mant_smaller; else mant_sum = mant_larger + mant_smaller;
+            
+            if (mant_sum[27]) begin // Addition overflow
+                mant_sum = mant_sum >> 1; final_exp = final_exp + 1;
+            end
 
-            if (mant_sum == 0) begin
-                final_sign = (rounding_mode==3'b010) & sign_a_dec & eff_sign_b; final_exp=0; final_mant=0; normal_path_enable=0;
+            // Subtract clear leading zero for implicit bit 1
+            for (i = 0; i < 24; i = i + 1) begin
+                if (!mant_sum[26]) begin
+                    mant_sum  = mant_sum << 1; final_exp = final_exp - 1;
+                end
             end
             
-            if (normal_path_enable) begin
-                if (mant_sum[27]) begin // Addition overflow
-                    mant_sum = mant_sum >> 1; final_exp = final_exp + 1;
-                end
+            begin
+                lsb = mant_sum[3];
+                g_bit = g_bit | mant_sum[2];
+                r_bit = r_bit | mant_sum[1];
+                s_bit = s_bit | mant_sum[0];
+                flag_inexact = g_bit | r_bit | s_bit;
+                case (rounding_mode)
+                    3'b000: round_up = g_bit & (lsb | r_bit | s_bit); // RNE
+                    3'b001: round_up = 1'b0; // RTZ
+                    3'b010: round_up = flag_inexact & final_sign; // RDN
+                    3'b011: round_up = flag_inexact & ~final_sign; // RUP
+                    3'b100: round_up = g_bit; //RMM
+                    default: round_up = 1'b0;
+                endcase
+                if(round_up) mant_sum = mant_sum + 8; // 1000 (lsb|g|r|s)
+                if (mant_sum[27]) begin mant_sum = mant_sum >> 1; final_exp = final_exp + 1; end
+                final_mant = mant_sum[26:3];
+            end
 
-                // Subtract clear leading zero for implicit bit 1
-                for (i = 0; i < 24; i = i + 1) begin
-                    if (!mant_sum[26]) begin
-                        mant_sum  = mant_sum << 1; final_exp = final_exp - 1;
-                    end
-                end
-                
-                begin
-                    lsb = mant_sum[3];
-                    g_bit = g_bit | mant_sum[2];
-                    r_bit = r_bit | mant_sum[1];
-                    s_bit = s_bit | mant_sum[0];
-                    flag_inexact = g_bit | r_bit | s_bit;
-                    case (rounding_mode)
-                        3'b000: round_up = g_bit & (lsb | r_bit | s_bit); // RNE
-                        3'b001: round_up = 1'b0; // RTZ
-                        3'b010: round_up = flag_inexact & final_sign; // RDN
-                        3'b011: round_up = flag_inexact & ~final_sign; // RUP
-                        3'b100: round_up = g_bit; //RMM
-                        default: round_up = 1'b0;
-                    endcase
-                    if(round_up) mant_sum = mant_sum + 8; // 1000 (lsb|g|r|s)
-                    if (mant_sum[27]) begin mant_sum = mant_sum >> 1; final_exp = final_exp + 1; end
-                    final_mant = mant_sum[26:3];
-                end
-
-                if (final_exp > 254) begin
-                    flag_overflow=1; flag_inexact=1; final_exp=8'hFF; final_mant=0;
-                end else if (final_exp == 0) begin
-                    flag_underflow=1; final_exp=0;
-                end
+            if (final_exp > 254) begin
+                flag_overflow=1; flag_inexact=1; final_exp=8'hFF; final_mant=0;
+            end else if (final_exp == 0) begin
+                flag_underflow=1; final_exp=0;
             end
         end
     end

@@ -1,4 +1,6 @@
 module SP_Sqrt (
+    input           clk,
+    input           rst_n,
     input               start,
     input [31:0]        operand_a,
     input [2:0]         rounding_mode,
@@ -28,24 +30,24 @@ module SP_Sqrt (
     wire mult_check_inexact;
 
     // evil trick
-    SP_Multiplier mult0 ( .start(), .operand_a(operand_a), .operand_b(32'h3f000000), .rounding_mode(3'b001), .result(mult_result_0), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
+    SP_Multiplier mult0 ( .clk(clk), .rst_n(rst_n), .start(start), .operand_a(operand_a), .operand_b(32'h3f000000), .rounding_mode(3'b001), .result(mult_result_0), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
 
     genvar i;
     generate
         for (i = 0 ; i < loops+1 ; i = i + 1) begin
-            SP_Multiplier mult1 ( .start(start), .operand_a(mult_result_3[i]), .operand_b(mult_result_3[i]), .rounding_mode(3'b001), .result(mult_result_1[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
-            SP_Multiplier mult2 ( .start(start), .operand_a(mult_result_1[i]), .operand_b(mult_result_0), .rounding_mode(3'b001), .result(mult_result_2[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
-            SP_Adder sub ( .start(start), .operand_a(threehalfs), .operand_b(mult_result_2[i]), .is_subtraction(1'b1), .rounding_mode(3'b001), .result(sub_result[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
-            SP_Multiplier mult3 ( .start(start), .operand_a(mult_result_3[i]), .operand_b(sub_result[i]), .rounding_mode(3'b001), .result(mult_result_3[i+1]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
+            SP_Multiplier mult1 ( .clk(clk), .rst_n(rst_n), .start(start), .operand_a(mult_result_3[i]), .operand_b(mult_result_3[i]), .rounding_mode(3'b001), .result(mult_result_1[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
+            SP_Multiplier mult2 ( .clk(clk), .rst_n(rst_n), .start(start), .operand_a(mult_result_1[i]), .operand_b(mult_result_0), .rounding_mode(3'b001), .result(mult_result_2[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
+            SP_Adder sub ( .clk(clk), .rst_n(rst_n), .start(start), .operand_a(threehalfs), .operand_b(mult_result_2[i]), .is_subtraction(1'b1), .rounding_mode(3'b001), .result(sub_result[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
+            SP_Multiplier mult3 ( .clk(clk), .rst_n(rst_n), .start(start), .operand_a(mult_result_3[i]), .operand_b(sub_result[i]), .rounding_mode(3'b001), .result(mult_result_3[i+1]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
         end
     endgenerate
 
-    SP_Divider sp_divider_inst ( .start(start), .operand_a(32'h3F800000), .operand_b(mult_result_3[loops+1]), .rounding_mode(rounding_mode), .result(div_result), .flag_invalid(), .flag_divbyzero(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
+    SP_Divider sp_divider_inst ( .clk(clk), .rst_n(rst_n), .start(start), .operand_a(32'h3F800000), .operand_b(mult_result_3[loops+1]), .rounding_mode(rounding_mode), .result(div_result), .flag_invalid(), .flag_divbyzero(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
 
     // evil init
     assign mult_result_3[0] = 32'h5f3759df - (operand_a >> 1);
 
-    SP_Multiplier mult_check ( .start(start), .operand_a(div_result), .operand_b(div_result), .rounding_mode(rounding_mode), .result(mult_check_result), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(mult_check_inexact), .done() );
+    SP_Multiplier mult_check ( .clk(clk), .rst_n(rst_n), .start(start), .operand_a(div_result), .operand_b(div_result), .rounding_mode(rounding_mode), .result(mult_check_result), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(mult_check_inexact), .done() );
 
     always @(*) begin
         // --- Default assignments ---

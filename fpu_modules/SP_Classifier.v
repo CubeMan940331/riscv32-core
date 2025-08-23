@@ -1,4 +1,6 @@
 module SP_Classifier (
+    input           clk,
+    input           rst_n,
     input           start,
     input  [31:0]   fp_in,
     output [9:0]    result,
