@@ -14,12 +14,14 @@ module SP_Adder (
     output reg      done
 );
     // operand a
+    reg  [31:0] operand_a_reg;
     wire sign_a_dec;
     wire [7:0] exp_a_dec;
     wire [23:0] mant_a_dec;
     wire is_a_zero, is_a_infinity, is_a_nan, is_a_denormal;
 
     // operand b
+    reg  [31:0] operand_b_reg;
     wire sign_b_dec;
     wire [7:0] exp_b_dec;
     wire [23:0] mant_b_dec;
@@ -31,13 +33,13 @@ module SP_Adder (
     reg [23:0] final_mant;
     
     // Decode / Encode
-    SP_Decoder decoder_a ( .fp_in(operand_a), .sign_out(sign_a_dec), .exponent_out(exp_a_dec), .mantissa_out(mant_a_dec), .is_zero(is_a_zero), .is_infinity(is_a_infinity), .is_nan(is_a_nan), .is_denormal(is_a_denormal) );
-    SP_Decoder decoder_b ( .fp_in(operand_b), .sign_out(sign_b_dec), .exponent_out(exp_b_dec), .mantissa_out(mant_b_dec), .is_zero(is_b_zero), .is_infinity(is_b_infinity), .is_nan(is_b_nan), .is_denormal(is_b_denormal) );
+    SP_Decoder decoder_a ( .fp_in(operand_a_reg), .sign_out(sign_a_dec), .exponent_out(exp_a_dec), .mantissa_out(mant_a_dec), .is_zero(is_a_zero), .is_infinity(is_a_infinity), .is_nan(is_a_nan), .is_denormal(is_a_denormal) );
+    SP_Decoder decoder_b ( .fp_in(operand_b_reg), .sign_out(sign_b_dec), .exponent_out(exp_b_dec), .mantissa_out(mant_b_dec), .is_zero(is_b_zero), .is_infinity(is_b_infinity), .is_nan(is_b_nan), .is_denormal(is_b_denormal) );
     SP_Encoder encoder ( .sign_in(final_sign), .exponent_in(final_exp), .mantissa_in(final_mant), .fp_out(result) );
     
     // --- 1. Special Value Handling ---
     reg [3:0] state;
-    parameter   WAITING = 4'd0,
+    localparam  WAITING = 4'd0,
                 SPECIAL_VAL = 4'd1,
                 NORMAL_CAL_0 = 4'd2,
                 NORMAL_CAL_1 = 4'd3,
@@ -67,6 +69,8 @@ module SP_Adder (
                     flag_inexact <= 0;
                     done <= 0;
                     if (start) begin
+                        operand_a_reg <= operand_a;
+                        operand_b_reg <= operand_b;
                         state <= SPECIAL_VAL;
                     end
                 end
@@ -151,7 +155,7 @@ module SP_Adder (
                         3'b001: round_up <= 1'b0; // RTZ
                         3'b010: round_up <= (g_bit | r_bit | s_bit) & final_sign; // RDN
                         3'b011: round_up <= (g_bit | r_bit | s_bit) & ~final_sign; // RUP
-                        3'b100: round_up <= g_bit; //RMM
+                        3'b100: round_up <= (g_bit | r_bit | s_bit); //RMM
                         default: round_up <= 1'b0;
                     endcase
                     state <= ROUNDING_1;
