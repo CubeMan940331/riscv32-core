@@ -65,7 +65,7 @@ module CSRFile (
     // CSR registers
     ,output [1:0]   priv_o
     ,output [31:0]  mstatus_o
-    // ,output [31:0]  satp_o
+    ,output [31:0]  satp_o
 
     ,output [31:0]  interrupt_o
 );
@@ -73,8 +73,6 @@ module CSRFile (
 // utilities
 reg [1:0]   csr_priv_r;
 reg [1:0]   csr_priv_q;
-// reg [31:0]  csr_satp_r;
-// reg [31:0]  csr_satp_q;
 
 // CSR - Machine
 
@@ -146,6 +144,9 @@ reg [31:0] csr_frm_q;
 reg [31:0] csr_mtimecmp_q;
 reg        csr_mtime_ie_q;
 
+// CSR - Supervisor
+reg [31:0]  csr_satp_q;
+
 //-----------------------------------------------------------------
 // Masked Interrupts
 //-----------------------------------------------------------------
@@ -188,7 +189,8 @@ always @(*) begin
     // CSR - Machine
         `CSR_MHARTID:   csr_rd_data_r = cpu_id_i;
         // Trap Setup
-        `CSR_MSTATUS:   csr_rd_data_r = csr_mstatus_q & `CSR_MSTATUS_MASK;
+        // no need in S-mode
+        `CSR_MSTATUS:   csr_rd_data_r = {csr_mstatus_q[31:13], (csr_mstatus_q[12:11] == 2'b11) ? 2'b11 : 2'b00, csr_mstatus_q[10:0]} & `CSR_MSTATUS_MASK;
         `CSR_MISA:      csr_rd_data_r = misa_i;
         `CSR_MEDELEG:   csr_rd_data_r = csr_medeleg_q & `CSR_MEDELEG_MASK;
         `CSR_MIDELEG:   csr_rd_data_r = csr_mideleg_q & `CSR_MIDELEG_MASK;
@@ -212,19 +214,20 @@ always @(*) begin
         // Non-Standard Timer Interrupt
         `CSR_MTIMECMP:  csr_rd_data_r = csr_mtimecmp_q;
     // CSR - Supervisor
-        default:
-                        csr_rd_data_r = 32'b0;
+        `CSR_SATP:      csr_rd_data_r = csr_satp_q & `CSR_SATP_MASK;
+        default:        csr_rd_data_r = 32'b0;
     endcase
 end
 
 assign csr_rd_data_o = csr_rd_data_r;
 assign priv_o        = csr_priv_q;
 assign mstatus_o     = csr_mstatus_q;
-// assign satp_o        = csr_satp_q;
+assign satp_o        = csr_satp_q;
 
 //-----------------------------------------------------------------
 // CSR register next state
 //-----------------------------------------------------------------
+// CSR - Machine
     // Information RO
 reg [31:0] csr_mvendorid_r;
 reg [31:0] csr_marchid_r;
@@ -282,11 +285,13 @@ reg [31:0] csr_frm_r;
     // Timer interrupts
 reg [31:0] csr_mtimecmp_r;
 reg        csr_mtime_ie_r;
+// CSR - Supervisor
+    // SATP
+reg [31:0] csr_satp_r;
 
 always @(*) begin
     // privilege level
     csr_priv_r = csr_priv_q;
-
     // Trap Setup
     csr_mstatus_r   = csr_mstatus_q;
     csr_medeleg_r   = csr_medeleg_q;
@@ -313,6 +318,9 @@ always @(*) begin
     // Non-Standard Timer Interrupt
     csr_mtimecmp_r  = csr_mtimecmp_q;
     csr_mtime_ie_r  = csr_mtime_ie_q;
+
+    // SATP
+    csr_satp_r      = csr_satp_q;
 
     // Interrupt
     if((exception_i & `EXCEPTION_TYPE_MASK) == `EXCEPTION_INTERRUPT) begin
@@ -358,6 +366,7 @@ always @(*) begin
         csr_mstatus_r[`SR_MPIE_R] = csr_mstatus_r[`SR_MIE_R];
         csr_mstatus_r[`SR_MPP_R]  = csr_priv_q;
         csr_mstatus_r[`SR_MIE_R]  = 1'b0;
+        csr_mstatus_r[`SR_SD_R]   = (csr_mstatus_r[`SR_FS_R] == `SR_FS_DIRTY) || (csr_mstatus_r[`SR_XS_R] == `SR_XS_DIRTY);
         csr_priv_r                = `PRIV_MACHINE;
         csr_mepc_r                = exception_pc_i;
         csr_mcause_r              = {28'b0, exception_i[3:0]}; // need to check if this is correct
@@ -384,7 +393,7 @@ always @(*) begin
         case(csr_wr_addr_i)
         // CSR - Machine
             // Trap Setup
-            `CSR_MSTATUS: csr_mstatus_r   = csr_wr_data_i & `CSR_MSTATUS_MASK;
+            `CSR_MSTATUS: csr_mstatus_r   = {csr_wr_data_i[31:13], (csr_wr_data_i[12:11] == 2'b11) ? 2'b11 : 2'b00, csr_wr_data_i[10:0]} & `CSR_MSTATUS_MASK;
             `CSR_MEDELEG: csr_medeleg_r   = csr_wr_data_i & `CSR_MEDELEG_MASK;
             `CSR_MIDELEG: csr_mideleg_r   = csr_wr_data_i & `CSR_MIDELEG_MASK;
             `CSR_MIE:     csr_mie_r       = csr_wr_data_i & `CSR_MIE_MASK;
@@ -409,6 +418,9 @@ always @(*) begin
                 csr_mtimecmp_r = csr_wr_data_i & `CSR_MTIMECMP_MASK;
                 csr_mtime_ie_r = 1'b1;
             end
+        // CSR - Supervisor
+            // SATP
+            `CSR_SATP:     csr_satp_r     = csr_wr_data_i & `CSR_SATP_MASK;
             default:;
         endcase
     end
@@ -458,6 +470,10 @@ always @(posedge clk or negedge rst_n) begin
             // Non-Standard Timer Interrupt
         csr_mtimecmp_q <= 32'b0;
         csr_mtime_ie_q <= 1'b0;
+
+        // CSR - Supervisor
+            // SATP
+        csr_satp_q     <= 32'b0;
     end else begin
         // CSR - Machine
             // privilege level
@@ -486,6 +502,9 @@ always @(posedge clk or negedge rst_n) begin
         csr_mtimecmp_q <= csr_mtimecmp_r;
         csr_mtime_ie_q <= csr_mtime_ie_r;
         csr_mip_next_q <= buffer_mip_w ? csr_mip_next_r : 32'b0;
+        // CSR - Supervisor
+            // SATP
+        csr_satp_q     <= csr_satp_r & `CSR_SATP_MASK;
 
     end
 end
