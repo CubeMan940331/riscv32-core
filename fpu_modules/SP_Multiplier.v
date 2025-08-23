@@ -10,7 +10,7 @@ module SP_Multiplier (
     output reg      flag_overflow,
     output reg      flag_underflow,
     output reg      flag_inexact,
-    output          done
+    output reg      done
 );
     // operand a
     reg  [31:0] operand_a_reg;
