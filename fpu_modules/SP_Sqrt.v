@@ -24,30 +24,33 @@ module SP_Sqrt (
     localparam loops = 5;
     localparam threehalfs = 32'h3fc00000; // 1.5
     wire [31:0] mult_result_0, mult_result_1 [loops:0], mult_result_2 [loops:0], mult_result_3[loops+1:0];
+    wire mult_0_done, mult_1_done [loops:0], mult_2_done [loops:0], mult_3_done [loops+1:0];
     wire [31:0] sub_result [loops:0];
+    wire sub_done [loops:0];
     wire [31:0] div_result;
+    wire div_done;
     wire [31:0] mult_check_result;
     wire mult_check_inexact;
 
     // evil trick
-    SP_Multiplier mult0 ( .clk(clk), .rst_n(rst_n), .start(start), .operand_a(operand_a), .operand_b(32'h3f000000), .rounding_mode(3'b001), .result(mult_result_0), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
+    SP_Multiplier mult0 ( .clk(clk), .rst_n(rst_n), .start(start), .operand_a(operand_a), .operand_b(32'h3f000000), .rounding_mode(3'b001), .result(mult_result_0), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done(mult_0_done) );
 
     genvar i;
     generate
         for (i = 0 ; i < loops+1 ; i = i + 1) begin
-            SP_Multiplier mult1 ( .clk(clk), .rst_n(rst_n), .start(start), .operand_a(mult_result_3[i]), .operand_b(mult_result_3[i]), .rounding_mode(3'b001), .result(mult_result_1[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
-            SP_Multiplier mult2 ( .clk(clk), .rst_n(rst_n), .start(start), .operand_a(mult_result_1[i]), .operand_b(mult_result_0), .rounding_mode(3'b001), .result(mult_result_2[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
-            SP_Adder sub ( .clk(clk), .rst_n(rst_n), .start(start), .operand_a(threehalfs), .operand_b(mult_result_2[i]), .is_subtraction(1'b1), .rounding_mode(3'b001), .result(sub_result[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
-            SP_Multiplier mult3 ( .clk(clk), .rst_n(rst_n), .start(start), .operand_a(mult_result_3[i]), .operand_b(sub_result[i]), .rounding_mode(3'b001), .result(mult_result_3[i+1]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
+            SP_Multiplier mult1 ( .clk(clk), .rst_n(rst_n), .start((mult_0_done ^ mult_3_done[i]) || mult_3_done[i]), .operand_a(mult_result_3[i]), .operand_b(mult_result_3[i]), .rounding_mode(3'b001), .result(mult_result_1[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done(mult_1_done[i]) );
+            SP_Multiplier mult2 ( .clk(clk), .rst_n(rst_n), .start(mult_1_done[i]), .operand_a(mult_result_1[i]), .operand_b(mult_result_0), .rounding_mode(3'b001), .result(mult_result_2[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done(mult_2_done[i]) );
+            SP_Adder sub ( .clk(clk), .rst_n(rst_n), .start(mult_2_done[i]), .operand_a(threehalfs), .operand_b(mult_result_2[i]), .is_subtraction(1'b1), .rounding_mode(3'b001), .result(sub_result[i]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done(sub_done[i]) );
+            SP_Multiplier mult3 ( .clk(clk), .rst_n(rst_n), .start(sub_done[i]), .operand_a(mult_result_3[i]), .operand_b(sub_result[i]), .rounding_mode(3'b001), .result(mult_result_3[i+1]), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done(mult_3_done[i+1]) );
         end
     endgenerate
 
-    SP_Divider sp_divider_inst ( .clk(clk), .rst_n(rst_n), .start(start), .operand_a(32'h3F800000), .operand_b(mult_result_3[loops+1]), .rounding_mode(rounding_mode), .result(div_result), .flag_invalid(), .flag_divbyzero(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done() );
+    SP_Divider sp_divider_inst ( .clk(clk), .rst_n(rst_n), .start(mult_3_done[loops+1]), .operand_a(32'h3F800000), .operand_b(mult_result_3[loops+1]), .rounding_mode(rounding_mode), .result(div_result), .flag_invalid(), .flag_divbyzero(), .flag_overflow(), .flag_underflow(), .flag_inexact(), .done(div_done) );
 
     // evil init
     assign mult_result_3[0] = 32'h5f3759df - (operand_a >> 1);
 
-    SP_Multiplier mult_check ( .clk(clk), .rst_n(rst_n), .start(start), .operand_a(div_result), .operand_b(div_result), .rounding_mode(rounding_mode), .result(mult_check_result), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(mult_check_inexact), .done() );
+    SP_Multiplier mult_check ( .clk(clk), .rst_n(rst_n), .start(div_done), .operand_a(div_result), .operand_b(div_result), .rounding_mode(rounding_mode), .result(mult_check_result), .flag_invalid(), .flag_overflow(), .flag_underflow(), .flag_inexact(mult_check_inexact), .done(done) );
 
     always @(*) begin
         // --- Default assignments ---
