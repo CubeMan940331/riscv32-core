@@ -544,18 +544,21 @@ wire [4:0] FPU_flags;
 FPU_Top m_FPU(
     .clk(clk),
     .rst_n(rst_n),
+    .FPU_start(FPU_start),
+
     .opcode(EX_inst_out[6:0]),
     .func7(EX_inst_out[31:25]),         // func7 code to select the function
     .func3(EX_inst_out[14:12]),         // Rounding mode for arithmetic operations (if 111 swap to frm)
     .frm(csr_rd_data[2:0]),             // Rounding mode (dynamic from frm)
     .rs2(EX_inst_out[24:20]),           // For selecting convert type
+
     .operand_a(FPU_in1),                // Operand A 
     .operand_b(EX_freg_fwd_data2),      // Operand B 
     .operand_c(EX_freg_fwd_data3),      // Operand C
     .result_out(FPU_out),               // Result of the operation
-    .fflags(FPU_flags)
+    .fflags(FPU_flags),
+    .FPU_done(FPU_done)
 );
-assign FPU_done = FPU_start;
 
 // LSU =========================
 // not implemented yet, a simple one is used

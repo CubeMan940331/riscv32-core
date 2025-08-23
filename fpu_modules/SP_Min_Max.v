@@ -1,9 +1,11 @@
 module SP_Min_Max (
+    input                   start,
     input [31:0]            operand_a,
     input [31:0]            operand_b,
     input [2:0]             func3,
     output reg [31:0]       result,
-    output reg              flag_invalid
+    output reg              flag_invalid,
+    output                  done
 );
     // operand a
     wire sign_a_dec;
@@ -84,4 +86,7 @@ module SP_Min_Max (
             endcase
         end
     end
+
+    assign done = start;
+
 endmodule
