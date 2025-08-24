@@ -42,22 +42,24 @@ module SP_Divider (
     localparam  WAITING = 4'd0,
                 SPECIAL_VAL = 4'd1,
                 NORMALIZE = 4'd2,
-                NORMAL_CAL_0 = 4'd3,
-                ROUNDING_0 = 4'd4,
-                ROUNDING_1 = 4'd5,
-                FINAL_CHECK = 4'd6,
-                READY = 4'd8;
+                MANT_DIV_0 = 4'd3,
+                MANT_DIV_1 = 4'd4,
+                NORMAL_CAL_0 = 4'd5,
+                NORMAL_CAL_1 = 4'd6,
+                ROUNDING_0 = 4'd7,
+                ROUNDING_1 = 4'd8,
+                FINAL_CHECK = 4'd9,
+                READY = 4'd10;
+    reg [4:0] count;
     integer i;
-    reg normal_path_enable;
-
     integer exp_diff;
     reg [23:0] mant_a_div;
     reg [23:0] mant_b_div;
 
-    localparam div_precision = 60;
+    localparam div_precision = 27;
     reg [div_precision + 23:0] dividend;
     reg [div_precision + 23:0] divisor;
-    reg [1 + div_precision + 23:0] quotient;
+    reg [div_precision + 1:0] quotient;
 
     reg lsb, g_bit, r_bit, s_bit, round_up;
 
@@ -118,20 +120,43 @@ module SP_Divider (
                         if (mant_a_div < mant_b_div) begin exp_diff <= exp_diff - 1; end // carry
 
                         // --- Division ---
-                        quotient[div_precision + 23:0] <= {mant_a_div, {div_precision{1'b0}}} / {{div_precision{1'b0}}, mant_b_div}; // dividend / divisor;
+                        dividend <= {mant_a_div, {div_precision{1'b0}}};
+                        divisor <= {mant_b_div, {div_precision{1'b0}}};
+                        count <= 0;
+                        state <= MANT_DIV_0;
+                    end
+                end
+
+                MANT_DIV_0: begin
+                    if (dividend >= divisor) begin
+                        dividend <= dividend - divisor;
+                        quotient <= quotient + 1;
+                    end else begin
+                        dividend <= dividend;
+                    end
+                    state <= MANT_DIV_1;
+                end
+
+                MANT_DIV_1: begin
+                    if (count < div_precision-1) begin
+                        divisor <= divisor >> 1;
+                        quotient <= quotient << 1;
+                        count <= count + 1;
+                        state <= MANT_DIV_0;
+                    end else begin
                         state <= NORMAL_CAL_0;
                     end
                 end
 
                 NORMAL_CAL_0: begin
                     // --- Post-Division leading zero ---
-                    if(!quotient[div_precision + 23]) begin
+                    if(!quotient[div_precision]) begin
                         quotient <= quotient << 1;
                     end else begin
-                        lsb <= quotient[div_precision];
-                        g_bit <= quotient[div_precision-1];
-                        r_bit <= quotient[div_precision-2];
-                        s_bit <= |quotient[div_precision-3:0];
+                        lsb <= quotient[div_precision-24];
+                        g_bit <= quotient[div_precision-25];
+                        r_bit <= quotient[div_precision-26];
+                        s_bit <= |quotient[div_precision-27:0];
                         state <= ROUNDING_0;
                     end
                 end
@@ -150,8 +175,10 @@ module SP_Divider (
                 end
 
                 ROUNDING_1: begin
-                    if (round_up) begin quotient <= quotient + {24'b0, 1'b1, {div_precision{1'b0}}}; end
-                    else if (quotient[div_precision + 24]) begin
+                    if (round_up) begin
+                        quotient <= quotient + {24'b0, 1'b1, {(div_precision-24){1'b0}}};
+                        round_up <= 0;
+                    end else if (quotient[div_precision+1]) begin
                         quotient <= quotient >> 1;
                         exp_diff <= exp_diff + 1;
                         state <= FINAL_CHECK;
@@ -178,7 +205,7 @@ module SP_Divider (
                     end else begin
                         // result
                         final_exp <= exp_diff[7:0];
-                        final_mant <= quotient[div_precision + 23 : div_precision];
+                        final_mant <= quotient[div_precision:div_precision-23];
                         state <= READY;
                     end
                 end
