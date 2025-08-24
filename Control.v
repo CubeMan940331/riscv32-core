@@ -33,6 +33,7 @@ module Control (
     // FPU
     output is_fpu_o,
     output FPU_sel1_o, // 0: fs1, 1: rs1
+    output is_f_ext_o,
 
     // Bypass
     output [1:0] bypass_sel_o,
@@ -148,6 +149,13 @@ wire is_impl_w =((inst&`INST_ADDI_MASK) == `INST_ADDI)   ||
                 ((inst&`INST_CSRRSI_MASK) == `INST_CSRRSI) ||
                 ((inst&`INST_CSRRCI_MASK) == `INST_CSRRCI) ||
                 ((inst&`INST_ECALL_MASK) == `INST_ECALL)   ||
+                ((inst&`INST_MRET_MASK) == `INST_MRET)     ||
+                // Zifencei
+                ((inst&`INST_IFENCE_MASK) == `INST_IFENCE) ||
+                // fence
+                ((inst&`INST_FENCE_MASK) == `INST_FENCE) ||
+                // Wfi
+                ((inst&`INST_WFI_MASK) == `INST_WFI)       ||
                 // RVF
                 ((inst&`INST_FMADD_MASK) == `INST_FMADD)         ||
                 ((inst&`INST_FMSUB_MASK) == `INST_FMSUB)         ||
@@ -174,9 +182,7 @@ wire is_impl_w =((inst&`INST_ADDI_MASK) == `INST_ADDI)   ||
                 ((inst&`INST_FCVT_S_W_MASK) == `INST_FCVT_S_W)   ||
                 ((inst&`INST_FCVT_S_WU_MASK) == `INST_FCVT_S_WU) ||
                 ((inst&`INST_FMV_W_X_MASK) == `INST_FMV_W_X)     ||
-                ((inst&`INST_FMV_X_W_MASK) == `INST_FMV_X_W)     ||
-                // m priv
-                ((inst&`INST_MRET_MASK) == `INST_MRET);
+                ((inst&`INST_FMV_X_W_MASK) == `INST_FMV_X_W)     ;
 
 wire reg_wr_en_w = ((inst&`INST_ADDI_MASK) == `INST_ADDI)    ||
                     ((inst&`INST_SLTI_MASK) == `INST_SLTI)   ||
@@ -376,7 +382,41 @@ wire FPU_sel1_w = ((inst&`INST_FCVT_S_W_MASK) == `INST_FCVT_S_W)   ||
 
 wire fetch_invalid_w = ((inst&`INST_FENCE_MASK) == `INST_FENCE)   ||
                        ((inst&`INST_IFENCE_MASK) == `INST_IFENCE) ||
-                       ((inst&`INST_SFENCE_MASK) == `INST_IFENCE) ;
+                       ((inst&`INST_SFENCE_MASK) == `INST_SFENCE) ;
+
+wire is_f_ext_w = ((inst&`INST_FMADD_MASK) == `INST_FMADD)         ||
+                  ((inst&`INST_FMSUB_MASK) == `INST_FMSUB)         ||
+                  ((inst&`INST_FNMSUB_MASK) == `INST_FNMSUB)       ||
+                  ((inst&`INST_FNMADD_MASK) == `INST_FNMADD)       ||
+                  ((inst&`INST_FADD_MASK) == `INST_FADD)           ||
+                  ((inst&`INST_FSUB_MASK) == `INST_FSUB)           ||
+                  ((inst&`INST_FMUL_MASK) == `INST_FMUL)           ||
+                  ((inst&`INST_FDIV_MASK) == `INST_FDIV)           ||
+                  ((inst&`INST_FSQRT_MASK) == `INST_FSQRT)         ||
+                  ((inst&`INST_FSGNJ_MASK) == `INST_FSGNJ)         ||
+                  ((inst&`INST_FSGNJN_MASK) == `INST_FSGNJN)       ||
+                  ((inst&`INST_FSGNJX_MASK) == `INST_FSGNJX)       ||
+                  ((inst&`INST_FMIN_MASK) == `INST_FMIN)           ||
+                  ((inst&`INST_FMAX_MASK) == `INST_FMAX)           ||
+                  ((inst&`INST_FEQ_MASK) == `INST_FEQ)             ||
+                  ((inst&`INST_FLT_MASK) == `INST_FLT)             ||
+                  ((inst&`INST_FLE_MASK) == `INST_FLE)             ||
+                  ((inst&`INST_FCLASS_MASK) == `INST_FCLASS)       ||
+                  ((inst&`INST_FLW_MASK) == `INST_FLW)             ||
+                  ((inst&`INST_FSW_MASK) == `INST_FSW)             ||
+                  ((inst&`INST_FCVT_W_S_MASK) == `INST_FCVT_W_S)   ||
+                  ((inst&`INST_FCVT_WU_S_MASK) == `INST_FCVT_WU_S) ||
+                  ((inst&`INST_FCVT_S_W_MASK) == `INST_FCVT_S_W)   ||
+                  ((inst&`INST_FCVT_S_WU_MASK) == `INST_FCVT_S_WU) ||
+                  ((inst&`INST_FMV_X_W_MASK) == `INST_FMV_X_W)     ||
+                  ((inst&`INST_FMV_W_X_MASK) == `INST_FMV_W_X)     ||
+                  // double
+                  ((inst&`INST_FCVT_W_D_MASK) == `INST_FCVT_W_D)   ||
+                  ((inst&`INST_FCVT_WU_D_MASK) == `INST_FCVT_WU_D) ||
+                  ((inst&`INST_FCVT_D_W_MASK) == `INST_FCVT_D_W)   ||
+                  ((inst&`INST_FCVT_D_WU_MASK) == `INST_FCVT_D_WU) ||
+                  ((inst&`INST_FCVT_S_D_MASK) == `INST_FCVT_S_D)   ||
+                  ((inst&`INST_FCVT_D_S_MASK) == `INST_FCVT_D_S)   ;
 
 wire [2:0] MUL_DIV_ctrl_w = {3{is_MUL_DIV_w}} & funct3;
 
@@ -402,6 +442,7 @@ assign reg_w_sel_o = reg_w_sel_r;
 assign is_fpu_o = is_fpu_w;
 assign FPU_sel1_o = FPU_sel1_w;
 assign freg_wr_en_o = freg_wr_en_w;
+assign is_f_ext_o = is_f_ext_w;
 assign bypass_sel_o = bypass_sel_r;
 assign fetch_invalid_o = fetch_invalid_w;
 

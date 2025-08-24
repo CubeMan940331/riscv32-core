@@ -51,6 +51,7 @@ module Decode (
     output is_csr_imm_o, // is csr[r w]i
 
     // FPU
+    output is_f_ext_o,
     output is_fpu_o,
     output FPU_sel1_o, // 0: fs1, 1: rs1
 
@@ -174,6 +175,7 @@ Control m_Control(
     .csr_op_o(csr_op),
     .is_csr_imm_o(is_csr_imm),
 
+    .is_f_ext_o(is_f_ext_o),
     .is_fpu_o(is_fpu),
     .FPU_sel1_o(FPU_sel1), // 0: freg_rd_data1, 1: reg_rd_data1
 

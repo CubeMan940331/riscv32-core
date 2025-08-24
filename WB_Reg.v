@@ -10,6 +10,7 @@ module WB_Reg (
     input  wire [31:0] pc_i,
     input  wire [31:0] pc_p4_i,
     input  wire [4:0]  rd_i,
+    input  wire [5:0]  exception_i,
     
     input  wire [31:0] bypass_i,
     input  wire [31:0] ALU_i,
@@ -27,7 +28,8 @@ module WB_Reg (
     output wire        pc_valid_o,
     output wire [31:0] pc_o,
     output wire [31:0] pc_p4_o,
-    output wire [4:0]  rd_o,    
+    output wire [4:0]  rd_o,
+    output wire [5:0]  exception_o,
     
     output wire [31:0] bypass_o,
     output wire [31:0] ALU_o,
@@ -45,6 +47,7 @@ module WB_Reg (
     PipelineRegister #(.WIDTH(32)) reg_pc        (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(pc_i),      .data_o(pc_o));
     PipelineRegister #(.WIDTH(32)) reg_pc_p4     (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(pc_p4_i),     .data_o(pc_p4_o));
     PipelineRegister #(.WIDTH(5))  reg_rd        (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(rd_i),       .data_o(rd_o));
+    PipelineRegister #(.WIDTH(6))  reg_exception (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(exception_i),.data_o(exception_o));
     
     PipelineRegister #(.WIDTH(32)) reg_bypass    (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(bypass_i),   .data_o(bypass_o));
     PipelineRegister #(.WIDTH(32)) reg_alu       (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(ALU_i),  .data_o(ALU_o));

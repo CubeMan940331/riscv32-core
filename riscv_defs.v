@@ -584,6 +584,8 @@
 `define SR_MPIE_R      7
 `define SR_SPP         (1 << 8)
 `define SR_SPP_R       8
+`define SR_SD_R        31
+`define SR_SD          (1 << 31)
 
 `define SR_MPP_SHIFT   11
 `define SR_MPP_MASK    2'h3
@@ -601,7 +603,21 @@
 `define SR_MXR_R        19
 `define SR_MXR          (1 << `SR_MXR_R)
 
+`define SR_FS_R         14:13
+`define SR_XS_R         16:15
+
+`define SR_XS_OFF      0
+`define SR_XS_INIT     1
+`define SR_XS_CLEAN    2
+`define SR_XS_DIRTY    3
+
+`define SR_FS_OFF      `SR_XS_OFF
+`define SR_FS_INIT     `SR_XS_INIT
+`define SR_FS_CLEAN    `SR_XS_CLEAN
+`define SR_FS_DIRTY    `SR_XS_DIRTY
+
 `define SR_SMODE_MASK   (`SR_UIE | `SR_SIE | `SR_UPIE | `SR_SPIE | `SR_SPP | `SR_SUM)
+
 
 //--------------------------------------------------------------------
 // SATP definitions
