@@ -132,9 +132,9 @@ mmu_cache_ctrl u_mmu_cache_ctrl(
 );
 
 assign fetch_out_value_o    = icache_in_value_i;
-assign fetch_out_valid_o    = (vm_enable)?(icache_valid && itlb_hit && itlb_req):(icache_valid);
-assign lsu_out_value_o      = (lsu_in_rd_i)?dcache_in_value_i:32'h0;
-assign lsu_out_valid_o      = (vm_enable)?(dcache_valid && dtlb_hit && dtlb_req):(dcache_valid && dtlb_req);
+assign fetch_out_valid_o    = (vm_enable)?(icache_valid && itlb_hit):(icache_valid);
+assign lsu_out_value_o      = dcache_in_value_i;
+assign lsu_out_valid_o      = (vm_enable)?(dcache_valid && dtlb_hit):(dcache_valid);
 
 assign icache_addr_o        = icache_addr_r;
 assign dcache_addr_o        = dcache_addr_r;

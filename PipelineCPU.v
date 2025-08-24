@@ -632,6 +632,14 @@ wire dcache_valid_i_f = 1;
 wire fetch_rd_f = 1;
 wire [31:0] satp_i_f = 32'h0;
 
+reg [31:0] d_mem_data_r;
+always @(posedge clk or negedge rst_n)begin
+    if(!rst_n)
+        d_mem_data_r <= 32'h0;
+    else 
+        d_mem_data_r <= d_mem_rd_data;
+end
+
 assign i_mem_addr = mmu_icache_addr;
 assign d_mem_ctrl = (d_mem_rd_en)?4'b0100:mmu_dcache_mask;
 assign d_mem_wr_en = mmu_dcache_wr;
@@ -654,7 +662,7 @@ u_mmu(
     .lsu_in_flush_i      (lsu_mmu_dflush),
     .lsu_in_invalidate_i (lsu_mmu_dinvalidafte),
     .lsu_in_writeback_i  (lsu_mmu_dwriteback),
-    .dcache_in_value_i   (d_mem_rd_data),
+    .dcache_in_value_i   (d_mem_data_r),
     .dcache_in_valid_i   (dcache_valid_i_f), //
     .icache_in_value_i   (inst),
     .icache_in_valid_i   (icache_valid_i_f), //
