@@ -6,10 +6,11 @@
 
 module mmu
 #(
-     parameter  ADDR_MIN = 32'h80000000
-    ,parameter  ADDR_MAX = 32'h8fffffff
-    ,parameter  ICACHE_ADDR_MIN = 32'h00000000
-    ,parameter  ICACHE_ADDR_MAX = 32'h00800000
+     parameter  MMU_SUPPORT = 1 
+    ,parameter  ADDR_MIN = 32'h80000000
+    ,parameter  ADDR_MAX = 32'hffffffff
+    ,parameter  ICACHE_ADDR_MIN = 32'h80000000
+    ,parameter  ICACHE_ADDR_MAX = 32'h80010000
 )
 (
      input          clk_i
@@ -21,7 +22,8 @@ module mmu
     ,input  [31:0]  lsu_in_addr_i
     ,input  [31:0]  lsu_in_data_i
     ,input          lsu_in_rd_i
-    ,input  [ 3:0]  lsu_in_wr_i
+    ,input          lsu_in_wr_i
+    ,input  [ 3:0]  lsu_in_mask_i
     ,input          lsu_in_flush_i
     ,input          lsu_in_invalidate_i
     ,input          lsu_in_writeback_i
@@ -53,10 +55,15 @@ module mmu
 );
 
 
+
+generate
+if(MMU_SUPPORT) 
+begin : MMU
+
 localparam PPN_SIZE             = 20;
 
 wire itlb_req = fetch_rd_i;
-wire dtlb_req = lsu_in_rd_i || (|lsu_in_wr_i);
+wire dtlb_req = lsu_in_rd_i || lsu_in_wr_i;
 
 wire [31:0] itlb_entry_o;
 wire [31:0] dtlb_entry_o;
@@ -68,35 +75,39 @@ wire        is_pte;
 wire        is_update;
 
 wire        vm_enable   = satp_i[`SATP_MODE_R];
-wire        vm_asid     = satp_i[`SATP_ASID_R];
+wire [ 8:0] vm_asid     = satp_i[`SATP_ASID_R];
 wire [31:0] vm_ppn      = {satp_i[`SATP_PPN_R],12'b0};
 
 wire [31:0] ptw_pte_addr_o;
 wire [31:0] ptw_pte_value_o;
 wire        ptw_pte_fault_o;
 
-wire        cache_interupt;
-wire        icache_addr_error;
-wire        dcache_addr_error;
-
 reg [31:0] dcache_addr_r;
 reg [31:0] icache_addr_r;
 reg [ 3:0] dcache_mask_r;
 
-assign cache_interupt = ((dcache_addr_r >= ICACHE_ADDR_MIN) && (dcache_addr_r <= ICACHE_ADDR_MAX));
-assign icache_addr_error = !((icache_addr_r >= ADDR_MIN) && (icache_addr_r <= ADDR_MAX));
-assign dcache_addr_error = !((dcache_addr_r >= ADDR_MIN) && (dcache_addr_r <= ADDR_MAX)) || cache_interupt;
+// wire cache_interupt = ((dcache_addr_r >= ICACHE_ADDR_MIN) && (dcache_addr_r <= ICACHE_ADDR_MAX));
+// wire icache_addr_error = !((icache_addr_r >= ADDR_MIN) && (icache_addr_r <= ADDR_MAX));
+// wire dcache_addr_error = !((dcache_addr_r >= ADDR_MIN) && (dcache_addr_r <= ADDR_MAX)) || cache_interupt;
 
 // ---------------------------------------
 // Output Control
 //----------------------------------------
-wire req_d_rd = lsu_in_rd_i && ~dcache_addr_error;
-wire req_d_wr = (|lsu_in_wr_i) && ~dcache_addr_error;
-wire req_i_rd = fetch_rd_i && ~icache_addr_error;
+// wire req_d_rd = lsu_in_rd_i && ~dcache_addr_error;
+// wire req_d_wr = lsu_in_wr_i && ~dcache_addr_error;
+// wire req_i_rd = fetch_rd_i && ~icache_addr_error;
 
-wire vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte) && ~dcache_addr_error;
-wire vm_d_wr = (|lsu_in_wr_i) && dtlb_hit && ~dcache_addr_error;
-wire vm_i_rd = fetch_rd_i && itlb_hit && ~icache_addr_error;
+// wire vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte) && ~dcache_addr_error;
+// wire vm_d_wr = lsu_in_wr_i && dtlb_hit && ~dcache_addr_error;
+// wire vm_i_rd = fetch_rd_i && itlb_hit && ~icache_addr_error;
+
+wire req_d_rd = lsu_in_rd_i;
+wire req_d_wr = lsu_in_wr_i;
+wire req_i_rd = fetch_rd_i;
+
+wire vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte);
+wire vm_d_wr = lsu_in_wr_i && dtlb_hit;
+wire vm_i_rd = fetch_rd_i && itlb_hit;
 
 wire dcache_rd_c = (vm_enable)? vm_d_rd : req_d_rd;
 wire dcache_wr_c = (vm_enable)? vm_d_wr : req_d_wr;
@@ -122,7 +133,7 @@ mmu_cache_ctrl u_mmu_cache_ctrl(
 
 assign fetch_out_value_o    = icache_in_value_i;
 assign fetch_out_valid_o    = (vm_enable)?(icache_valid && itlb_hit && itlb_req):(icache_valid);
-assign lsu_out_value_o      = dcache_in_value_i;
+assign lsu_out_value_o      = (lsu_in_rd_i)?dcache_in_value_i:32'h0;
 assign lsu_out_valid_o      = (vm_enable)?(dcache_valid && dtlb_hit && dtlb_req):(dcache_valid && dtlb_req);
 
 assign icache_addr_o        = icache_addr_r;
@@ -151,13 +162,13 @@ always @(*)begin
     if(dcache_rd_o)
         dcache_mask_r = 4'hf;
     else if(dcache_wr_o)
-        dcache_mask_r = lsu_in_wr_i;
+        dcache_mask_r = lsu_in_mask_i;
     else
         dcache_mask_r = 4'h0;
 end
 
 assign load_fault_o     = lsu_in_rd_i   && ( ptw_pte_fault_o || (!dtlb_entry_o[`PAGE_READ]  && dtlb_hit));
-assign store_fault_o    =(|lsu_in_wr_i) && ( ptw_pte_fault_o || (!dtlb_entry_o[`PAGE_WRITE] && dtlb_hit));
+assign store_fault_o    = lsu_in_wr_i && ( ptw_pte_fault_o || (!dtlb_entry_o[`PAGE_WRITE] && dtlb_hit));
 assign inst_fault_o     = fetch_rd_i    && ( ptw_pte_fault_o || (!itlb_entry_o[`PAGE_EXEC]  && itlb_hit));
 
 assign dcache_invalidate_o  = lsu_in_invalidate_i;
@@ -261,5 +272,41 @@ mmu_ptw ptw(
     .pte_fault_o  (ptw_pte_fault_o),
     .ptw_work_o   (is_pte)
 );
+
+end
+else 
+begin : SIMPLE_MMU
+
+mmu_cache_ctrl u_mmu_cache_ctrl(
+    .clk_i                  (clk_i),
+    .rst_i                  (rst_i),
+    .mmu_dcache_rd_i        (lsu_in_rd_i),
+    .mmu_dcache_wr_i        (lsu_in_wr_i),
+    .dcache_mmu_available_i (dcache_in_valid_i),
+    .mmu_dcache_rd_o        (dcache_rd_o),
+    .mmu_dcache_wr_o        (dcache_wr_o),
+    .dcache_valid_o         (lsu_out_valid_o),
+    .mmu_icache_rd_i        (fetch_rd_i),
+    .icache_mmu_available_i (icache_in_valid_i),
+    .mmu_icache_rd_o        (icache_rd_o),
+    .icache_valid_o         (fetch_out_valid_o)
+);
+    
+assign fetch_out_value_o = icache_in_value_i;
+assign lsu_out_value_o = dcache_in_value_i;
+assign dcache_addr_o = lsu_in_addr_i;
+assign dcache_value_o = lsu_in_data_i;
+assign dcache_mask_o = lsu_in_mask_i;
+assign dcache_flush_o = lsu_in_flush_i;
+assign dcache_writeback_o = lsu_in_writeback_i;
+assign dcache_invalidate_o = lsu_in_invalidate_i;
+assign icache_addr_o = fetch_pc_i;
+assign load_fault_o = 0;
+assign store_fault_o = 0;
+assign inst_fault_o = 0;
+
+end
+endgenerate
+
 
 endmodule

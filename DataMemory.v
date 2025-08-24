@@ -19,24 +19,33 @@ module DataMemory
 reg [7:0] mem [0:SIZE-1] /* verilator public */;
 assign inst = i_addr<SIZE ? {mem[i_addr+3], mem[i_addr+2], mem[i_addr+1], mem[i_addr+0]}: 32'h0;
 always @(posedge clk) begin
-    if (wr_en) begin
-        // SW
-        if (ctrl[2]) begin
-            mem[address   ] <= data_i[ 7: 0];
-            mem[address +1] <= data_i[15: 8];
-            mem[address +2] <= data_i[23:16];
-            mem[address +3] <= data_i[31:24];
-        end
-        // SH
-        else if (ctrl[1]) begin
-            mem[address   ] <= data_i[ 7: 0];
-            mem[address +1] <= data_i[15: 8];
-        end
-        // SB
-        else if (ctrl[0]) begin
-            mem[address    ] <= data_i[ 7: 0];
-        end
-    end
+    // if (wr_en) begin
+    //     // SW
+    //     if (ctrl[2]) begin
+    //         mem[address   ] <= data_i[ 7: 0];
+    //         mem[address +1] <= data_i[15: 8];
+    //         mem[address +2] <= data_i[23:16];
+    //         mem[address +3] <= data_i[31:24];
+    //     end
+    //     // SH
+    //     else if (ctrl[1]) begin
+    //         mem[address   ] <= data_i[ 7: 0];
+    //         mem[address +1] <= data_i[15: 8];
+    //     end
+    //     // SB
+    //     else if (ctrl[0]) begin
+    //         mem[address    ] <= data_i[ 7: 0];
+    //     end
+    // end
+
+	if(ctrl[3] && wr_en)
+		mem[address+3] <= data_i[31:24];
+	if(ctrl[2] && wr_en)
+		mem[address+2] <= data_i[23:16];
+	if(ctrl[1] && wr_en) 
+		mem[address+1] <= data_i[15:8];
+	if(ctrl[0] && wr_en)
+		mem[address  ] <= data_i[7:0];
 end
 
 // --------------------------------------------------------
