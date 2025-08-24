@@ -55,6 +55,7 @@ module SP_Sqrt (
                 WAITING: begin
                     flag_invalid <= 0;
                     flag_inexact <= 0;
+                    done <= 0;
                     if (start) begin
                         operand_a_reg <= operand_a;
                         y <= 32'h5f3759df - (operand_a >> 1);
