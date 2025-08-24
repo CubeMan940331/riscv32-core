@@ -30,9 +30,11 @@ module SP_Sqrt (
                 READY = 4'd8;
 
     // reg for evil trick
-    reg sub_start, sub_done, mult_start, mult_done, div_start, div_done;
+    reg sub_start, mult_start, div_start;
+    wire sub_done, mult_done, div_done;
     wire mult_inexact;
-    reg [31:0] sub_b, sub_result, mult_a, mult_b, mult_result, div_b, div_result;
+    reg [31:0] sub_b, mult_a, mult_b, div_b;
+    wire [31:0] sub_result, mult_result, div_result;
     reg [31:0] y, x2;
     localparam loops = 5;
     reg [3:0] loop;
