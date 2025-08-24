@@ -7,7 +7,7 @@ module SP_Sqrt (
     output reg [31:0]   result,
     output reg          flag_invalid,
     output reg          flag_inexact,
-    output              done
+    output reg          done
 );
     // operand a
     wire sign_a_dec;
@@ -70,7 +70,5 @@ module SP_Sqrt (
             flag_inexact = (operand_a != mult_check_result) | mult_check_inexact;
         end
     end
-
-    assign done = start;
 
 endmodule
