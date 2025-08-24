@@ -23,7 +23,7 @@ wire [31:0]pc_in;
 wire [31:0]pc_out;
 wire [31:0]pc_p4;
 
-assign i_mem_addr = pc_out;
+// assign i_mem_addr = pc_out;
 
 // ID_Reg =====================
 wire ID_clear;
@@ -320,7 +320,7 @@ Decode m_ID(
 
     .pc_i(pc_out),
     .pc_p4_i(pc_p4),
-    .inst_i(inst),
+    .inst_i(mmu_fetch_value),
     
     .pc_valid_o(ID_pc_valid_out),
     .pc_o(ID_pc_out),
@@ -627,13 +627,12 @@ u_lsu (
 );
 
 // // MMU =========================
+wire icache_valid_i_f = 1;
 wire dcache_valid_i_f = 1;
-wire icache_valid_i_f = 0;
-wire fetch_rd_f = 0;
+wire fetch_rd_f = 1;
 wire [31:0] satp_i_f = 32'h0;
-assign icache_mmu_valid_in = 0;
-// assign i_mem_addr = mmu_icache_addr;
 
+assign i_mem_addr = mmu_icache_addr;
 assign d_mem_ctrl = (d_mem_rd_en)?4'b0100:mmu_dcache_mask;
 assign d_mem_wr_en = mmu_dcache_wr;
 assign d_mem_rd_en = mmu_dcache_rd;
@@ -658,7 +657,7 @@ u_mmu(
     .dcache_in_value_i   (d_mem_rd_data),
     .dcache_in_valid_i   (dcache_valid_i_f), //
     .icache_in_value_i   (inst),
-    .icache_in_valid_i   (icache_mmu_valid_in),
+    .icache_in_valid_i   (icache_valid_i_f), //
     .fetch_out_value_o   (mmu_fetch_value),
     .fetch_out_valid_o   (mmu_fetch_valid),
     .lsu_out_value_o     (mmu_lsu_data),

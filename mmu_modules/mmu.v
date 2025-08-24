@@ -246,7 +246,8 @@ wire [31:0] ptw_resp_data_i  = dcache_in_value_i;
 wire        ptw_resp_valid_i = dcache_valid;
 wire        ptw_req_valid_i  = (itlb_miss || dtlb_miss) && vm_enable;
 wire [31:0] ptw_req_addr_i   = ptw_req_addr_r;
-wire        ptw_error_i      = dcache_addr_error && dcache_rd_o; 
+// wire        ptw_error_i      = dcache_addr_error && dcache_rd_o; 
+wire        ptw_error_i = 0;
 
 always @(*)begin
     ptw_req_addr_r = 32'h0;
