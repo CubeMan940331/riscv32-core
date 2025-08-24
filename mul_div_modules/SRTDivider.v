@@ -33,11 +33,11 @@ module SRTDivider (
     wire [4:0] shift_o;
 
     // processing
-    reg [65:0] r_1 [15:0]; // sign + 65 bits 
-    reg [65:0] r_2 [15:0];
+    wire [65:0] r_1 [15:0]; // sign + 65 bits 
+    wire [65:0] r_2 [15:0];
 
-    reg [31:0] pos_q [15:0];
-    reg [31:0] neg_q [15:0];
+    wire [31:0] pos_q [15:0];
+    wire [31:0] neg_q [15:0];
 
     // end
     wire [31:0] quotient;

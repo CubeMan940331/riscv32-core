@@ -52,6 +52,7 @@ module Exec(
     ,input wire is_csr_imm_i // is csr[r w]i
 
     // fpu
+    ,input wire is_f_ext_i
     ,input wire is_fpu_i
     ,input wire FPU_sel1_i
     // bypass
@@ -117,6 +118,7 @@ module Exec(
     ,output wire is_csr_imm_o // is csr[r w]i
 
     // fpu
+    ,output wire is_f_ext_o
     ,output wire [31:0] FPU_src1_o
     ,output wire is_fpu_o
     ,output wire FPU_sel1_o
@@ -180,6 +182,7 @@ PipelineRegister #(.WIDTH(1))  reg_is_csr    (.clk(clk), .rst_n(rst_n), .clear(c
 PipelineRegister #(.WIDTH(3))  reg_csr_op    (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(csr_op_i), .data_o(csr_op_o));
 PipelineRegister #(.WIDTH(1))  reg_is_csr_imm (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(is_csr_imm_i), .data_o(is_csr_imm_o));
 // fpu
+PipelineRegister #(.WIDTH(1))  reg_is_f_ext  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(is_f_ext_i), .data_o(is_f_ext_o));
 PipelineRegister #(.WIDTH(1))  reg_is_fpu    (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(is_fpu_i), .data_o(is_fpu_o));
 PipelineRegister #(.WIDTH(1))  reg_FPU_sel1  (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en),  .data_i(FPU_sel1_i), .data_o(FPU_sel1_o));
 // bypass

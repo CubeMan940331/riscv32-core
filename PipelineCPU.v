@@ -79,6 +79,7 @@ wire [2:0] csr_op;
 wire is_csr_imm; // is csr[r w]i
 
 // FPU
+wire is_f_ext;
 wire is_fpu;
 wire FPU_sel1; // 0: freg_rd_data1, 1: reg_rd_data1
 
@@ -143,6 +144,7 @@ wire [2:0] EX_csr_op_out;
 wire EX_is_csr_imm_out;
 wire [11:0] EX_csr_addr_out;
 // FPU
+wire EX_is_f_ext;
 wire EX_is_fpu_out;
 wire EX_FPU_sel1_out;
 // ByPass
@@ -182,6 +184,7 @@ wire        lsu_stall_o;
 wire [ 5:0] lsu_exception_o;
 
 // MMU =========================
+wire [31:0] mmu_sapt;
 wire [31:0] mmu_fetch_value;
 wire        mmu_fetch_valid;
 wire        mmu_inst_fault;
@@ -358,6 +361,7 @@ Decode m_ID(
     .csr_op_o(csr_op),
     .is_csr_imm_o(is_csr_imm),
 
+    .is_f_ext_o(is_f_ext),
     .is_fpu_o(is_fpu),
     .FPU_sel1_o(FPU_sel1),
 
@@ -456,6 +460,7 @@ Exec m_EX(
     .csr_op_i(csr_op),
     .is_csr_imm_i(is_csr_imm),
     // FPU
+    .is_f_ext_i(is_f_ext),
     .is_fpu_i(is_fpu),
     .FPU_sel1_i(FPU_sel1), // 0: freg_rd_data1, 1: reg_rd_data1
     // bypass
@@ -511,6 +516,7 @@ Exec m_EX(
     .csr_op_o(EX_csr_op_out),
     .is_csr_imm_o(EX_is_csr_imm_out),
     // FPU
+    .is_f_ext_o(EX_is_f_ext),
     .FPU_src1_o(FPU_in1),
     .is_fpu_o(EX_is_fpu_out),
     .FPU_sel1_o(EX_FPU_sel1_out),
@@ -521,7 +527,7 @@ Exec m_EX(
 );
 
 // BypassUnit ==================
-assign bypass_start = EX_start && (|EX_bypass_sel_out);
+assign bypass_start = EX_start && (|EX_bypass_sel_out || ((EX_inst_out&`INST_FENCE_MASK) == `INST_FENCE));
 BypassUnit m_BypassUnit(
     .bypass_sel(EX_bypass_sel_out),
     .imm(EX_imm_out),
@@ -592,7 +598,9 @@ FPU_Top m_FPU(
 assign FPU_done = FPU_start;
 
 // LSU =========================
-assign LSU_start = EX_start && (EX_mem_wr_en_out || EX_mem_rd_en_out);
+assign LSU_start = EX_start && 
+    (csr_exception&`EXCEPTION_TYPE_MASK)!=`EXCEPTION_EXCEPTION &&
+    (EX_mem_wr_en_out || EX_mem_rd_en_out);
 assign LSU_done = lsu_writeback_valid_o;
 
 lsu #( .DEPTH(2) ) 
@@ -630,7 +638,6 @@ u_lsu (
 wire icache_valid_i_f = 1;
 wire dcache_valid_i_f = 1;
 wire fetch_rd_f = 1;
-wire [31:0] satp_i_f = 32'h0;
 
 reg [31:0] d_mem_data_r;
 always @(posedge clk or negedge rst_n)begin
@@ -651,7 +658,7 @@ mmu #(.MMU_SUPPORT(1))
 u_mmu(
     .clk_i               (clk),
     .rst_i               (rst_n),
-    .satp_i              (satp_i_f), //
+    .satp_i              (mmu_sapt),
     .fetch_pc_i          (pc_out),
     .fetch_rd_i          (fetch_rd_f), //
     .lsu_in_addr_i       (lsu_mmu_addr),
@@ -686,20 +693,28 @@ u_mmu(
 );
 
 // CSR =========================
-assign SYS_start = EX_start && (EX_is_csr_out || (|csr_exception) || csr_br_taken);
+assign SYS_start = EX_start && (
+    EX_is_csr_out ||
+    ((csr_exception&`EXCEPTION_TYPE_MASK)==`EXCEPTION_EXCEPTION) ||
+    csr_br_taken
+);
 wire [31:0] csr_rd_data_xtval;
 CSR m_CSR(
     .inst(EX_inst_out),
-    .inst_valid(1),
+    .inst_valid(!EX_pc_valid_out || EX_is_impl_out),
     .csr_op_i(EX_csr_op_out),
     .is_csr_i(EX_is_csr_out),
     .is_csr_imm_i(EX_is_csr_imm_out),
     .cur_priv_i(csr_priv),
+    .rs1_i(EX_rs1_out),
     .imm_i(EX_imm_out),
     .reg_rd_data1_i(EX_fwd_data1),
     .csr_old_i(csr_rd_data),
     .is_fpu_done_i(FPU_done),
     .fpu_flags_i(FPU_flags),
+    .is_f_ext_i(EX_is_f_ext),
+    .mstatus_i(csr_mstatus),
+    .csr_wr_addr_i(EX_csr_addr_out),
 
     .csr_rd_data_o(csr_rd_data_xtval),
     .csr_wr_valid_o(csr_wr_en),
@@ -712,7 +727,7 @@ CSRFile m_CSRFile(
     .rst_n(rst_n),
 
     .cpu_id_i(0),
-    .misa_i(`MISA_RV32 | `MISA_RVI),
+    .misa_i(`MISA_RV32 | `MISA_RVU | `MISA_RVI | `MISA_RVM | `MISA_RVF),
 
     .exception_i(csr_exception),
     .exception_pc_i(EX_pc_out),
@@ -730,7 +745,8 @@ CSRFile m_CSRFile(
 
     .priv_o(csr_priv),
     .mstatus_o(csr_mstatus),
-    .interrupt_o(csr_interrupt)
+    .interrupt_o(csr_interrupt),
+    .satp_o(mmu_sapt)
 );
 assign SYS_done = SYS_start;
 
@@ -747,6 +763,7 @@ Writeback m_WB(
     .pc_i(EX_pc_out),
     .pc_p4_i(EX_pc_p4_out),
     .rd_i(EX_rd_out),
+    .exception_i(csr_exception),
 
     .bypass_i(bypass_out),
     .ALU_i(ALU_out),

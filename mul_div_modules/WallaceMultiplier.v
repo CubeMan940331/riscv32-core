@@ -32,6 +32,11 @@ module WallaceMultiplier (
     wire [63:0] partial_3 [1:0];
 
     //reg
+    wire [((64 * 8) - 1):0] partial_1_flat;
+    wire [((64 * 2) - 1):0] partial_3_flat;
+    wire [((64 * 8) - 1):0] partial_1_flat_o;
+    wire [((64 * 2) - 1):0] partial_3_flat_o;
+
     wire [63:0] partial_1_o [7:0];
     wire [63:0] partial_3_o [1:0];
     wire [1:0] r_sign_o [1:0];
@@ -106,19 +111,31 @@ module WallaceMultiplier (
         end
     endgenerate
 
+    generate
+        for (g_i = 0; g_i < 8; g_i = g_i + 1) begin: partial_1_flatten
+            assign partial_1_flat[(64 * (g_i + 1) - 1):(64 * g_i)] = partial_1[g_i];
+        end
+    endgenerate
+
     MUL_Reg #(.SIZE(8)) m_MUL_0_Reg(
         .clk(clk),
         .rst_n(rst_n),
-        .partial_i(partial_1),
+        .partial_i(partial_1_flat),
         .sign_i(sign),
         .higher_i(higher),
         .start_i(start),
 
-        .partial_o(partial_1_o),
+        .partial_o(partial_1_flat_o),
         .sign_o(r_sign_o[0]),
         .higher_o(r_higher_o[0]),
         .start_o(r_start_o[0])
     );
+
+    generate
+        for (g_i = 0; g_i < 8; g_i = g_i + 1) begin: partial_1_o_unflatten
+            assign partial_1_o[g_i] = partial_1_flat_o[(64 * (g_i + 1) - 1):(64 * g_i)];
+        end
+    endgenerate
 
     // 8 -> 4
     generate
@@ -147,18 +164,30 @@ module WallaceMultiplier (
         end
     endgenerate
 
+    generate
+        for (g_i = 0; g_i < 2; g_i = g_i + 1) begin: partial_3_flatten
+            assign partial_3_flat[(64 * (g_i + 1) - 1):(64 * g_i)] = partial_3[g_i];
+        end
+    endgenerate
+
     MUL_Reg #(.SIZE(2)) m_MUL_3_Reg(
         .clk(clk),
         .rst_n(rst_n),
-        .partial_i(partial_3),
+        .partial_i(partial_3_flat),
         .sign_i(r_sign_o[0]),
         .higher_i(r_higher_o[0]),
         .start_i(r_start_o[0]),
 
-        .partial_o(partial_3_o),
+        .partial_o(partial_3_flat_o),
         .sign_o(r_sign_o[1]),
         .higher_o(r_higher_o[1]),
         .start_o(r_start_o[1])
     );
+
+    generate
+        for (g_i = 0; g_i < 2; g_i = g_i + 1) begin: partial_3_o_unflatten
+            assign partial_3_o[g_i] = partial_3_flat_o[(64 * (g_i + 1) - 1):(64 * g_i)];
+        end
+    endgenerate
 
 endmodule  

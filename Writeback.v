@@ -1,3 +1,4 @@
+`include "riscv_defs.v"
 module Writeback (
     input  wire        clk,
     input  wire        rst_n,
@@ -10,6 +11,7 @@ module Writeback (
     input  wire [31:0] pc_i,
     input  wire [31:0] pc_p4_i,
     input  wire [4:0]  rd_i,
+    input  wire [5:0]  exception_i,
     
     input  wire [31:0] bypass_i,
     input  wire [31:0] ALU_i,
@@ -40,6 +42,7 @@ wire WB_pc_valid_out /* verilator public */;
 wire [31:0] WB_pc_out /* verilator public */;
 wire [31:0] WB_pc_p4_out;
 wire [4:0]  WB_rd_out;
+wire [5:0]  WB_exception_out;
 
 wire [31:0] WB_ALU_out;
 wire [31:0] WB_MUL_DIV_out;
@@ -63,6 +66,7 @@ WB_Reg m_WB_Reg(
     .pc_i(pc_i),
     .pc_p4_i(pc_p4_i),
     .rd_i(rd_i),
+    .exception_i(exception_i),
 
     .bypass_i(bypass_i),
     .ALU_i(ALU_i),
@@ -82,6 +86,8 @@ WB_Reg m_WB_Reg(
     .pc_o(WB_pc_out),
     .pc_p4_o(WB_pc_p4_out),
     .rd_o(WB_rd_out),
+    .exception_o(WB_exception_out),
+
     .bypass_o(WB_bypass_out),
     .ALU_o(WB_ALU_out),
     .MUL_DIV_o(WB_MUL_DIV_out),
@@ -96,8 +102,18 @@ WB_Reg m_WB_Reg(
 assign is_impl_o = WB_is_impl_out;
 assign pc_valid_o = WB_pc_valid_out;
 assign pc_o = WB_pc_out;
-assign reg_wr_en_o = WB_reg_wr_en_out & WB_pc_valid_out & WB_is_impl_out;
-assign freg_wr_en_o = WB_freg_wr_en_out & WB_pc_valid_out & WB_is_impl_out;
+assign reg_wr_en_o = (
+    WB_reg_wr_en_out &
+    WB_pc_valid_out &
+    WB_is_impl_out &
+    !((WB_exception_out&`EXCEPTION_TYPE_MASK) == `EXCEPTION_EXCEPTION)
+);
+assign freg_wr_en_o = (
+    WB_freg_wr_en_out &
+    WB_pc_valid_out &
+    WB_is_impl_out &
+    !((WB_exception_out&`EXCEPTION_TYPE_MASK) == `EXCEPTION_EXCEPTION)
+);
 assign rd_o = WB_rd_out;
 
 // writeback select
