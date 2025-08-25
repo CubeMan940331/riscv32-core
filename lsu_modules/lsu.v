@@ -39,7 +39,6 @@ module lsu
 
     ,output  reg [31:0]  writeback_value_o
     ,output          writeback_valid_o
-    ,output          stall_o
 
     ,output  [5:0]   exception_o
 );
@@ -355,12 +354,6 @@ lsu_queue #(
     .data_o(resp_data_o),
     .valid_o(resp_valid_o)      
 );
-
-// --------------------------------------------
-//  Stall
-// --------------------------------------------
-
-assign stall_o = (~resp_accept_o && (ld_inst || st_inst)) || (dwriteback || dinvalidate || dflush);
 
 // --------------------------------------------
 //  Writeback

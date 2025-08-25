@@ -189,8 +189,7 @@ mmu_tlb #(
     .rst_i    (rst_i),
     .addr_i   (itlb_vpn_i),
     .entry_i  (update_entry),
-    .valid_i  (itlb_req),
-    .update_i (is_update),
+    .update_i (is_update && itlb_req),
     .hit_o    (itlb_hit),
     .entry_o  (itlb_entry_o)
 );
@@ -202,8 +201,7 @@ mmu_tlb #(
     .rst_i    (rst_i),
     .addr_i   (dtlb_vpn_i),
     .entry_i  (update_entry),
-    .valid_i  (dtlb_req),
-    .update_i (is_update),
+    .update_i (is_update && dtlb_req),
     .hit_o    (dtlb_hit),
     .entry_o  (dtlb_entry_o)
 );

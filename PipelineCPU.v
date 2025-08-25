@@ -23,7 +23,7 @@ wire [31:0]pc_in;
 wire [31:0]pc_out;
 wire [31:0]pc_p4;
 
-// assign i_mem_addr = pc_out;
+assign i_mem_addr = pc_out;
 
 // ID_Reg =====================
 wire ID_clear;
@@ -180,7 +180,6 @@ wire        lsu_mmu_dinvalidafte;
 wire        lsu_mmu_dwriteback;
 wire [31:0] lsu_writeback_value_o;
 wire        lsu_writeback_valid_o;
-wire        lsu_stall_o;
 wire [ 5:0] lsu_exception_o;
 
 // MMU =========================
@@ -323,7 +322,8 @@ Decode m_ID(
 
     .pc_i(pc_out),
     .pc_p4_i(pc_p4),
-    .inst_i(mmu_fetch_value),
+    // .inst_i(mmu_fetch_value),
+    .inst_i(inst),
     
     .pc_valid_o(ID_pc_valid_out),
     .pc_o(ID_pc_out),
@@ -630,7 +630,6 @@ u_lsu (
     .mmu_dwriteback_o  (lsu_mmu_dwriteback),
     .writeback_value_o (lsu_writeback_value_o),
     .writeback_valid_o (lsu_writeback_valid_o),
-    .stall_o           (lsu_stall_o),
     .exception_o       (lsu_exception_o)
 );
 
@@ -647,7 +646,7 @@ always @(posedge clk or negedge rst_n)begin
         d_mem_data_r <= d_mem_rd_data;
 end
 
-assign i_mem_addr = mmu_icache_addr;
+// assign i_mem_addr = mmu_icache_addr;
 assign d_mem_ctrl = (d_mem_rd_en)?4'b0100:mmu_dcache_mask;
 assign d_mem_wr_en = mmu_dcache_wr;
 assign d_mem_rd_en = mmu_dcache_rd;
