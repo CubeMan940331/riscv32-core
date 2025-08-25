@@ -1,3 +1,4 @@
+`include "riscv_defs.v"
 module Exec(
     input clk
     ,input rst_n
@@ -65,7 +66,6 @@ module Exec(
     ,input WB_reg_wr_en_i
     ,input WB_freg_wr_en_i
     ,input [31:0] wb_data_i
-
 //=================================
     // output
     // data
@@ -100,9 +100,8 @@ module Exec(
     ,output wire        is_j_o
     ,output wire        is_br_o
     // ALU
-    ,output wire [31:0] ALU_src1_o
-    ,output wire [31:0] ALU_src2_o
     ,output wire [3:0]  ALU_ctrl_o
+    ,output wire [31:0] ALU_o
     // cmp
     ,output wire [2:0]  cmp_op_o
 
@@ -124,9 +123,24 @@ module Exec(
     ,output wire FPU_sel1_o
 
     ,output wire [1:0] bypass_sel_o
+    ,output wire [31:0] bypass_o
 
     ,output wire fetch_invalid_o
-
+// exception
+    ,input wire [5:0] csr_exception_i
+// EX control
+    ,output wire EX_start_o
+    ,output wire MUL_DIV_start_o
+    ,output wire FPU_start_o
+    ,output wire LSU_start_o
+    
+    ,input wire Br_done_i
+    ,input wire MUL_DIV_done_i
+    ,input wire FPU_done_i
+    ,input wire LSU_done_i
+    ,input wire SYS_done_i
+    
+    ,output wire EX_done_o
 );
 wire [31:0] reg_rd_data1_o;
 wire [31:0] reg_rd_data2_o;
@@ -245,17 +259,18 @@ Mux2to1 #(.size(32)) m_EX_freg_fwd3_MUX(
 );
 
 // ALU src
+wire [31:0] ALU_src1, ALU_src2;
 Mux2to1 #(.size(32)) m_ALU_SRC1_MUX(
     .sel(ALU_sel1_o),
     .s0(pc_o),
     .s1(reg_fwd_data1_o),
-    .out(ALU_src1_o)
+    .out(ALU_src1)
 );
 Mux2to1 #(.size(32)) m_ALU_SRC2_MUX(
     .sel(ALU_sel2_o),
     .s0(reg_fwd_data2_o),
     .s1(imm_o),
-    .out(ALU_src2_o)
+    .out(ALU_src2)
 );
 
 // FPU src1
@@ -265,5 +280,63 @@ Mux2to1 #(.size(32)) m_FPU_SRC1_MUX(
     .s1(reg_fwd_data1_o),
     .out(FPU_src1_o)
 );
+
+// EX start control
+wire bypass_start;
+wire ALU_start;
+
+// start logic
+/*
+set to 0 if
+    - first cycle of execution
+    - not executing
+set to 1 if
+    - not the first cycle of execution
+*/
+reg started;
+always @(posedge clk or negedge rst_n) begin
+    if(!rst_n) started <= 0;
+    else begin     
+        if(EX_done_o || !(pc_valid_o && is_impl_o)) started <= 0;
+        else if((pc_valid_o && is_impl_o) && !started)
+            started <= 1;
+    end
+end
+assign EX_start_o = (!started) && (pc_valid_o && is_impl_o);
+
+assign bypass_start = EX_start_o && (|bypass_sel_o);
+assign ALU_start = EX_start_o && (|ALU_ctrl_o);
+assign MUL_DIV_start_o = EX_start_o && is_MUL_DIV_o;
+assign FPU_start_o = EX_start_o && is_fpu_o;
+assign LSU_start_o = EX_start_o && 
+    (csr_exception_i&`EXCEPTION_TYPE_MASK)!=`EXCEPTION_EXCEPTION &&
+    (mem_wr_en_o || mem_rd_en_o);
+
+// ALU =========================
+wire ALU_done;
+ALU_top m_ALU(
+    .ALU_ctrl(ALU_ctrl_o),
+    .a(ALU_src1),
+    .b(ALU_src2),
+    .out(ALU_o)
+);
+assign ALU_done = ALU_start;
+
+// BypassUnit ==================
+wire bypass_done;
+BypassUnit m_BypassUnit(
+    .bypass_sel(bypass_sel_o),
+    .imm(imm_o),
+    .reg_data1(reg_fwd_data1_o),
+    .freg_data1(freg_fwd_data1_o),
+    .result_o(bypass_o)
+);
+assign bypass_done = bypass_start;
+
+
+// EX done logic
+assign EX_done_o = (!pc_valid_o) | (!is_impl_o) |
+    ALU_done | Br_done_i | LSU_done_i | FPU_done_i |
+    SYS_done_i | bypass_done | MUL_DIV_done_i;
 
 endmodule

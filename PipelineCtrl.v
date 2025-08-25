@@ -6,18 +6,7 @@ module PipelineCtrl(
 
     ,input br_taken
 
-// EX control
-    ,input EX_pc_valid_i
-    ,input EX_is_impl_i
-    ,input ALU_done_i
-    ,input Br_done_i
-    ,input LSU_done_i
-    ,input FPU_done_i
-    ,input SYS_done_i
-    ,input bypass_done_i
-    ,input MUL_DIV_done_i
-
-    ,output EX_start
+    ,input EX_stall
 
 // Pipeline control
     ,output reg pc_en
@@ -31,34 +20,6 @@ module PipelineCtrl(
     ,output reg WB_en
     ,output reg WB_clear
 );
-
-// EX control
-wire EX_stall;
-wire EX_done;
-
-// start logic
-/*
-set to 0 if
-    - first cycle of execution
-    - not executing
-set to 1 if
-    - not the first cycle of execution
-*/
-reg started;
-always @(posedge clk or negedge rst_n) begin
-    if(!rst_n) started <= 0;
-    else begin     
-        if(EX_done || !(EX_pc_valid_i && EX_is_impl_i)) started <= 0;
-        else if((EX_pc_valid_i && EX_is_impl_i) && !started)
-            started <= 1;
-    end
-end
-assign EX_start = (!started) && (EX_pc_valid_i && EX_is_impl_i);
-assign EX_done = (!EX_pc_valid_i) | (!EX_is_impl_i) |
-    ALU_done_i | Br_done_i | LSU_done_i | FPU_done_i |
-    SYS_done_i | bypass_done_i | MUL_DIV_done_i;
-
-assign EX_stall = !EX_done;
 
 always @(*)begin
     pc_en=1;
