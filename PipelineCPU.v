@@ -11,7 +11,10 @@ module PipelineCPU (
     output d_mem_rd_en,
     output [31:0] d_mem_addr,
     output [31:0] d_mem_wr_data,
-    input  [31:0] d_mem_rd_data
+    input  [31:0] d_mem_rd_data,
+
+    output [31:0] WB_pc,
+    output WB_pc_valid
 );
 //wires
 //================================================================
@@ -672,5 +675,8 @@ Writeback m_WB(
     .reg_wr_en_o(WB_reg_wr_en_out),
     .freg_wr_en_o(WB_freg_wr_en_out)
 );
+
+assign WB_pc = WB_pc_out;
+assign WB_pc_valid = WB_pc_valid_out;
 
 endmodule
