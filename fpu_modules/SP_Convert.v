@@ -1,13 +1,17 @@
 module SP_Convert (
-    input [31:0]    operand_in,
-    input [1:0]     input_type,
-    input [1:0]     output_type,
-    input [2:0]     rounding_mode,
+    input           clk,
+    input           rst_n,
+    input               start,
+    input [31:0]        operand_in,
+    input [1:0]         input_type,
+    input [1:0]         output_type,
+    input [2:0]         rounding_mode,
     output reg [31:0]   result,
-    output reg      flag_invalid,
-    output reg      flag_overflow,
-    output reg      flag_underflow,
-    output reg      flag_inexact
+    output reg          flag_invalid,
+    output reg          flag_overflow,
+    output reg          flag_underflow,
+    output reg          flag_inexact,
+    output              done
 );
     // --- Type & Constant Definitions ---
     localparam FP_TYPE_FP32 = 2'b00, FP_TYPE_FP64 = 2'b01;
@@ -226,4 +230,6 @@ module SP_Convert (
         // --- 3. Final Result Muxing ---
         result = (output_type == FP_TYPE_FP32) ? result_sp : result_int[31:0];
     end
+
+    assign done = start;
 endmodule

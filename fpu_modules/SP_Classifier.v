@@ -1,6 +1,10 @@
 module SP_Classifier (
-    input  [31:0] fp_in,
-    output [9:0]  result
+    input           clk,
+    input           rst_n,
+    input           start,
+    input  [31:0]   fp_in,
+    output [9:0]    result,
+    output          done
 );
     // intermediate logic
     wire is_exp_max = (fp_in[30:23] == 8'hFF);
@@ -24,4 +28,6 @@ module SP_Classifier (
     assign result[7] = ~fp_in[31] && is_infinity;   // +infinity
     assign result[8] = is_nan && ~fp_in[22];        // SNaN
     assign result[9] = is_nan && fp_in[22];         // QNaN
+
+    assign done = start;
 endmodule

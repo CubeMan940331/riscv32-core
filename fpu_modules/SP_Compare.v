@@ -1,9 +1,13 @@
 module SP_Compare (
+    input           clk,
+    input           rst_n,
+    input           start,
     input [31:0]    operand_a,
     input [31:0]    operand_b,
     input [2:0]     func3,
     output reg      flag_cmp,
-    output reg      flag_invalid
+    output reg      flag_invalid,
+    output          done
 );
     // operand a
     wire sign_a_dec;
@@ -86,4 +90,7 @@ module SP_Compare (
             default: flag_cmp = 0; 
         endcase
     end
+
+    assign done = start;
+
 endmodule
