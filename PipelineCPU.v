@@ -133,8 +133,6 @@ wire EX_is_j_out;
 wire EX_is_br_out;
 wire [2:0] EX_cmp_op_out;
 // ALU
-wire EX_ALU_sel1_out;
-wire EX_ALU_sel2_out;
 wire [3:0] EX_ALU_ctrl_out;
 // MUL/DIV
 wire EX_is_MUL_DIV_out;
@@ -156,8 +154,6 @@ wire EX_fetch_invalid_out;
 wire EX_start, EX_done;
 // ALU ========================
 wire ALU_start, ALU_done;
-wire [31:0] ALU_in1;
-wire [31:0] ALU_in2;
 wire [31:0] ALU_out;
 
 // BranchCmp ==================
@@ -244,7 +240,6 @@ wire EX_freg_fwd_sel2;
 wire EX_freg_fwd_sel3;
 wire [31:0] EX_fwd_data1;
 wire [31:0] EX_fwd_data2;
-wire [31:0] EX_fwd_data3;
 
 // Hazerd =====================
 wire [3:0] stall;
@@ -257,17 +252,7 @@ PipelineCtrl m_PipelineCtrl(
     .rst_n(rst_n),
     .br_taken(br_taken),
     
-    .EX_pc_valid_i(EX_pc_valid_out),
-    .EX_is_impl_i(EX_is_impl_out),
-    .ALU_done_i(ALU_done),
-    .Br_done_i(Br_done),
-    .LSU_done_i(LSU_done),
-    .FPU_done_i(FPU_done),
-    .SYS_done_i(SYS_done),
-    .bypass_done_i(bypass_done),
-    .MUL_DIV_done_i(MUL_DIV_done),
-
-    .EX_start(EX_start),
+    .EX_stall(!EX_done),
 
     .pc_en(pc_en),
     .ID_en(ID_en),
@@ -417,7 +402,7 @@ Exec m_EX(
     .rst_n(rst_n),
     .en(EX_en),
     .clear(EX_clear),
-    // inputs =====================
+// inputs =====================
     // sys
     .is_impl_i(is_impl),
     .pc_valid_i(ID_pc_valid_out),
@@ -473,7 +458,7 @@ Exec m_EX(
     .WB_reg_wr_en_i(WB_reg_wr_en_out),
     .WB_freg_wr_en_i(WB_freg_wr_en_out),
     .wb_data_i(wb_data_in),
-    // outputs =====================
+// outputs =====================
     // sys
     .is_impl_o(EX_is_impl_out),
     .pc_valid_o(EX_pc_valid_out),
@@ -505,9 +490,8 @@ Exec m_EX(
     .is_br_o(EX_is_br_out),
     .cmp_op_o(EX_cmp_op_out),
     // ALU
-    .ALU_src1_o(ALU_in1),
-    .ALU_src2_o(ALU_in2),
     .ALU_ctrl_o(EX_ALU_ctrl_out),
+    .ALU_o(ALU_out),
     // MUL/DIV
     .is_MUL_DIV_o(EX_is_MUL_DIV_out),
     .MUL_DIV_ctrl_o(EX_MUL_DIV_ctrl_out),
@@ -523,30 +507,24 @@ Exec m_EX(
     .FPU_sel1_o(EX_FPU_sel1_out),
     // bypass
     .bypass_sel_o(EX_bypass_sel_out),
+    .bypass_o(bypass_out),
     // fetch
     .fetch_invalid_o(EX_fetch_invalid_out)
-);
+// EX control ==================
+    ,.csr_exception_i(csr_exception)
+    ,.EX_start_o(EX_start)
+    ,.MUL_DIV_start_o(MUL_DIV_start)
+    ,.FPU_start_o(FPU_start)
+    ,.LSU_start_o(LSU_start)
 
-// BypassUnit ==================
-assign bypass_start = EX_start && (|EX_bypass_sel_out || ((EX_inst_out&`INST_FENCE_MASK) == `INST_FENCE));
-BypassUnit m_BypassUnit(
-    .bypass_sel(EX_bypass_sel_out),
-    .imm(EX_imm_out),
-    .reg_data1(EX_fwd_data1),
-    .freg_data1(EX_freg_fwd_data1),
-    .result_o(bypass_out)
-);
-assign bypass_done = bypass_start;
+    ,.Br_done_i(Br_done)
+    ,.MUL_DIV_done_i(MUL_DIV_done)
+    ,.FPU_done_i(FPU_done)
+    ,.LSU_done_i(LSU_done)
+    ,.SYS_done_i(SYS_done)
 
-// ALU =========================
-assign ALU_start = EX_start && (|EX_ALU_ctrl_out);
-ALU_top m_ALU(
-    .ALU_ctrl(EX_ALU_ctrl_out),
-    .a(ALU_in1),
-    .b(ALU_in2),
-    .out(ALU_out)
+    ,.EX_done_o(EX_done)
 );
-assign ALU_done = ALU_start;
 
 // Branch ======================
 assign Br_start  = EX_start && (EX_is_br_out || EX_is_j_out); // only deal with inst br
@@ -565,7 +543,6 @@ BranchUnit m_BranchUnit(
 assign Br_done = Br_start;
 
 // MUL/DIV =====================
-assign MUL_DIV_start = EX_start && EX_is_MUL_DIV_out;
 MUL_DIV_top m_MUL_DIV_top(
     .clk(clk),
     .rst_n(rst_n),
@@ -580,7 +557,6 @@ MUL_DIV_top m_MUL_DIV_top(
 );
 
 // FPU =========================
-assign FPU_start = EX_start && EX_is_fpu_out;
 wire [4:0] FPU_flags;
 FPU_Top m_FPU(
     .clk(clk),
@@ -714,7 +690,7 @@ CSR m_CSR(
     .csr_rd_data_o(csr_rd_data_xtval),
     .csr_wr_valid_o(csr_wr_en),
     .csr_wr_data_o(csr_wr_data),
-    .csr_exception_o(csr_exception) // generate csr related exceptions
+    .csr_exception_o(csr_exception)
 );
 
 CSRFile m_CSRFile(
@@ -769,7 +745,7 @@ Writeback m_WB(
     
     // control_in
     .reg_wr_en_i(EX_reg_wr_en_out),
-    .freg_wr_en_i(EX_freg_wr_en_out), // TODO
+    .freg_wr_en_i(EX_freg_wr_en_out),
     .reg_w_sel_i(EX_reg_w_sel_out),
     // ===================================
     // data_out

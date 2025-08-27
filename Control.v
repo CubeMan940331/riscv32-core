@@ -512,6 +512,8 @@ always @(*) begin
     if      ((inst&`INST_LUI_MASK) == `INST_LUI)         bypass_sel_r = 1;
     else if ((inst&`INST_FMV_W_X_MASK) == `INST_FMV_W_X) bypass_sel_r = 2;
     else if ((inst&`INST_FMV_X_W_MASK) == `INST_FMV_X_W) bypass_sel_r = 3;
+    // impl as nop, but still need something to start
+    else if ((inst&`INST_FENCE_MASK) == `INST_FENCE)     bypass_sel_r = 1;
     else                                                 bypass_sel_r = 0;
 
     // 0: pc_p4, 1: ALU, 2: mem, 3:csr, 4: FPU, 5: bypass
