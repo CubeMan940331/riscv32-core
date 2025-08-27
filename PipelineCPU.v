@@ -11,7 +11,8 @@ module PipelineCPU (
     output d_mem_rd_en,
     output [31:0] d_mem_addr,
     output [31:0] d_mem_wr_data,
-    input  [31:0] d_mem_rd_data
+    input  [31:0] d_mem_rd_data,
+    input         d_mem_available
 );
 //wires
 //================================================================
@@ -604,6 +605,7 @@ FPU_Top m_FPU(
 assign LSU_start = EX_start && 
     (csr_exception&`EXCEPTION_TYPE_MASK)!=`EXCEPTION_EXCEPTION &&
     (EX_mem_wr_en_out || EX_mem_rd_en_out);
+
 assign LSU_done = lsu_writeback_valid_o;
 
 lsu #( .DEPTH(2) ) 
@@ -638,19 +640,10 @@ u_lsu (
 
 // // MMU =========================
 wire icache_valid_i_f = 1;
-wire dcache_valid_i_f = 1;
 wire fetch_rd_f = 1;
 
-reg [31:0] d_mem_data_r;
-always @(posedge clk or negedge rst_n)begin
-    if(!rst_n)
-        d_mem_data_r <= 32'h0;
-    else 
-        d_mem_data_r <= d_mem_rd_data;
-end
-
 // assign i_mem_addr = mmu_icache_addr;
-assign d_mem_ctrl = (d_mem_rd_en)?4'b0100:mmu_dcache_mask;
+assign d_mem_ctrl = mmu_dcache_mask;
 assign d_mem_wr_en = mmu_dcache_wr;
 assign d_mem_rd_en = mmu_dcache_rd;
 assign d_mem_addr = mmu_dcache_addr;
@@ -671,8 +664,8 @@ u_mmu(
     .lsu_in_flush_i      (lsu_mmu_dflush),
     .lsu_in_invalidate_i (lsu_mmu_dinvalidafte),
     .lsu_in_writeback_i  (lsu_mmu_dwriteback),
-    .dcache_in_value_i   (d_mem_data_r),
-    .dcache_in_valid_i   (dcache_valid_i_f), //
+    .dcache_in_value_i   (d_mem_rd_data),
+    .dcache_in_valid_i   (d_mem_available),
     .icache_in_value_i   (inst),
     .icache_in_valid_i   (icache_valid_i_f), //
     .fetch_out_value_o   (mmu_fetch_value),
