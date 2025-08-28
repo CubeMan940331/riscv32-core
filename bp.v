@@ -6,8 +6,8 @@ module bp
 )
 (
     //Input
-     input        clk_i
-    ,input        rst_i
+     input        clk
+    ,input        rst_n
     ,input [31:0] pc_f_i
     ,input [31:0] pc_ex_i
     ,input        is_jump_i
@@ -38,8 +38,8 @@ module bp
           .INDEX_BITS(INDEX_BITS)
          ,.GHR_BITS(GHR_BITS) 
     ) u_gshare_bht (
-          .clk_i(clk_i)
-         ,.rst_i(rst_i)
+          .clk(clk)
+         ,.rst_n(rst_n)
          ,.pc_f_i(pc_f_i)
          ,.update_en_i(is_branch_i)
          ,.update_pc_i(pc_ex_i)
@@ -55,8 +55,8 @@ module bp
           .INDEX_BITS(INDEX_BITS) 
          ,.TAG_BITS(TAG_BITS)
     ) u_btb (
-          .clk_i(clk_i)
-         ,.rst_i(rst_i)
+          .clk(clk)
+         ,.rst_n(rst_n)
          ,.pc_f_i(pc_f_i)
          ,.update_en_i(is_branch_i)
          ,.update_pc_i(pc_ex_i)

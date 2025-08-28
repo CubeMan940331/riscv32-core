@@ -1,3 +1,4 @@
+/* verilator lint_off BLKLOOPINIT */
 module bht_2bit
 //Params
 #(
@@ -7,8 +8,8 @@ module bht_2bit
 //Ports
 (
     //Input
-     input              clk_i
-    ,input              rst_i
+     input              clk
+    ,input              rst_n
     ,input  [31:0]      pc_f_i
     ,input              update_en_i
     ,input  [31:0]      update_pc_i
@@ -26,8 +27,8 @@ module bht_2bit
     
     integer i;
     
-    always @(posedge clk_i or posedge rst_i) begin
-        if (rst_i) begin			//Initialize BHT
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin			//Initialize BHT
             for (i = 0; i < BHT_SIZE; i = i + 1)
                 bht[i] <= 2'b00;
         end else if (update_en_i) begin	//The EX stage instruction is a branch

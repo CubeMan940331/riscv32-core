@@ -8,10 +8,14 @@ module Decode (
     input [31:0] pc_p4_i,
     input [31:0] inst_i,
 
+    input bp_pred_taken_i,
+
     output pc_valid_o,
     output [31:0] pc_o,
     output [31:0] pc_p4_o,
     output [31:0] inst_o,
+
+    output bp_pred_taken_o,
     
     output [4:0] rs1_o,
     output [4:0] rs2_o,
@@ -139,11 +143,13 @@ ID_Reg m_ID_Reg(
     .pc_p4_i(pc_p4_i),
     .inst_i(inst_i),
     .pc_i(pc_i),
+    .bp_pred_taken_i(bp_pred_taken_i),
 
     .pc_valid_o(ID_pc_valid_out),
     .pc_o(ID_pc_out),
     .pc_p4_o(ID_pc_p4_out),
-    .inst_o(ID_inst_out)
+    .inst_o(ID_inst_out),
+    .bp_pred_taken_o(bp_pred_taken_o)
 );
 
 wire [6:0] opcode = ID_inst_out[6:0];

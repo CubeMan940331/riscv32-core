@@ -1,3 +1,4 @@
+/* verilator lint_off BLKLOOPINIT */
 module btb
 //Params
 #(
@@ -8,8 +9,8 @@ module btb
 //Ports
 (
     //Input
-     input              clk_i,
-     input              rst_i,
+     input              clk,
+     input              rst_n,
      input  [31:0]      pc_f_i,
      input              update_en_i,
      input  [31:0]      update_pc_i,
@@ -36,8 +37,8 @@ module btb
 
     integer i;
 
-    always @(posedge clk_i or negedge rst_i) begin
-        if (~rst_i) begin
+    always @(posedge clk or negedge rst_n) begin
+        if (~rst_n) begin
             for (i = 0; i < BTB_SIZE; i = i + 1) begin
                 valid_ram[i] <= 1'b0;
                 target_ram[i] <= 32'b0;
