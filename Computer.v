@@ -9,6 +9,7 @@ wire [31:0] inst;
 wire d_mem_wr_en;
 wire d_mem_rd_en;
 wire d_mem_available;
+wire i_mem_available;
 wire [3:0] d_mem_ctrl;
 wire [31:0] d_mem_addr;
 wire [31:0] d_mem_wr_data;
@@ -21,6 +22,7 @@ m_DataMemory(
     
     .i_addr(i_mem_addr),
     .inst(inst),
+    .i_available_o(i_mem_available),
     
     .wr_en(d_mem_wr_en),
     .rd_en(d_mem_rd_en),
@@ -37,6 +39,7 @@ PipelineCPU m_core0(
     
     .i_mem_addr(i_mem_addr),
     .inst(inst),
+    .i_mem_available(i_mem_available),
     
     .d_mem_ctrl(d_mem_ctrl),
     .d_mem_addr(d_mem_addr),

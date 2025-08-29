@@ -5,6 +5,7 @@ module PipelineCPU (
 
     output [31:0] i_mem_addr,
     input  [31:0] inst,
+    input         i_mem_available,
 
     output [3:0] d_mem_ctrl,
     output d_mem_wr_en,
@@ -637,7 +638,6 @@ u_lsu (
 );
 
 // // MMU =========================
-wire icache_valid_i_f = 1;
 wire fetch_rd_f = 1;
 
 // assign i_mem_addr = mmu_icache_addr;
@@ -665,7 +665,7 @@ u_mmu(
     .dcache_in_value_i   (d_mem_rd_data),
     .dcache_in_valid_i   (d_mem_available),
     .icache_in_value_i   (inst),
-    .icache_in_valid_i   (icache_valid_i_f), //
+    .icache_in_valid_i   (i_mem_available),
     .fetch_out_value_o   (mmu_fetch_value),
     .fetch_out_valid_o   (mmu_fetch_valid),
     .lsu_out_value_o     (mmu_lsu_data),
