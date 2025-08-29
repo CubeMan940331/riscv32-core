@@ -578,10 +578,6 @@ FPU_Top m_FPU(
 );
 
 // LSU =========================
-assign LSU_start = EX_start && 
-    (csr_exception&`EXCEPTION_TYPE_MASK)!=`EXCEPTION_EXCEPTION &&
-    (EX_mem_wr_en_out || EX_mem_rd_en_out);
-
 assign LSU_done = lsu_writeback_valid_o;
 
 lsu #( .DEPTH(2) ) 
