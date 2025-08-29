@@ -246,11 +246,12 @@ wire [3:0] stall;
 
 //componets
 //================================================================
+wire bp_mispred_out;
 
 PipelineCtrl m_PipelineCtrl(
     .clk(clk),
     .rst_n(rst_n),
-    .br_taken(br_taken),
+    .br_taken(bp_mispred_out || pc_sel==2'd2),
     
     .EX_stall(!EX_done),
 
@@ -281,6 +282,26 @@ ForwardUnit m_Forward(
 
 // ================================
 // Instruction Fetch stage
+wire [31:0] bp_nx_pc_out;
+wire bp_pred_taken_out;
+wire ID_bp_pred_taken_out;
+wire EX_bp_pred_taken_out;
+
+bp m_bp(
+     .clk(clk)
+    ,.rst_n(rst_n)
+    ,.pc_f_i(pc_out)
+    ,.pc_ex_i(EX_pc_out)
+    ,.is_jump_i(EX_is_j_out)
+    ,.is_branch_i(EX_is_br_out)
+    ,.branch_taken_ex_i(br_taken)
+    ,.branch_target_ex_i(ALU_out)
+    ,.predict_taken_ex_i(EX_bp_pred_taken_out)
+
+    ,.predict_taken_o(bp_pred_taken_out)
+    ,.next_fetch_pc_o(bp_nx_pc_out)
+    ,.misprediction_o(bp_mispred_out)
+);
 
 PC m_PC(
     .clk(clk),
@@ -293,8 +314,8 @@ assign pc_p4 = pc_out+4;
 
 Mux3to1 #(.size(32)) m_PC_MUX(
     .sel(pc_sel),
-    .s0(pc_p4),
-    .s1(ALU_out),
+    .s0(bp_nx_pc_out),
+    .s1(bp_nx_pc_out),
     .s2(csr_pc_target),
     .out(pc_in)
 );
@@ -310,11 +331,14 @@ Decode m_ID(
     .pc_p4_i(pc_p4),
     // .inst_i(mmu_fetch_value),
     .inst_i(inst),
+
+    .bp_pred_taken_i(bp_pred_taken_out),
     
     .pc_valid_o(ID_pc_valid_out),
     .pc_o(ID_pc_out),
     .pc_p4_o(ID_pc_p4_out),
     .inst_o(ID_inst_out),
+    .bp_pred_taken_o(ID_bp_pred_taken_out),
 
     .rs1_o(decode_rs1),
     .rs2_o(decode_rs2),
@@ -409,6 +433,7 @@ Exec m_EX(
     .inst_i(ID_inst_out),
     .pc_i(ID_pc_out),
     .pc_p4_i(ID_pc_p4_out),
+    .bp_pred_taken_i(ID_bp_pred_taken_out),
     // data
     .reg_rd_data1_i(reg_data1_out),
     .reg_rd_data2_i(reg_data2_out),
@@ -465,6 +490,7 @@ Exec m_EX(
     .inst_o(EX_inst_out),
     .pc_o(EX_pc_out),
     .pc_p4_o(EX_pc_p4_out),
+    .bp_pred_taken_o(EX_bp_pred_taken_out),
     // data
     .reg_fwd_data1_o(EX_fwd_data1),
     .reg_fwd_data2_o(EX_fwd_data2),
