@@ -653,7 +653,7 @@ u_mmu(
     .rst_i               (rst_n),
     .satp_i              (mmu_sapt),
     .fetch_pc_i          (pc_out),
-    .fetch_rd_i          (fetch_rd_f), //
+    .fetch_rd_i          (fetch_rd_f), 
     .lsu_in_addr_i       (lsu_mmu_addr),
     .lsu_in_data_i       (lsu_mmu_data),
     .lsu_in_rd_i         (lsu_mmu_rd),
