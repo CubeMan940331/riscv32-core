@@ -1,4 +1,4 @@
-module bp
+module BP_top
 #(
       parameter INDEX_BITS = 11
      ,parameter GHR_BITS = 4

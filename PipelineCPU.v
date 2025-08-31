@@ -38,9 +38,6 @@ wire [31:0] ID_inst_out;
 
 // Decode ========================
 wire [31:0]   decode_imm;
-wire [6:0]    decode_opcode;
-wire [2:0]    decode_funct3;
-wire [6:0]    decode_funct7;
 
 wire [4:0]    decode_rs1;
 wire [4:0]    decode_rs2;
@@ -110,11 +107,6 @@ wire [31:0] EX_inst_out;
 wire [31:0] EX_pc_out;
 wire [31:0] EX_pc_p4_out;
 // data
-wire [31:0] EX_reg_rd_data1_out;
-wire [31:0] EX_reg_rd_data2_out;
-wire [31:0] EX_freg_rd_data1_out;
-wire [31:0] EX_freg_rd_data2_out;
-wire [31:0] EX_freg_rd_data3_out;
 wire [31:0] EX_imm_out;
 // reg addr
 wire [4:0]  EX_rd_out;
@@ -154,7 +146,6 @@ wire EX_fetch_invalid_out;
 
 wire EX_start, EX_done;
 // ALU ========================
-wire ALU_start, ALU_done;
 wire [31:0] ALU_out;
 
 // BranchCmp ==================
@@ -206,19 +197,14 @@ wire        icache_mmu_valid_in;
 wire SYS_start, SYS_done;
 wire [31:0] csr_pc_target;
 wire [31:0] csr_rd_data; // output of CSRFile
-wire [31:0] csr_wr_data; // output of CSR
-wire        csr_wr_en;
-wire [1:0]  csr_priv;
 wire [`EXCEPTION_W-1:0] csr_exception;
 wire        csr_br_taken;
-wire [31:0] csr_mstatus;
 wire [31:0] csr_interrupt;
 // FPU =========================
 wire FPU_start, FPU_done;
 wire [31:0] FPU_out; // output of FPU
 
 // ByPass ======================
-wire bypass_start, bypass_done;
 wire [31:0] bypass_out;
 
 // WB_Reg =====================
@@ -234,24 +220,14 @@ wire        WB_reg_wr_en_out;
 wire        WB_freg_wr_en_out;
 
 // Forward ====================
-wire EX_fwd1_sel;
-wire EX_fwd2_sel;
-wire EX_freg_fwd_sel1;
-wire EX_freg_fwd_sel2;
-wire EX_freg_fwd_sel3;
 wire [31:0] EX_fwd_data1;
 wire [31:0] EX_fwd_data2;
-
-// Hazerd =====================
-wire [3:0] stall;
 
 //componets
 //================================================================
 wire bp_mispred_out;
 
 PipelineCtrl m_PipelineCtrl(
-    .clk(clk),
-    .rst_n(rst_n),
     .br_taken(bp_mispred_out || pc_sel==2'd2),
     
     .EX_stall(!EX_done),
@@ -265,22 +241,6 @@ PipelineCtrl m_PipelineCtrl(
     .WB_clear(WB_clear)
 );
 
-ForwardUnit m_Forward(
-    .EX_rs1(EX_rs1_out),
-    .EX_rs2(EX_rs2_out),
-    .EX_rs3(EX_rs3_out),
-    
-    .WB_rd(WB_rd_out),
-    .WB_reg_wr_en(WB_reg_wr_en_out),
-    .WB_freg_wr_en(WB_freg_wr_en_out),
-    
-    .EX_fwd_sel1(EX_fwd1_sel),
-    .EX_fwd_sel2(EX_fwd2_sel),
-    .EX_freg_fwd_sel1(EX_freg_fwd_sel1),
-    .EX_freg_fwd_sel2(EX_freg_fwd_sel2),
-    .EX_freg_fwd_sel3(EX_freg_fwd_sel3)
-);
-
 // ================================
 // Instruction Fetch stage
 wire [31:0] bp_nx_pc_out;
@@ -288,7 +248,7 @@ wire bp_pred_taken_out;
 wire ID_bp_pred_taken_out;
 wire EX_bp_pred_taken_out;
 
-bp m_bp(
+BP_top m_bp(
      .clk(clk)
     ,.rst_n(rst_n)
     ,.pc_f_i(pc_out)
@@ -585,7 +545,7 @@ MUL_DIV_top m_MUL_DIV_top(
 
 // FPU =========================
 wire [4:0] FPU_flags;
-FPU_Top m_FPU(
+FPU_top m_FPU(
     .clk(clk),
     .rst_n(rst_n),
     .FPU_start(FPU_start),
@@ -691,56 +651,37 @@ assign SYS_start = EX_start && (
     ((csr_exception&`EXCEPTION_TYPE_MASK)==`EXCEPTION_EXCEPTION) ||
     csr_br_taken
 );
-wire [31:0] csr_rd_data_xtval;
 CSR m_CSR(
+    .clk(clk),
+    .rst_n(rst_n),
     .inst(EX_inst_out),
     .inst_valid(!EX_pc_valid_out || EX_is_impl_out),
+    
     .csr_op_i(EX_csr_op_out),
     .is_csr_i(EX_is_csr_out),
     .is_csr_imm_i(EX_is_csr_imm_out),
-    .cur_priv_i(csr_priv),
     .rs1_i(EX_rs1_out),
     .imm_i(EX_imm_out),
     .reg_rd_data1_i(EX_fwd_data1),
-    .csr_old_i(csr_rd_data),
+    
     .is_fpu_done_i(FPU_done),
     .fpu_flags_i(FPU_flags),
     .is_f_ext_i(EX_is_f_ext),
-    .mstatus_i(csr_mstatus),
     .csr_wr_addr_i(EX_csr_addr_out),
-
-    .csr_rd_data_o(csr_rd_data_xtval),
-    .csr_wr_valid_o(csr_wr_en),
-    .csr_wr_data_o(csr_wr_data),
-    .csr_exception_o(csr_exception)
-);
-
-CSRFile m_CSRFile(
-    .clk(clk),
-    .rst_n(rst_n),
-
-    .cpu_id_i(0),
-    .misa_i(`MISA_RV32 | `MISA_RVU | `MISA_RVI | `MISA_RVM | `MISA_RVF),
-
-    .exception_i(csr_exception),
+    
     .exception_pc_i(EX_pc_out),
-    .exception_addr_i(0),
-
     .csr_rd_addr_i(EX_csr_addr_out),
-    .csr_rd_data_o(csr_rd_data),
-
-    .csr_wr_en_i(csr_wr_en),
-    .csr_wr_addr_i(EX_csr_addr_out),
-    .csr_wr_data_i(csr_wr_data),
 
     .csr_branch_o(csr_br_taken),
     .csr_target_o(csr_pc_target),
-
-    .priv_o(csr_priv),
-    .mstatus_o(csr_mstatus),
     .interrupt_o(csr_interrupt),
+    .csr_exception_o(csr_exception),
+    
+    .csr_rd_data_o(csr_rd_data)
+    
     .satp_o(mmu_sapt)
 );
+
 assign SYS_done = SYS_start;
 
 //================================

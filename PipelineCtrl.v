@@ -1,10 +1,7 @@
 // control pipeline register
 // stall or insert nop
 module PipelineCtrl(
-     input clk
-    ,input rst_n
-
-    ,input br_taken
+    input br_taken
 
     ,input EX_stall
 

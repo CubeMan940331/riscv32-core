@@ -1,16 +1,22 @@
-.PHONY: clean verilate
+.PHONY: all clean verilate
 
-default: obj_dir/VComputer
+TOP       := Computer
+TB        := example_testbench.cpp
+SRC_DIRS  := mul_div_modules fpu_modules bp_modules alu_modules lsu_modules mmu_modules
+VERILATOR := verilator
+VFLAGS    := -Wall --cc --trace -j 0 --default-language 1364-2001 -Wno-unused -Wno-pinconnectempty
+VFLAGS    += $(addprefix -y ,$(SRC_DIRS))
+OBJ_DIR   := obj_dir
 
-obj_dir/VComputer.mk: *.v
-# generate makefile for example_testbench.cpp
-	verilator -Wall -Wno-unused -Wno-pinconnectempty --cc Computer.v --exe example_testbench.cpp --trace -j 0 -y mul_div_modules -y fpu_modules -y mmu_modules -y lsu_modules --default-language 1364-2001
+all: $(OBJ_DIR)/V$(TOP)
 
-verilate: obj_dir/VComputer.mk
+$(OBJ_DIR)/V$(TOP).mk: $(wildcard *.v) $(TB)
+	$(VERILATOR) $(VFLAGS) $(TOP).v --exe $(TB)
 
-obj_dir/VComputer: obj_dir/VComputer.mk example_testbench.cpp
-# compile testbench
-	make -C obj_dir -f VComputer.mk
+verilate: $(OBJ_DIR)/V$(TOP).mk
+
+$(OBJ_DIR)/V$(TOP): $(OBJ_DIR)/V$(TOP).mk
+	$(MAKE) -C $(OBJ_DIR) -f V$(TOP).mk
 
 clean:
-	rm -rf obj_dir
+	rm -rf $(OBJ_DIR)

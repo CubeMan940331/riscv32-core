@@ -1,4 +1,4 @@
-module FPU_Top (
+module FPU_top (
     input clk,
     input rst_n,
     input FPU_start,
