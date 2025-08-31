@@ -4,7 +4,7 @@ default: obj_dir/VComputer
 
 obj_dir/VComputer.mk: *.v
 # generate makefile for example_testbench.cpp
-	verilator -Wall -Wno-unused -Wno-pinconnectempty --cc Computer.v --exe example_testbench.cpp --trace -j 0 -y mul_div_modules -y fpu_modules --default-language 1364-2001
+	verilator -Wall -Wno-unused -Wno-pinconnectempty --cc Computer.v --exe example_testbench.cpp --trace -j 0 -y mul_div_modules -y fpu_modules -y bp_modules -y alu_modules --default-language 1364-2001
 
 verilate: obj_dir/VComputer.mk
 

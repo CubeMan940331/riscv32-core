@@ -252,7 +252,7 @@ wire bp_pred_taken_out;
 wire ID_bp_pred_taken_out;
 wire EX_bp_pred_taken_out;
 
-bp m_bp(
+BP_top m_bp(
      .clk(clk)
     ,.rst_n(rst_n)
     ,.pc_f_i(pc_out)
@@ -548,7 +548,7 @@ MUL_DIV_top m_MUL_DIV_top(
 
 // FPU =========================
 wire [4:0] FPU_flags;
-FPU_Top m_FPU(
+FPU_top m_FPU(
     .clk(clk),
     .rst_n(rst_n),
     .FPU_start(FPU_start),
