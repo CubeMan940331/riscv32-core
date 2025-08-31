@@ -599,6 +599,7 @@ u_lsu (
 
 // // MMU =========================
 wire fetch_rd_f = 1;
+assign mmu_sapt = 32'h0;
 
 // assign i_mem_addr = mmu_icache_addr;
 assign d_mem_ctrl = mmu_dcache_mask;
@@ -678,8 +679,6 @@ CSR m_CSR(
     .csr_exception_o(csr_exception),
     
     .csr_rd_data_o(csr_rd_data)
-    
-    .satp_o(mmu_sapt)
 );
 
 assign SYS_done = SYS_start;
