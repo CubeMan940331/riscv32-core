@@ -12,6 +12,9 @@ module PipelineCPU (
     output d_mem_rd_en,
     output [31:0] d_mem_addr,
     output [31:0] d_mem_wr_data,
+    output        d_mem_writeback,
+    output        d_mem_invalidate,
+    output        d_mem_flush,
     input  [31:0] d_mem_rd_data,
     input         d_mem_available
 );
@@ -25,7 +28,7 @@ wire [31:0]pc_in;
 wire [31:0]pc_out;
 wire [31:0]pc_p4;
 
-assign i_mem_addr = pc_out;
+// assign i_mem_addr = pc_out;
 
 // ID_Reg =====================
 wire ID_clear;
@@ -185,9 +188,6 @@ wire [31:0] mmu_dcache_data;
 wire        mmu_dcache_rd;
 wire        mmu_dcache_wr;
 wire [ 3:0] mmu_dcache_mask;
-wire        mmu_dcache_flush;
-wire        mmu_dcache_writeback;
-wire        mmu_dcache_invalidate;
 wire [31:0] mmu_icache_addr;
 wire        mmu_icache_rd;
 
@@ -229,6 +229,7 @@ wire bp_mispred_out;
 
 PipelineCtrl m_PipelineCtrl(
     .br_taken(bp_mispred_out || pc_sel==2'd2),
+    .i_cache_wait(!mmu_fetch_valid),
     
     .EX_stall(!EX_done),
 
@@ -290,8 +291,8 @@ Decode m_ID(
 
     .pc_i(pc_out),
     .pc_p4_i(pc_p4),
-    // .inst_i(mmu_fetch_value),
-    .inst_i(inst),
+    .inst_i(mmu_fetch_value),
+    // .inst_i(inst),
 
     .bp_pred_taken_i(bp_pred_taken_out),
     
@@ -601,7 +602,7 @@ u_lsu (
 wire fetch_rd_f = 1;
 assign mmu_sapt = 32'h0;
 
-// assign i_mem_addr = mmu_icache_addr;
+assign i_mem_addr = mmu_icache_addr;
 assign d_mem_ctrl = mmu_dcache_mask;
 assign d_mem_wr_en = mmu_dcache_wr;
 assign d_mem_rd_en = mmu_dcache_rd;
@@ -636,9 +637,9 @@ u_mmu(
     .dcache_rd_o         (mmu_dcache_rd),
     .dcache_wr_o         (mmu_dcache_wr),
     .dcache_mask_o       (mmu_dcache_mask),
-    .dcache_flush_o      (mmu_dcache_flush),
-    .dcache_invalidate_o (mmu_dcache_invalidate),
-    .dcache_writeback_o  (mmu_dcache_writeback),
+    .dcache_flush_o      (d_mem_flush),
+    .dcache_invalidate_o (d_mem_invalidate),
+    .dcache_writeback_o  (d_mem_writeback),
     .icache_addr_o       (mmu_icache_addr),
     .icache_rd_o         (mmu_icache_rd),
     .load_fault_o        (mmu_lsu_load_fault),

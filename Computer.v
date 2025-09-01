@@ -9,6 +9,9 @@ wire [31:0] inst;
 wire d_mem_wr_en;
 wire d_mem_rd_en;
 wire d_mem_available;
+wire d_mem_flush;
+wire d_mem_writeback;
+wire d_mem_invalidate;
 wire i_mem_available;
 wire [3:0] d_mem_ctrl;
 wire [31:0] d_mem_addr;
@@ -47,6 +50,9 @@ PipelineCPU m_core0(
     .d_mem_rd_en(d_mem_rd_en),
     .d_mem_wr_data(d_mem_wr_data),
     .d_mem_rd_data(d_mem_rd_data),
+    .d_mem_flush(d_mem_flush),
+    .d_mem_invalidate(d_mem_invalidate),
+    .d_mem_writeback(d_mem_writeback),
     .d_mem_available(d_mem_available)
 );
 

@@ -2,7 +2,7 @@
 // stall or insert nop
 module PipelineCtrl(
     input br_taken
-
+    ,input i_cache_wait
     ,input EX_stall
 
 // Pipeline control
@@ -36,7 +36,7 @@ always @(*)begin
         ID_clear=1;
         EX_clear=1;
     end
-    else if(EX_stall) begin
+    else if(EX_stall || i_cache_wait) begin
         // freeze IF, ID, EX
         pc_en=0;
         ID_en=0;
