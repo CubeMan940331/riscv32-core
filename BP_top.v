@@ -15,9 +15,11 @@ module BP_top
     ,input        branch_taken_ex_i
     ,input [31:0] branch_target_ex_i
     ,input        predict_taken_ex_i
+    ,input [31:0] predict_target_ex_i
     
     //Output
     ,output        predict_taken_o
+    ,output [31:0] predict_target_o
     ,output        misprediction_o     //To flush invalid instructions from the pipeline.
     ,output [31:0] next_fetch_pc_o
 );
@@ -26,12 +28,15 @@ module BP_top
     wire [31:0] target_w;
     wire        predict_taken_w;
     wire [31:0] branch_target_ex_w;
-    wire [31:0] predict_target_w;
     
-    assign misprediction_o  = (is_branch_i & (predict_taken_ex_i ^ branch_taken_ex_i)) | is_jump_i;
-    assign predict_target_w = (predict_taken_w && hit_w) ? target_w : pc_f_i + 32'b0100;
+    assign misprediction_o  = 
+        is_jump_i | 
+        (is_branch_i &
+         ((predict_taken_ex_i ^ branch_taken_ex_i) |
+          (branch_taken_ex_i & (predict_target_ex_i != branch_target_ex_i))));
+    assign predict_target_o = (predict_taken_w && hit_w) ? target_w : pc_f_i + 32'b0100;
     assign branch_target_ex_w = branch_taken_ex_i ? branch_target_ex_i : pc_ex_i + 32'b0100;
-    assign next_fetch_pc_o  = misprediction_o ? branch_target_ex_w : predict_target_w;
+    assign next_fetch_pc_o  = misprediction_o ? branch_target_ex_w : predict_target_o;
     
     gshare_bht
     #(
@@ -48,7 +53,7 @@ module BP_top
          ,.predict_taken_o(predict_taken_w)
     );
     
-    assign predict_taken_o = predict_taken_w;
+    assign predict_taken_o = predict_taken_w && hit_w;
     
     btb 
     #(

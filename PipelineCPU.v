@@ -244,6 +244,9 @@ PipelineCtrl m_PipelineCtrl(
 // ================================
 // Instruction Fetch stage
 wire [31:0] bp_nx_pc_out;
+wire [31:0] bp_pred_target_out;
+wire [31:0] ID_bp_pred_target_out;
+wire [31:0] EX_bp_pred_target_out;
 wire bp_pred_taken_out;
 wire ID_bp_pred_taken_out;
 wire EX_bp_pred_taken_out;
@@ -258,8 +261,10 @@ BP_top m_bp(
     ,.branch_taken_ex_i(br_taken)
     ,.branch_target_ex_i(ALU_out)
     ,.predict_taken_ex_i(EX_bp_pred_taken_out)
+    ,.predict_target_ex_i(EX_bp_pred_target_out) //EX_bp_pred_target_out
 
     ,.predict_taken_o(bp_pred_taken_out)
+    ,.predict_target_o(bp_pred_target_out) //bp_pred_target_out
     ,.next_fetch_pc_o(bp_nx_pc_out)
     ,.misprediction_o(bp_mispred_out)
 );
@@ -294,12 +299,14 @@ Decode m_ID(
     .inst_i(inst),
 
     .bp_pred_taken_i(bp_pred_taken_out),
+    .bp_pred_target_i(bp_pred_target_out),
     
     .pc_valid_o(ID_pc_valid_out),
     .pc_o(ID_pc_out),
     .pc_p4_o(ID_pc_p4_out),
     .inst_o(ID_inst_out),
     .bp_pred_taken_o(ID_bp_pred_taken_out),
+    .bp_pred_target_o(ID_bp_pred_target_out),
 
     .rs1_o(decode_rs1),
     .rs2_o(decode_rs2),
@@ -395,6 +402,7 @@ Exec m_EX(
     .pc_i(ID_pc_out),
     .pc_p4_i(ID_pc_p4_out),
     .bp_pred_taken_i(ID_bp_pred_taken_out),
+    .bp_pred_target_i(ID_bp_pred_target_out),
     // data
     .reg_rd_data1_i(reg_data1_out),
     .reg_rd_data2_i(reg_data2_out),
@@ -452,6 +460,7 @@ Exec m_EX(
     .pc_o(EX_pc_out),
     .pc_p4_o(EX_pc_p4_out),
     .bp_pred_taken_o(EX_bp_pred_taken_out),
+    .bp_pred_target_o(EX_bp_pred_target_out),
     // data
     .reg_fwd_data1_o(EX_fwd_data1),
     .reg_fwd_data2_o(EX_fwd_data2),
