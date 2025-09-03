@@ -214,8 +214,6 @@ assign mmu_addr_o   = {resp_addr[31:2],2'b00};
 assign mmu_data_o   = resp_data;
 assign mmu_rd_o     = resp_valid_o && resp_rd && !mmu_valid_i;
 assign mmu_wr_o     = resp_valid_o && resp_wr && !mmu_valid_i;
-// assign mmu_rd_o     = resp_valid_o && resp_rd;
-// assign mmu_wr_o     = resp_valid_o && resp_wr;
 assign mmu_mask_o   = (mmu_wr_o)?resp_mask: (mmu_rd_o)?4'hf: 4'h0;
 
 // --------------------------------------------
@@ -311,7 +309,6 @@ end
 // --------------------------------------------
 
 wire push_q = ((mem_rd_r || mem_wr_r ) && resp_accept_o) || u_state;
-// wire pop_q = mmu_valid_i && resp_valid_o && pop_pre;
 wire pop_q = mmu_valid_i && resp_valid_o;
 wire mem_sign = sign_inst || u_sign;
 wire mem_lb = lb_inst || u_lh;

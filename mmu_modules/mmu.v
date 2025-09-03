@@ -54,8 +54,6 @@ module mmu
     ,output         inst_fault_o
 );
 
-
-
 generate
 if(MMU_SUPPORT) 
 begin : MMU
@@ -86,13 +84,16 @@ reg [31:0] dcache_addr_r;
 reg [31:0] icache_addr_r;
 reg [ 3:0] dcache_mask_r;
 
+// ---------------------------------------
+// Output Control
+//----------------------------------------
+
+// with addr error detection
+
 // wire cache_interupt = ((dcache_addr_r >= ICACHE_ADDR_MIN) && (dcache_addr_r <= ICACHE_ADDR_MAX));
 // wire icache_addr_error = !((icache_addr_r >= ADDR_MIN) && (icache_addr_r <= ADDR_MAX));
 // wire dcache_addr_error = !((dcache_addr_r >= ADDR_MIN) && (dcache_addr_r <= ADDR_MAX)) || cache_interupt;
 
-// ---------------------------------------
-// Output Control
-//----------------------------------------
 // wire req_d_rd = lsu_in_rd_i && ~dcache_addr_error;
 // wire req_d_wr = lsu_in_wr_i && ~dcache_addr_error;
 // wire req_i_rd = fetch_rd_i && ~icache_addr_error;
@@ -101,6 +102,7 @@ reg [ 3:0] dcache_mask_r;
 // wire vm_d_wr = lsu_in_wr_i && dtlb_hit && ~dcache_addr_error;
 // wire vm_i_rd = fetch_rd_i && itlb_hit && ~icache_addr_error;
 
+// without addr error detection
 wire req_d_rd = lsu_in_rd_i;
 wire req_d_wr = lsu_in_wr_i;
 wire req_i_rd = fetch_rd_i;
@@ -108,6 +110,7 @@ wire req_i_rd = fetch_rd_i;
 wire vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte);
 wire vm_d_wr = lsu_in_wr_i && dtlb_hit;
 wire vm_i_rd = fetch_rd_i && itlb_hit;
+
 
 wire dcache_rd_c = (vm_enable)? vm_d_rd : req_d_rd;
 wire dcache_wr_c = (vm_enable)? vm_d_wr : req_d_wr;

@@ -36,8 +36,7 @@ assign mmu_dcache_rd_o = mmu_dcache_rd_i && d_available_pre;
 assign mmu_dcache_wr_o = mmu_dcache_wr_i && d_available_pre;
 
 
-// assign icache_valid_o = i_rd_r && i_available;
-assign icache_valid_o = i_valid_r;
+assign icache_valid_o = i_rd_r && i_available;
 assign mmu_icache_rd_o = mmu_icache_rd_i && i_available_pre;
 
 always @(posedge clk_i or negedge rst_i)begin
