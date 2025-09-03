@@ -7,7 +7,9 @@ module ID_Reg (
     input  wire [31:0] pc_i,
     input  wire [31:0] pc_p4_i,
     input  wire        bp_pred_taken_i,
+    input  wire [31:0] bp_pred_target_i,
     output wire        bp_pred_taken_o,
+    output wire [31:0] bp_pred_target_o,
 
     output wire        pc_valid_o,
     output wire [31:0] pc_o,
@@ -21,4 +23,5 @@ module ID_Reg (
     PipelineRegister #(.WIDTH(32)) reg_inst     (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(inst_i), .data_o(inst_o));
 
     PipelineRegister #(.WIDTH( 1)) reg_bp_pred_taken (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(bp_pred_taken_i), .data_o(bp_pred_taken_o));
+    PipelineRegister #(.WIDTH(32)) reg_bp_pred_target (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(bp_pred_target_i), .data_o(bp_pred_target_o));
 endmodule
