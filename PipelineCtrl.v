@@ -1,7 +1,7 @@
 // control pipeline register
 // stall or insert nop
 module PipelineCtrl(
-    input br_taken
+    input br_flush
 
     ,input EX_stall
 
@@ -30,7 +30,7 @@ always @(*)begin
     WB_en=1;
     WB_clear=0;
 
-    if(br_taken)begin
+    if(br_flush)begin
         // branch determined at EX stage
         // clear Id, EX next clock
         ID_clear=1;

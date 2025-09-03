@@ -135,6 +135,7 @@ wire EX_is_csr_out;
 wire [2:0] EX_csr_op_out;
 wire EX_is_csr_imm_out;
 wire [11:0] EX_csr_addr_out;
+wire [31:0] csr_satp_out;
 // FPU
 wire EX_is_f_ext;
 wire EX_is_fpu_out;
@@ -225,10 +226,10 @@ wire [31:0] EX_fwd_data2;
 
 //componets
 //================================================================
-wire bp_mispred_out;
+wire br_flush;
 
 PipelineCtrl m_PipelineCtrl(
-    .br_taken(bp_mispred_out || pc_sel==2'd2),
+    .br_flush(br_flush),
     
     .EX_stall(!EX_done),
 
@@ -251,39 +252,31 @@ wire bp_pred_taken_out;
 wire ID_bp_pred_taken_out;
 wire EX_bp_pred_taken_out;
 
-BP_top m_bp(
+Fetch m_Fetch(
      .clk(clk)
-    ,.rst_n(rst_n)
-    ,.pc_f_i(pc_out)
-    ,.pc_ex_i(EX_pc_out)
-    ,.is_jump_i(EX_is_j_out)
-    ,.is_branch_i(EX_is_br_out)
-    ,.branch_taken_ex_i(br_taken)
-    ,.branch_target_ex_i(ALU_out)
-    ,.predict_taken_ex_i(EX_bp_pred_taken_out)
-    ,.predict_target_ex_i(EX_bp_pred_target_out) //EX_bp_pred_target_out
+    ,.rst_n(rst_n) 
+    ,.en(pc_en)
+    
+    ,.EX_pc_i(EX_pc_out)
 
-    ,.predict_taken_o(bp_pred_taken_out)
-    ,.predict_target_o(bp_pred_target_out) //bp_pred_target_out
-    ,.next_fetch_pc_o(bp_nx_pc_out)
-    ,.misprediction_o(bp_mispred_out)
-);
+    ,.EX_bp_pred_taken_i(EX_bp_pred_taken_out)
+    ,.EX_bp_pred_pc_i(EX_bp_pred_target_out)
 
-PC m_PC(
-    .clk(clk),
-    .rst_n(rst_n),
-    .en(pc_en),
-    .pc_i(pc_in),
-    .pc_o(pc_out)
-);
-assign pc_p4 = pc_out+4;
+    ,.EX_is_br_i(EX_is_br_out)
+    ,.EX_br_taken_i(pc_sel==1) // inst br taken
+    ,.EX_br_target_i(ALU_out)
+    ,.EX_pc_p4_i(EX_pc_p4_out)
+    
+    ,.EX_csr_br_taken_i(csr_br_taken)
+    ,.EX_csr_br_target_i(csr_pc_target)
+// output
+    ,.br_flush_o(br_flush)
 
-Mux3to1 #(.size(32)) m_PC_MUX(
-    .sel(pc_sel),
-    .s0(bp_nx_pc_out),
-    .s1(bp_nx_pc_out),
-    .s2(csr_pc_target),
-    .out(pc_in)
+    ,.bp_pred_taken_o(bp_pred_taken_out)
+    ,.bp_pred_target_o(bp_pred_target_out)
+    
+    ,.pc_o(pc_out)
+    ,.pc_p4_o(pc_p4)
 );
 
 Decode m_ID(
@@ -608,7 +601,6 @@ u_lsu (
 
 // // MMU =========================
 wire fetch_rd_f = 1;
-assign mmu_sapt = 32'h0;
 
 // assign i_mem_addr = mmu_icache_addr;
 assign d_mem_ctrl = mmu_dcache_mask;
@@ -621,7 +613,7 @@ mmu #(.MMU_SUPPORT(1))
 u_mmu(
     .clk_i               (clk),
     .rst_i               (rst_n),
-    .satp_i              (mmu_sapt),
+    .satp_i              (csr_satp_out),
     .fetch_pc_i          (pc_out),
     .fetch_rd_i          (fetch_rd_f), 
     .lsu_in_addr_i       (lsu_mmu_addr),
@@ -687,7 +679,8 @@ CSR m_CSR(
     .interrupt_o(csr_interrupt),
     .csr_exception_o(csr_exception),
     
-    .csr_rd_data_o(csr_rd_data)
+    .csr_rd_data_o(csr_rd_data),
+    .csr_satp_o(csr_satp_out)
 );
 
 assign SYS_done = SYS_start;

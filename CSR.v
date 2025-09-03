@@ -25,7 +25,9 @@ module CSR (
     output [31:0]               interrupt_o,
     output [`EXCEPTION_W-1:0]   csr_exception_o,
 
-    output [31:0]               csr_rd_data_o       // read data
+    output [31:0]               csr_rd_data_o,       // read data
+
+    output [31:0]               csr_satp_o
 );
 
 //-----------------------------------------------------------------
@@ -57,7 +59,7 @@ CSRFile m_CSRFile(
     .priv_o(csr_priv),
     .mstatus_o(csr_mstatus),
     .interrupt_o(interrupt_o),
-    .satp_o()
+    .satp_o(csr_satp_o)
 );
 
 //-----------------------------------------------------------------
