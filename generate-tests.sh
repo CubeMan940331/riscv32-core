@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 riscv_toolchain="riscv32-unknown-elf-"
 if [ $(riscv64-unknown-elf-gcc --print-multi-lib | grep rv32imaf) ];then
     riscv_toolchain="riscv64-unknown-elf-"
