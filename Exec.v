@@ -106,8 +106,8 @@ module Exec(
     // ALU
     ,output wire [3:0]  ALU_ctrl_o
     ,output wire [31:0] ALU_o
-    // cmp
-    ,output wire [2:0]  cmp_op_o
+    // Branch
+    ,output wire        br_taken_o
 
     // MUL/DIV
     ,output wire is_MUL_DIV_o
@@ -138,7 +138,6 @@ module Exec(
     ,output wire FPU_start_o
     ,output wire LSU_start_o
     
-    ,input wire Br_done_i
     ,input wire MUL_DIV_done_i
     ,input wire FPU_done_i
     ,input wire LSU_done_i
@@ -154,6 +153,8 @@ wire [31:0] freg_rd_data3_o;
 
 wire ALU_sel1_o;
 wire ALU_sel2_o;
+
+wire [2:0] cmp_op_o;
 
 // data
 PipelineRegister #(.WIDTH( 1)) reg_is_impl   (.clk(clk), .rst_n(rst_n), .clear(clear), .en(en), .data_i(is_impl_i),   .data_o(is_impl_o));
@@ -290,6 +291,7 @@ Mux2to1 #(.size(32)) m_FPU_SRC1_MUX(
 // EX start control
 wire bypass_start;
 wire ALU_start;
+wire Br_start;
 
 // start logic
 /*
@@ -312,6 +314,7 @@ assign EX_start_o = (!started) && (pc_valid_o && is_impl_o);
 
 assign bypass_start = EX_start_o && (|bypass_sel_o);
 assign ALU_start = EX_start_o && (|ALU_ctrl_o);
+assign Br_start  = EX_start_o && (is_br_o || is_j_o);
 assign MUL_DIV_start_o = EX_start_o && is_MUL_DIV_o;
 assign FPU_start_o = EX_start_o && is_fpu_o;
 assign LSU_start_o = EX_start_o && 
@@ -339,10 +342,22 @@ BypassUnit m_BypassUnit(
 );
 assign bypass_done = bypass_start;
 
+// Branch Unit =================
+wire Br_done;
+BranchUnit m_Branch(
+    .is_br(is_br_o),
+    .is_j(is_j_o),
+    .cmp_op(cmp_op_o),
+    .reg_rd_data1(reg_fwd_data1_o),
+    .reg_rd_data2(reg_fwd_data2_o),
+
+    .br_taken(br_taken_o)
+);
+assign Br_done = Br_start;
 
 // EX done logic
 assign EX_done_o = (!pc_valid_o) | (!is_impl_o) |
-    ALU_done | Br_done_i | LSU_done_i | FPU_done_i |
+    ALU_done | Br_done | LSU_done_i | FPU_done_i |
     SYS_done_i | bypass_done | MUL_DIV_done_i;
 
 endmodule

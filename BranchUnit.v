@@ -1,14 +1,12 @@
 module BranchUnit (
     input is_br,
     input is_j,
-    input is_csr_br,
     
     input [2:0] cmp_op,
     input signed [31:0] reg_rd_data1,
     input signed [31:0] reg_rd_data2,
     
-    output br_taken, // indicate branch happened
-    output reg [1:0] pc_sel
+    output br_taken // inst br taken
 );
 // 0 beq
 // 1 bne
@@ -30,16 +28,6 @@ always @(*)begin
     endcase
 end
 
-// pc_sel = 0: pc_p4
-// pc_sel = 1: ALU_out
-// pc_sel = 2: csr_pc_target
-// priority: csr_br > inst_br
-always @(*)begin
-    if(is_csr_br) pc_sel=2;
-    else if(inst_br_taken) pc_sel=1;
-    else pc_sel=0;
-end
-
-assign br_taken = inst_br_taken | is_csr_br;
+assign br_taken = inst_br_taken;
 
 endmodule

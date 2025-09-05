@@ -19,9 +19,7 @@ module PipelineCPU (
 //================================================================
 
 // PC =========================
-wire [1:0] pc_sel;
 wire pc_en;
-wire [31:0]pc_in;
 wire [31:0]pc_out;
 wire [31:0]pc_p4;
 
@@ -150,8 +148,7 @@ wire EX_start, EX_done;
 wire [31:0] ALU_out;
 
 // BranchCmp ==================
-wire Br_start, Br_done;
-wire br_taken; // indicate any branch happen (trigger by inst, csr unit)
+wire br_taken; // indicate inst branch
 
 // MUL/DIV ====================
 wire MUL_DIV_start, MUL_DIV_done;
@@ -263,7 +260,7 @@ Fetch m_Fetch(
     ,.EX_bp_pred_pc_i(EX_bp_pred_target_out)
 
     ,.EX_is_br_i(EX_is_br_out)
-    ,.EX_br_taken_i(pc_sel==1) // inst br taken
+    ,.EX_br_taken_i(br_taken) // inst br taken
     ,.EX_br_target_i(ALU_out)
     ,.EX_pc_p4_i(EX_pc_p4_out)
     
@@ -477,7 +474,7 @@ Exec m_EX(
     // Branch
     .is_j_o(EX_is_j_out),
     .is_br_o(EX_is_br_out),
-    .cmp_op_o(EX_cmp_op_out),
+    .br_taken_o(br_taken),
     // ALU
     .ALU_ctrl_o(EX_ALU_ctrl_out),
     .ALU_o(ALU_out),
@@ -506,7 +503,6 @@ Exec m_EX(
     ,.FPU_start_o(FPU_start)
     ,.LSU_start_o(LSU_start)
 
-    ,.Br_done_i(Br_done)
     ,.MUL_DIV_done_i(MUL_DIV_done)
     ,.FPU_done_i(FPU_done)
     ,.LSU_done_i(LSU_done)
@@ -514,22 +510,6 @@ Exec m_EX(
 
     ,.EX_done_o(EX_done)
 );
-
-// Branch ======================
-assign Br_start  = EX_start && (EX_is_br_out || EX_is_j_out); // only deal with inst br
-BranchUnit m_BranchUnit(
-    .is_br(EX_is_br_out),
-    .is_j(EX_is_j_out),
-    .is_csr_br(csr_br_taken),
-
-    .cmp_op(EX_cmp_op_out),
-    .reg_rd_data1(EX_fwd_data1),
-    .reg_rd_data2(EX_fwd_data2),
-    
-    .br_taken(br_taken),
-    .pc_sel(pc_sel)
-);
-assign Br_done = Br_start;
 
 // MUL/DIV =====================
 MUL_DIV_top m_MUL_DIV_top(
