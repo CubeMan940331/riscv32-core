@@ -5,6 +5,7 @@ module PipelineCPU (
 
     output [31:0] i_mem_addr,
     input  [31:0] inst,
+    input         i_mem_available,
 
     output [3:0] d_mem_ctrl,
     output d_mem_wr_en,
@@ -14,15 +15,15 @@ module PipelineCPU (
     input  [31:0] d_mem_rd_data,
 
     output [31:0] WB_pc,
-    output WB_pc_valid
+    output WB_pc_valid,
+
+    input         d_mem_available
 );
 //wires
 //================================================================
 
 // PC =========================
-wire [1:0] pc_sel;
 wire pc_en;
-wire [31:0]pc_in;
 wire [31:0]pc_out;
 wire [31:0]pc_p4;
 
@@ -39,9 +40,6 @@ wire [31:0] ID_inst_out;
 
 // Decode ========================
 wire [31:0]   decode_imm;
-wire [6:0]    decode_opcode;
-wire [2:0]    decode_funct3;
-wire [6:0]    decode_funct7;
 
 wire [4:0]    decode_rs1;
 wire [4:0]    decode_rs2;
@@ -111,11 +109,6 @@ wire [31:0] EX_inst_out;
 wire [31:0] EX_pc_out;
 wire [31:0] EX_pc_p4_out;
 // data
-wire [31:0] EX_reg_rd_data1_out;
-wire [31:0] EX_reg_rd_data2_out;
-wire [31:0] EX_freg_rd_data1_out;
-wire [31:0] EX_freg_rd_data2_out;
-wire [31:0] EX_freg_rd_data3_out;
 wire [31:0] EX_imm_out;
 // reg addr
 wire [4:0]  EX_rd_out;
@@ -144,6 +137,7 @@ wire EX_is_csr_out;
 wire [2:0] EX_csr_op_out;
 wire EX_is_csr_imm_out;
 wire [11:0] EX_csr_addr_out;
+wire [31:0] csr_satp_out;
 // FPU
 wire EX_is_f_ext;
 wire EX_is_fpu_out;
@@ -155,12 +149,10 @@ wire EX_fetch_invalid_out;
 
 wire EX_start, EX_done;
 // ALU ========================
-wire ALU_start, ALU_done;
 wire [31:0] ALU_out;
 
 // BranchCmp ==================
-wire Br_start, Br_done;
-wire br_taken; // indicate any branch happen (trigger by inst, csr unit)
+wire br_taken; // indicate inst branch
 
 // MUL/DIV ====================
 wire MUL_DIV_start, MUL_DIV_done;
@@ -169,23 +161,52 @@ wire [31:0] MUL_DIV_out;
 // LSU =========================
 wire LSU_start, LSU_done;
 
+wire [31:0] lsu_mmu_addr;
+wire [31:0] lsu_mmu_data;
+wire        lsu_mmu_rd;
+wire        lsu_mmu_wr;
+wire [ 3:0] lsu_mmu_mask;
+wire        lsu_mmu_dflush;
+wire        lsu_mmu_dinvalidafte;
+wire        lsu_mmu_dwriteback;
+wire [31:0] lsu_writeback_value_o;
+wire        lsu_writeback_valid_o;
+wire [ 5:0] lsu_exception_o;
+
+// MMU =========================
+wire [31:0] mmu_sapt;
+wire [31:0] mmu_fetch_value;
+wire        mmu_fetch_valid;
+wire        mmu_inst_fault;
+wire [31:0] mmu_lsu_data;
+wire        mmu_lsu_valid;
+wire        mmu_lsu_load_fault;
+wire        mmu_lsu_store_fault;
+wire [31:0] mmu_dcache_addr;    
+wire [31:0] mmu_dcache_data;
+wire        mmu_dcache_rd;
+wire        mmu_dcache_wr;
+wire [ 3:0] mmu_dcache_mask;
+wire        mmu_dcache_flush;
+wire        mmu_dcache_writeback;
+wire        mmu_dcache_invalidate;
+wire [31:0] mmu_icache_addr;
+wire        mmu_icache_rd;
+
+wire        icache_mmu_valid_in;
+
 // CSR =========================
 wire SYS_start, SYS_done;
 wire [31:0] csr_pc_target;
 wire [31:0] csr_rd_data; // output of CSRFile
-wire [31:0] csr_wr_data; // output of CSR
-wire        csr_wr_en;
-wire [1:0]  csr_priv;
 wire [`EXCEPTION_W-1:0] csr_exception;
 wire        csr_br_taken;
-wire [31:0] csr_mstatus;
 wire [31:0] csr_interrupt;
 // FPU =========================
 wire FPU_start, FPU_done;
 wire [31:0] FPU_out; // output of FPU
 
 // ByPass ======================
-wire bypass_start, bypass_done;
 wire [31:0] bypass_out;
 
 // WB_Reg =====================
@@ -201,24 +222,15 @@ wire        WB_reg_wr_en_out;
 wire        WB_freg_wr_en_out;
 
 // Forward ====================
-wire EX_fwd1_sel;
-wire EX_fwd2_sel;
-wire EX_freg_fwd_sel1;
-wire EX_freg_fwd_sel2;
-wire EX_freg_fwd_sel3;
 wire [31:0] EX_fwd_data1;
 wire [31:0] EX_fwd_data2;
 
-// Hazerd =====================
-wire [3:0] stall;
-
 //componets
 //================================================================
+wire br_flush;
 
 PipelineCtrl m_PipelineCtrl(
-    .clk(clk),
-    .rst_n(rst_n),
-    .br_taken(br_taken),
+    .br_flush(br_flush),
     
     .EX_stall(!EX_done),
 
@@ -231,40 +243,41 @@ PipelineCtrl m_PipelineCtrl(
     .WB_clear(WB_clear)
 );
 
-ForwardUnit m_Forward(
-    .EX_rs1(EX_rs1_out),
-    .EX_rs2(EX_rs2_out),
-    .EX_rs3(EX_rs3_out),
-    
-    .WB_rd(WB_rd_out),
-    .WB_reg_wr_en(WB_reg_wr_en_out),
-    .WB_freg_wr_en(WB_freg_wr_en_out),
-    
-    .EX_fwd_sel1(EX_fwd1_sel),
-    .EX_fwd_sel2(EX_fwd2_sel),
-    .EX_freg_fwd_sel1(EX_freg_fwd_sel1),
-    .EX_freg_fwd_sel2(EX_freg_fwd_sel2),
-    .EX_freg_fwd_sel3(EX_freg_fwd_sel3)
-);
-
 // ================================
 // Instruction Fetch stage
+wire [31:0] bp_nx_pc_out;
+wire [31:0] bp_pred_target_out;
+wire [31:0] ID_bp_pred_target_out;
+wire [31:0] EX_bp_pred_target_out;
+wire bp_pred_taken_out;
+wire ID_bp_pred_taken_out;
+wire EX_bp_pred_taken_out;
 
-PC m_PC(
-    .clk(clk),
-    .rst_n(rst_n),
-    .en(pc_en),
-    .pc_i(pc_in),
-    .pc_o(pc_out)
-);
-assign pc_p4 = pc_out+4;
+Fetch m_Fetch(
+     .clk(clk)
+    ,.rst_n(rst_n) 
+    ,.en(pc_en)
+    
+    ,.EX_pc_i(EX_pc_out)
 
-Mux3to1 #(.size(32)) m_PC_MUX(
-    .sel(pc_sel),
-    .s0(pc_p4),
-    .s1(ALU_out),
-    .s2(csr_pc_target),
-    .out(pc_in)
+    ,.EX_bp_pred_taken_i(EX_bp_pred_taken_out)
+    ,.EX_bp_pred_pc_i(EX_bp_pred_target_out)
+
+    ,.EX_is_br_i(EX_is_br_out)
+    ,.EX_br_taken_i(br_taken) // inst br taken
+    ,.EX_br_target_i(ALU_out)
+    ,.EX_pc_p4_i(EX_pc_p4_out)
+    
+    ,.EX_csr_br_taken_i(csr_br_taken)
+    ,.EX_csr_br_target_i(csr_pc_target)
+// output
+    ,.br_flush_o(br_flush)
+
+    ,.bp_pred_taken_o(bp_pred_taken_out)
+    ,.bp_pred_target_o(bp_pred_target_out)
+    
+    ,.pc_o(pc_out)
+    ,.pc_p4_o(pc_p4)
 );
 
 Decode m_ID(
@@ -276,12 +289,18 @@ Decode m_ID(
 
     .pc_i(pc_out),
     .pc_p4_i(pc_p4),
+    // .inst_i(mmu_fetch_value),
     .inst_i(inst),
+
+    .bp_pred_taken_i(bp_pred_taken_out),
+    .bp_pred_target_i(bp_pred_target_out),
     
     .pc_valid_o(ID_pc_valid_out),
     .pc_o(ID_pc_out),
     .pc_p4_o(ID_pc_p4_out),
     .inst_o(ID_inst_out),
+    .bp_pred_taken_o(ID_bp_pred_taken_out),
+    .bp_pred_target_o(ID_bp_pred_target_out),
 
     .rs1_o(decode_rs1),
     .rs2_o(decode_rs2),
@@ -376,6 +395,8 @@ Exec m_EX(
     .inst_i(ID_inst_out),
     .pc_i(ID_pc_out),
     .pc_p4_i(ID_pc_p4_out),
+    .bp_pred_taken_i(ID_bp_pred_taken_out),
+    .bp_pred_target_i(ID_bp_pred_target_out),
     // data
     .reg_rd_data1_i(reg_data1_out),
     .reg_rd_data2_i(reg_data2_out),
@@ -432,6 +453,8 @@ Exec m_EX(
     .inst_o(EX_inst_out),
     .pc_o(EX_pc_out),
     .pc_p4_o(EX_pc_p4_out),
+    .bp_pred_taken_o(EX_bp_pred_taken_out),
+    .bp_pred_target_o(EX_bp_pred_target_out),
     // data
     .reg_fwd_data1_o(EX_fwd_data1),
     .reg_fwd_data2_o(EX_fwd_data2),
@@ -455,7 +478,7 @@ Exec m_EX(
     // Branch
     .is_j_o(EX_is_j_out),
     .is_br_o(EX_is_br_out),
-    .cmp_op_o(EX_cmp_op_out),
+    .br_taken_o(br_taken),
     // ALU
     .ALU_ctrl_o(EX_ALU_ctrl_out),
     .ALU_o(ALU_out),
@@ -484,7 +507,6 @@ Exec m_EX(
     ,.FPU_start_o(FPU_start)
     ,.LSU_start_o(LSU_start)
 
-    ,.Br_done_i(Br_done)
     ,.MUL_DIV_done_i(MUL_DIV_done)
     ,.FPU_done_i(FPU_done)
     ,.LSU_done_i(LSU_done)
@@ -492,22 +514,6 @@ Exec m_EX(
 
     ,.EX_done_o(EX_done)
 );
-
-// Branch ======================
-assign Br_start  = EX_start && (EX_is_br_out || EX_is_j_out); // only deal with inst br
-BranchUnit m_BranchUnit(
-    .is_br(EX_is_br_out),
-    .is_j(EX_is_j_out),
-    .is_csr_br(csr_br_taken),
-
-    .cmp_op(EX_cmp_op_out),
-    .reg_rd_data1(EX_fwd_data1),
-    .reg_rd_data2(EX_fwd_data2),
-    
-    .br_taken(br_taken),
-    .pc_sel(pc_sel)
-);
-assign Br_done = Br_start;
 
 // MUL/DIV =====================
 MUL_DIV_top m_MUL_DIV_top(
@@ -525,7 +531,7 @@ MUL_DIV_top m_MUL_DIV_top(
 
 // FPU =========================
 wire [4:0] FPU_flags;
-FPU_Top m_FPU(
+FPU_top m_FPU(
     .clk(clk),
     .rst_n(rst_n),
     .FPU_start(FPU_start),
@@ -545,38 +551,85 @@ FPU_Top m_FPU(
 );
 
 // LSU =========================
-// not implemented yet, a simple one is used
-reg MEM_mem_wr_en_out;
-reg MEM_mem_rd_en_out;
-reg [3:0] MEM_mem_ctrl_out;
-reg [31:0] MEM_mem_addr_out;
-reg [31:0] MEM_mem_wr_data_out;
-reg MEM_stage_reg;
-assign d_mem_ctrl = MEM_mem_ctrl_out;
-assign d_mem_wr_en = MEM_mem_wr_en_out;
-assign d_mem_rd_en = MEM_mem_rd_en_out;
-assign d_mem_addr = MEM_mem_addr_out;
-assign d_mem_wr_data = MEM_mem_wr_data_out;
+assign LSU_done = lsu_writeback_valid_o;
 
-always @(posedge clk) begin
-    if(LSU_start) begin
-        MEM_mem_wr_en_out <= EX_mem_wr_en_out;
-        MEM_mem_rd_en_out <= EX_mem_rd_en_out;
-        MEM_mem_ctrl_out <= EX_mem_ctrl_out;
-        MEM_mem_addr_out <= (EX_fwd_data1 + EX_imm_out);
-        MEM_mem_wr_data_out <= (EX_mem_ctrl_out[3] & EX_mem_wr_en_out) ? EX_freg_fwd_data2 : EX_fwd_data2;
-        MEM_stage_reg <= 1;
-    end
-    else begin
-        MEM_mem_wr_en_out <= 0;
-        MEM_mem_rd_en_out <= 0;
-        MEM_mem_ctrl_out <= 0;
-        MEM_mem_addr_out <= 0;
-        MEM_mem_wr_data_out <= 0;
-        MEM_stage_reg <= 0;
-    end
-end
-assign LSU_done = MEM_stage_reg;
+lsu #( .DEPTH(2) ) 
+u_lsu (
+    .clk_i             (clk),
+    .rst_i             (rst_n),
+    .opcode_opcode_i   (EX_inst_out),
+    .opcode_ra_data_i  (EX_fwd_data1),
+    .opcode_rb_data_i  (EX_fwd_data2),
+    .opcode_fp_data_i  (EX_freg_fwd_data2),
+    .opcode_valid_i    (LSU_start),
+    .ex_mem_imm_i      (EX_imm_out),
+    .ex_mem_rd_i       (EX_mem_rd_en_out),
+    .ex_mem_wr_i       (EX_mem_wr_en_out),
+    .ex_mem_ctrl_i     (EX_mem_ctrl_out),
+    .mmu_value_i       (mmu_lsu_data),
+    .mmu_valid_i       (mmu_lsu_valid),
+    .mmu_load_fault    (mmu_lsu_load_fault),
+    .mmu_store_fault   (mmu_lsu_store_fault),
+    .mmu_addr_o        (lsu_mmu_addr),
+    .mmu_data_o        (lsu_mmu_data),
+    .mmu_rd_o          (lsu_mmu_rd),
+    .mmu_wr_o          (lsu_mmu_wr),
+    .mmu_mask_o        (lsu_mmu_mask),
+    .mmu_dflush_o      (lsu_mmu_dflush),
+    .mmu_dinvalidate_o (lsu_mmu_dinvalidafte),
+    .mmu_dwriteback_o  (lsu_mmu_dwriteback),
+    .writeback_value_o (lsu_writeback_value_o),
+    .writeback_valid_o (lsu_writeback_valid_o),
+    .exception_o       (lsu_exception_o)
+);
+
+// // MMU =========================
+wire fetch_rd_f = 1;
+
+// assign i_mem_addr = mmu_icache_addr;
+assign d_mem_ctrl = mmu_dcache_mask;
+assign d_mem_wr_en = mmu_dcache_wr;
+assign d_mem_rd_en = mmu_dcache_rd;
+assign d_mem_addr = mmu_dcache_addr;
+assign d_mem_wr_data = mmu_dcache_data;
+
+mmu #(.MMU_SUPPORT(1))
+u_mmu(
+    .clk_i               (clk),
+    .rst_i               (rst_n),
+    .satp_i              (csr_satp_out),
+    .fetch_pc_i          (pc_out),
+    .fetch_rd_i          (fetch_rd_f), 
+    .lsu_in_addr_i       (lsu_mmu_addr),
+    .lsu_in_data_i       (lsu_mmu_data),
+    .lsu_in_rd_i         (lsu_mmu_rd),
+    .lsu_in_wr_i         (lsu_mmu_wr),
+    .lsu_in_mask_i       (lsu_mmu_mask),
+    .lsu_in_flush_i      (lsu_mmu_dflush),
+    .lsu_in_invalidate_i (lsu_mmu_dinvalidafte),
+    .lsu_in_writeback_i  (lsu_mmu_dwriteback),
+    .dcache_in_value_i   (d_mem_rd_data),
+    .dcache_in_valid_i   (d_mem_available),
+    .icache_in_value_i   (inst),
+    .icache_in_valid_i   (i_mem_available),
+    .fetch_out_value_o   (mmu_fetch_value),
+    .fetch_out_valid_o   (mmu_fetch_valid),
+    .lsu_out_value_o     (mmu_lsu_data),
+    .lsu_out_valid_o     (mmu_lsu_valid),
+    .dcache_addr_o       (mmu_dcache_addr),
+    .dcache_value_o      (mmu_dcache_data),
+    .dcache_rd_o         (mmu_dcache_rd),
+    .dcache_wr_o         (mmu_dcache_wr),
+    .dcache_mask_o       (mmu_dcache_mask),
+    .dcache_flush_o      (mmu_dcache_flush),
+    .dcache_invalidate_o (mmu_dcache_invalidate),
+    .dcache_writeback_o  (mmu_dcache_writeback),
+    .icache_addr_o       (mmu_icache_addr),
+    .icache_rd_o         (mmu_icache_rd),
+    .load_fault_o        (mmu_lsu_load_fault),
+    .store_fault_o       (mmu_lsu_store_fault),
+    .inst_fault_o        (mmu_inst_fault)
+);
 
 // CSR =========================
 assign SYS_start = EX_start && (
@@ -584,56 +637,36 @@ assign SYS_start = EX_start && (
     ((csr_exception&`EXCEPTION_TYPE_MASK)==`EXCEPTION_EXCEPTION) ||
     csr_br_taken
 );
-wire [31:0] csr_rd_data_xtval;
 CSR m_CSR(
+    .clk(clk),
+    .rst_n(rst_n),
     .inst(EX_inst_out),
     .inst_valid(!EX_pc_valid_out || EX_is_impl_out),
+    
     .csr_op_i(EX_csr_op_out),
     .is_csr_i(EX_is_csr_out),
     .is_csr_imm_i(EX_is_csr_imm_out),
-    .cur_priv_i(csr_priv),
     .rs1_i(EX_rs1_out),
     .imm_i(EX_imm_out),
     .reg_rd_data1_i(EX_fwd_data1),
-    .csr_old_i(csr_rd_data),
+    
     .is_fpu_done_i(FPU_done),
     .fpu_flags_i(FPU_flags),
     .is_f_ext_i(EX_is_f_ext),
-    .mstatus_i(csr_mstatus),
     .csr_wr_addr_i(EX_csr_addr_out),
-
-    .csr_rd_data_o(csr_rd_data_xtval),
-    .csr_wr_valid_o(csr_wr_en),
-    .csr_wr_data_o(csr_wr_data),
-    .csr_exception_o(csr_exception)
-);
-
-CSRFile m_CSRFile(
-    .clk(clk),
-    .rst_n(rst_n),
-
-    .cpu_id_i(0),
-    .misa_i(`MISA_RV32 | `MISA_RVU | `MISA_RVI | `MISA_RVM | `MISA_RVF),
-
-    .exception_i(csr_exception),
+    
     .exception_pc_i(EX_pc_out),
-    .exception_addr_i(0),
-
     .csr_rd_addr_i(EX_csr_addr_out),
-    .csr_rd_data_o(csr_rd_data),
-
-    .csr_wr_en_i(csr_wr_en),
-    .csr_wr_addr_i(EX_csr_addr_out),
-    .csr_wr_data_i(csr_wr_data),
 
     .csr_branch_o(csr_br_taken),
     .csr_target_o(csr_pc_target),
-
-    .priv_o(csr_priv),
-    .mstatus_o(csr_mstatus),
     .interrupt_o(csr_interrupt),
-    .satp_o()
+    .csr_exception_o(csr_exception),
+    
+    .csr_rd_data_o(csr_rd_data),
+    .csr_satp_o(csr_satp_out)
 );
+
 assign SYS_done = SYS_start;
 
 //================================
@@ -655,7 +688,7 @@ Writeback m_WB(
     .ALU_i(ALU_out),
     .MUL_DIV_i(MUL_DIV_out),
     .FPU_i(FPU_out),
-    .mem_data_i(d_mem_rd_data),
+    .mem_data_i(lsu_writeback_value_o),
     .csr_rd_data_i(csr_rd_data),
     
     // control_in

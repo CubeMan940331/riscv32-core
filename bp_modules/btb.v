@@ -1,24 +1,25 @@
+/* verilator lint_off BLKLOOPINIT */
 module btb
 //Params
 #(
-    parameter INDEX_BITS = 8,
+    parameter INDEX_BITS = 11,
     parameter TAG_BITS = 12,
     parameter BTB_SIZE = 1 << INDEX_BITS
 )
 //Ports
 (
     //Input
-     input              clk_i
-    ,input              rst_i
-    ,input  [31:0]      pc_f_i
-    ,input              update_en_i
-    ,input  [31:0]      update_pc_i
-    ,input              update_taken_i
-    ,input  [31:0]      update_target_i
-    
+     input              clk,
+     input              rst_n,
+     input  [31:0]      pc_f_i,
+     input              update_en_i,
+     input  [31:0]      update_pc_i,
+     input              update_taken_i,
+     input  [31:0]      update_target_i,
+
     //Output
-    ,output             hit_o
-    ,output [31:0]      target_o
+     output             hit_o,
+     output [31:0]      target_o
 );
 
     reg valid_ram [0:BTB_SIZE-1];
@@ -33,11 +34,11 @@ module btb
     
     assign hit_o = valid_ram[fetch_index] && (tag_ram[fetch_index] == fetch_tag);
     assign target_o = hit_o ? target_ram[fetch_index] : 32'b0;
-    
+
     integer i;
 
-    always @(posedge clk_i or posedge rst_i) begin
-        if (rst_i) begin
+    always @(posedge clk or negedge rst_n) begin
+        if (~rst_n) begin
             for (i = 0; i < BTB_SIZE; i = i + 1) begin
                 valid_ram[i] <= 1'b0;
                 target_ram[i] <= 32'b0;
@@ -49,6 +50,5 @@ module btb
             valid_ram[update_index] <= 1'b1;
         end
     end
-    
 
 endmodule
