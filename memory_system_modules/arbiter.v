@@ -38,16 +38,15 @@ module arbiter(
     output reg [255:0] d_rd_data_o,
     output reg d_mem_rdy_o,
 
-    // monitor
-	output [2:0] arb_cs,
-	output [2:0] arm_cs,
-    
     // i cache
     input [31:0] i_addr_i,
     input i_req_rd_i,
     output reg i_rd_end_o,
     output reg [255:0] i_rd_data_o,
     output reg i_mem_rdy_o,
+	
+	//mem_init_complete
+	output mem_init_complete_o,
     
 	///////////////
     // MIG ports //
@@ -70,13 +69,7 @@ module arbiter(
     input        app_rd_data_end,
     input        app_rd_data_valid
 );
-    //////////////////////////////////////////////////////////////////
-	//   issue request to MIG (READ回傳的訊息另外處理，加速資料傳輸效率)  //
-    //////////////////////////////////////////////////////////////////
-	assign arb_cs = cs;
-	assign arm_cs = RMCS;
 	
-	//還沒處理rd_end訊號
 	parameter INIT = 0;
 	parameter LOAD = 1;
     parameter IDLE = 2;
@@ -95,6 +88,9 @@ module arbiter(
         else
             cs <= 0;
     end
+	
+	assign mem_init_complete_o = (cs != LOAD)& (cs != INIT);
+	
 	// i cache和D cache實現邏輯不一樣
     // i cache 先判 rdy，才會動作              => rdy用於確認可以發送指令
     // d cache 先發request，然後等rdy回來再動作 => rdy用於確認動作完成
@@ -132,8 +128,8 @@ module arbiter(
                             ns = IDLE;
                         else
                             ns = LOAD;
-                        app_en = 1; //發送請求給MIG
-                        app_cmd = 3'b000; //寫命令
+                        app_en = 1; 
+                        app_cmd = 3'b000; 
                         app_wdf_wren = 1;
                         app_wdf_end = init_end_i; 
                     end
@@ -249,116 +245,10 @@ module arbiter(
     end
 	
 	
-	// deal with RD issue //
-	// worst case : I/d同時要讀取mem ?還是直接用的FSM寫??
-    //還沒處理讀訊號
 	parameter RM_IDLE = 0, RM_I0 = 1, RM_I1 = 2, RM_D0 = 3, RM_D1 = 4, RM_ID = 5, RM_DI = 6;
-	reg [2:0]RMCS,RMNS;
+	reg [2:0]RMCS;
 	
 	reg [127:0] data_temp;
-	
-	
-	// always@(posedge clk or negedge rst_n)begin
-		// if(!rst_n)
-			// RMCS <= RM_IDLE;
-		// else
-			// RMCS <= RMNS;
-	// end
-	
-	// reg iWait,dWait;
-	// always@(*)begin
-		// iWait = iWait;
-		// dWait = dWait;
-        
-        // d_rd_end_o = d_rd_end_o;
-        // i_rd_end_o = i_rd_end_o;
-        
-        // data_temp = data_temp;
-        // d_rd_data_o = 0;
-        // i_rd_data_o = 0;
-		// case(RMCS)
-			// RM_IDLE : begin
-						// iWait = 0;
-						// dWait = 0;
-
-                        // data_temp = 0;
-                        // d_rd_data_o = 0;
-                        // i_rd_data_o = 0;
-
-						// if(cs != I_RM && ns == I_RM)begin
-							// RMNS = RM_I0;
-						// end
-						// else if(cs != D_RM && ns == D_RM)begin
-							// RMNS = RM_D0;
-						// end
-						// else begin
-							// RMNS =RM_IDLE;
-						// end
-			// end
-			// RM_I0	:	begin
-						// iWait = 0;
-                        // data_temp = data_temp;
-						// if(app_rd_data_end && app_rd_data_valid)begin
-							// RMNS = RM_I1;
-                            // data_temp = app_rd_data;
-						// end
-						// else 
-							// RMNS = RM_I0;
-						
-						// if(cs != D_RM && ns == D_RM)
-							// dWait = 1;
-						// else
-							// dWait = dWait;				
-			// end
-			// RM_I1	:	begin
-						// iWait = 0;
-						// data_temp = data_temp;
-                        // i_rd_data_o = {app_rd_data, data_temp};
-						// if(app_rd_data_end && app_rd_data_valid)begin
-							// RMNS = dWait ? RM_D0 : IDLE;
-                            // i_rd_end_o =  1;
-						// end
-						// else
-							// RMNS = RM_I1;
-							
-						// if(cs != D_RM && ns == D_RM)
-							// dWait = 1;
-						// else
-							// dWait = dWait;	
-			// end
-			// RM_D0	:	begin
-						// dWait = 0;
-                        // data_temp = data_temp;
-						// if(app_rd_data_end && app_rd_data_valid)begin
-							// RMNS = RM_D1;
-                            // data_temp = app_rd_data;
-						// end
-						// else
-							// RMNS = RM_D0;
-							
-						// if(cs != I_RM && ns == I_RM)
-							// iWait = 1;
-			// end
-			// RM_D1	:	begin
-						// dWait = 0;
-						// data_temp = data_temp;
-                        // d_rd_data_o = {app_rd_data, data_temp};
-						// if(app_rd_data_end && app_rd_data_valid)begin
-							// RMNS = iWait ? RM_D0 : RM_IDLE;
-                            // d_rd_end_o = 1;
-						// end
-						// else
-							// RMNS = RM_D1;
-							
-						// if(cs != I_RM && ns == I_RM)
-							// iWait = 1;
-						// else
-							// iWait = iWait;	
-			// end
-			// default	: RMNS = RM_IDLE;
-		// endcase
-	// end
-	
 	reg iWait,dWait;
 	always@(posedge clk or negedge rst_n)begin
 		if(!rst_n)

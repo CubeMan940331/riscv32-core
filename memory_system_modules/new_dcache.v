@@ -33,31 +33,24 @@ module new_dcache(
     input cpu_req_wr,
     input cpu_req_rd,
 	output reg [31:0]cpu_data_o,
-    //output reg cpu_stall_o, //還沒定義，不知道會不會用到，用於I cache已經占用DDR2且D cache也需要用到DDR2，需要先Stall訊號等待I cahce完成，但這應該是交由更上層決定
-    output dcache_rdy_o, //通知CPU不能再塞rd/wr指令
+    output dcache_rdy_o, 
 	
 	// MMU interface
 	input invalidate_i,
-	input flush_i, //要不要新增中斷功能?FSM有寫，但實際沒做握手訊號
+	input flush_i, 
 	input writeback_i,
-
-	// monitor
-	output [2:0]d_cs,
-	output d_hit,
 
 	// mem interface //
 	input mem_init_complete_i,
-    input mem_rdy_i, //有沒有必要給mem_rdy以外的訊號? 此訊號由仲裁器去給
-	input [255:0]mem_data_i, //分批整合交由其他cell處理
-	output reg wr_mem_end_o, //這個可能不用
+    input mem_rdy_i, 
+	input [255:0]mem_data_i, 
+	output reg wr_mem_end_o,
 	input rd_mem_end_i,
     output reg req_wr_mem,
     output reg req_rd_mem,
     output reg [31:0]mem_addr_o,
     output reg [255:0]mem_data_o
 );  
-    assign d_cs = cs;
-    assign d_hit = hit;
     
     
 	// way parameter //
@@ -181,19 +174,11 @@ module new_dcache(
 						ns = do_wb ? IDLE : RM;
 					else
 						ns = WM;
-			// WMEND :	if(mem_rdy_i)
-						// ns = do_wb ? IDLE : RM;
-					// else
-						// ns = WMEND;
-			RM : 	if(flush_i)			//發請求
-						ns = WMALL;
-					else if(mem_rdy_i)
+			RM : 	if(mem_rdy_i)
 						ns = RMEND;
 					else
 						ns = RM;
-			RMEND : if(flush_i)			//接收
-						ns = WMALL;
-					else if(rd_mem_end_i)
+			RMEND : if(rd_mem_end_i)
 						ns = RECOMP;
 					else 
 						ns = RMEND;
@@ -205,16 +190,6 @@ module new_dcache(
 						ns = wr_mem_end_o ? IDLE : WMALL;
 					else
 						ns = WMALL;
-			// WMALLEND:if(wm_all_end)
-						// ns = IDLE;
-					 // else if(mem_rdy_i)
-						// ns = WMALL;
-					 // else
-						// ns = WMALL;
-			// ABANDON:if(clean_end)
-						// ns = IDLE;
-					// else
-						// ns = ABANDON;
 			default:ns = IDLE;
 		endcase
 	end
@@ -409,7 +384,7 @@ module new_dcache(
 				wr_dty = 0;
 				dty_i = 0; end
 		end
-		else if(cs == WM)begin //沒必要驗 mem_rdy_i
+		else if(cs == WM)begin 
 			wr_vld = 0;
 			vld_i = 0;
 			wr_dty = lru ? 2'b10 : 2'b01;
@@ -430,11 +405,6 @@ module new_dcache(
 				vld_i =  0;
 				wr_dty = 0;
 				dty_i =  0; end			
-		// else if(cs == ABANDON)begin
-			// wr_vld = 1;
-			// vld_i =  0;
-			// wr_dty = 0;
-			// dty_i =  0; end
 		end
 		else begin
 				wr_vld = 0;
@@ -448,7 +418,6 @@ module new_dcache(
     // instance construction //
     lru_1b lru_arr(clk, do_lru, cache_idx_i, lru);
 	
-	//需要補上wr_vld, wr_dty, vld_i, dty_i
     way_32Bx512 way0(
         .clk(clk),
         .cpu_wr(cpu_wr[0]),

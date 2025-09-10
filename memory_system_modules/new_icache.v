@@ -27,12 +27,8 @@ module new_icache(
     input [7:0]idx_i,
     input [4:0]ofs_i,
     input invalidate_i,
-    output reg icache_rdy_o, //給CPU端看的
+    output reg icache_rdy_o,
     output reg [31:0]cpu_inst_o,
-	
-	// monitor
-	output i_cs,
-	output i_hit,
 	
 	// mem interface
     input [255:0]mem_data_i,
@@ -42,8 +38,6 @@ module new_icache(
     output reg req_rd_mem_o,
     output reg [31:0]mem_addr_o
 );
-    assign i_cs = cs;
-    assign i_hit = hit;
     
     // parameter def //
     reg fifo_en;
