@@ -12,7 +12,7 @@ module gshare_bht
      input              clk,
      input              rst_n,
      input  [31:0]      pc_f_i,
-     input              update_en_i,
+     input  [ 1:0]      update_en_i,
      input  [31:0]      update_pc_i,
      input              update_taken_i,
     
@@ -36,7 +36,7 @@ module gshare_bht
             for (i = 0; i < BHT_SIZE; i = i + 1) begin
                 bht[i] <= 2'b00;
             end
-        end else if (update_en_i) begin
+        end else if (update_en_i == 1) begin
             case(bht[update_index])
                 2'b11: bht[update_index] <= update_taken_i ? 2'b11 : 2'b10;
                 2'b10: bht[update_index] <= update_taken_i ? 2'b11 : 2'b01;
