@@ -10,6 +10,7 @@ module Fetch (
     ,input [31:0] EX_bp_pred_pc_i
     
     ,input EX_is_br_i
+    ,input EX_is_j_i
     ,input EX_br_taken_i
     ,input [31:0] EX_br_target_i
     ,input [31:0] EX_pc_p4_i
@@ -35,7 +36,7 @@ BP_top m_bp(
     ,.pc_f_i(pc_o)
 
     ,.pc_ex_i(EX_pc_i)
-    ,.is_branch_i(EX_is_br_i)
+    ,.inst_type_i(inst_type_r)
     ,.branch_taken_ex_i(EX_br_taken_i)
     ,.branch_target_ex_i(EX_br_target_i)
 
@@ -57,6 +58,14 @@ always @(*) begin
     if(EX_csr_br_taken_i) EX_pc_nx_r = EX_csr_br_target_i;
     else if(EX_br_taken_i) EX_pc_nx_r = EX_br_target_i;
     else EX_pc_nx_r = EX_pc_p4_i;
+end
+
+//EX inst type
+reg [1:0] inst_type_r;
+always @(*) begin
+    if(EX_is_j_i) inst_type_r = 2;
+    else if(EX_is_br_i) inst_type_r = 1;
+    else inst_type_r = 0;
 end
 
 // br_flush logic

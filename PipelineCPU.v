@@ -260,6 +260,7 @@ Fetch m_Fetch(
     ,.EX_bp_pred_pc_i(EX_bp_pred_target_out)
 
     ,.EX_is_br_i(EX_is_br_out)
+    ,.EX_is_j_i(EX_is_j_out)
     ,.EX_br_taken_i(br_taken) // inst br taken
     ,.EX_br_target_i(ALU_out)
     ,.EX_pc_p4_i(EX_pc_p4_out)
