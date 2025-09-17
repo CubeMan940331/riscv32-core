@@ -197,7 +197,7 @@ wire        icache_mmu_valid_in;
 
 // CSR =========================
 wire SYS_start, SYS_done;
-wire [31:0] csr_pc_target;
+wire [31:0] csr_br_target;
 wire [31:0] csr_rd_data; // output of CSRFile
 wire [`EXCEPTION_W-1:0] csr_exception;
 wire        csr_br_taken;
@@ -269,7 +269,7 @@ Fetch m_Fetch(
     ,.EX_pc_p4_i(EX_pc_p4_out)
     
     ,.EX_csr_br_taken_i(csr_br_taken)
-    ,.EX_csr_br_target_i(csr_pc_target)
+    ,.EX_csr_br_target_i(csr_br_target)
 // output
     ,.br_flush_o(br_flush)
 
@@ -659,7 +659,7 @@ CSR m_CSR(
     .csr_rd_addr_i(EX_csr_addr_out),
 
     .csr_branch_o(csr_br_taken),
-    .csr_target_o(csr_pc_target),
+    .csr_target_o(csr_br_target),
     .interrupt_o(csr_interrupt),
     .csr_exception_o(csr_exception),
     
