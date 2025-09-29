@@ -185,7 +185,7 @@ wire buffer_mip_w = (csr_rd_addr_i == `CSR_MIP) | csr_mip_upd_q;
 //-----------------------------------------------------------------
 reg [31:0] csr_rd_data_r;
 always @(*) begin
-    case (csr_rd_addr_i)
+    casez (csr_rd_addr_i)
     // CSR - Machine
         `CSR_MHARTID:   csr_rd_data_r = cpu_id_i;
         // Trap Setup
@@ -202,6 +202,9 @@ always @(*) begin
         `CSR_MCAUSE:    csr_rd_data_r = csr_mcause_q & `CSR_MCAUSE_MASK;
         `CSR_MTVAL:     csr_rd_data_r = csr_mtval_q & `CSR_MTVAL_MASK;
         `CSR_MIP:       csr_rd_data_r = csr_mip_q & `CSR_MIP_MASK;
+        // Memory Protection
+        `CSR_PMPCFG:    csr_rd_data_r = csr_pmpcfg_q[csr_rd_addr_i[3:0]] & `CSR_PMPCFG_MASK;
+        `CSR_PMPADDR:   csr_rd_data_r = csr_pmpaddr_q[csr_rd_addr_i[5:0]];
         // Counter/Timers
         `CSR_MCYCLE,    
         `CSR_MTIME:     csr_rd_data_r = csr_mcycle_q;
@@ -289,6 +292,7 @@ reg        csr_mtime_ie_r;
     // SATP
 reg [31:0] csr_satp_r;
 
+integer i;
 always @(*) begin
     // privilege level
     csr_priv_r = csr_priv_q;
@@ -307,6 +311,14 @@ always @(*) begin
     csr_mtval_r     = csr_mtval_q;
     csr_mip_r       = csr_mip_q;
     csr_mip_next_r  = csr_mip_next_q;
+
+    // Memory Protection
+    for (i=0; i<16; i=i+1) begin
+        csr_pmpcfg_r[i]  = csr_pmpcfg_q[i];
+    end
+    for (i=0; i<64; i=i+1) begin
+        csr_pmpaddr_r[i] = csr_pmpaddr_q[i];
+    end
 
     // Counter/Timers
     csr_mcycle_r    = csr_mcycle_q + 32'd1;
@@ -390,7 +402,7 @@ always @(*) begin
         csr_fflags_r = csr_wr_data_i & `CSR_FFLAGS_MASK;
     // normal write operation WL
     end else if(csr_wr_en_i) begin
-        case(csr_wr_addr_i)
+        casez(csr_wr_addr_i)
         // CSR - Machine
             // Trap Setup
             `CSR_MSTATUS: csr_mstatus_r   = {csr_wr_data_i[31:13], (csr_wr_data_i[12:11] == 2'b11) ? 2'b11 : 2'b00, csr_wr_data_i[10:0]} & `CSR_MSTATUS_MASK;
@@ -404,6 +416,13 @@ always @(*) begin
             `CSR_MCAUSE:  csr_mcause_r    = csr_wr_data_i & `CSR_MCAUSE_MASK;
             `CSR_MTVAL:   csr_mtval_r     = csr_wr_data_i & `CSR_MTVAL_MASK;
             `CSR_MIP:     csr_mip_r       = csr_wr_data_i & `CSR_MIP_MASK;
+            // Memory Protection
+                // PMP Configuration
+            `CSR_PMPCFG:
+                csr_pmpcfg_r[csr_wr_addr_i[3:0]] = csr_wr_data_i & `CSR_PMPCFG_MASK;
+                // PMP Address
+            `CSR_PMPADDR:
+                csr_pmpaddr_r[csr_wr_addr_i[5:0]] = csr_wr_data_i;
             // Floating Point
             `CSR_FFLAGS:  csr_fflags_r    = csr_wr_data_i & `CSR_FFLAGS_MASK;
             `CSR_FRM:     csr_frm_r       = csr_wr_data_i & `CSR_FRM_MASK;
@@ -461,6 +480,13 @@ always @(posedge clk or negedge rst_n) begin
         csr_mtval_q    <= 32'b0;
         csr_mip_q      <= 32'b0;
         csr_mip_next_q <= 32'b0;
+            // Memory Protection
+        for (i=0; i<16; i=i+1) begin
+            csr_pmpcfg_q[i]  <= 32'b0;
+        end
+        for (i=0; i<64; i=i+1) begin
+            csr_pmpaddr_q[i] <= 32'b0;
+        end
             // Counter/Timers
         csr_mcycle_q   <= 32'b0;
         csr_mcycleh_q  <= 32'b0;
@@ -491,6 +517,13 @@ always @(posedge clk or negedge rst_n) begin
         csr_mcause_q   <= csr_mcause_r;
         csr_mtval_q    <= csr_mtval_r;
         csr_mip_q      <= csr_mip_r;
+            // Memory Protection
+        for (i=0; i<16; i=i+1) begin
+            csr_pmpcfg_q[i]  <= csr_pmpcfg_r[i];
+        end
+        for (i=0; i<64; i=i+1) begin
+            csr_pmpaddr_q[i] <= csr_pmpaddr_r[i];
+        end
             // Counter/Timers
         csr_mcycle_q   <= csr_mcycle_r;
         if (csr_mcycle_q == 32'hFFFFFFFF)
