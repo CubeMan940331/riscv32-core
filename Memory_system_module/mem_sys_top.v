@@ -129,8 +129,8 @@ module mem_sys_top (
         .word_ofs_i(dword_ofs_i),
         .cpu_data_i(cpu_ddata_i),
         .mask_i(dmask_i),
-        .cpu_req_wr(req_wr_d), // 使用控制器輸出的可快取請求
-        .cpu_req_rd(req_rd_d), // 使用控制器輸出的可快取請求
+        .cpu_req_wr(req_wr_d), 
+        .cpu_req_rd(req_rd_d), 
         .cpu_data_o(cpu_ddata_o),
         .dcache_rdy_o(dcache_rdy_o),
         .exception(dcache_exception_o),
@@ -155,7 +155,7 @@ module mem_sys_top (
         .wm_complete(dcache_wm_complete_w)
     );
     
-    // C. I-Cache 核心
+    
     icache_plus u_icache_plus (
         .clk(cpu_clk_i),
         .rst_n(sys_rst_n_i),
@@ -178,7 +178,7 @@ module mem_sys_top (
     );
     
     
-    // D. AXI 總線系統 (Block Design)
+    
     axi_bus u_axi_bus (
         // 外部引腳
         .DDR2_0_addr(DDR2_0_addr), .DDR2_0_ba(DDR2_0_ba), .DDR2_0_cas_n(DDR2_0_cas_n),
@@ -194,8 +194,8 @@ module mem_sys_top (
         .cdma_except_complete_0(except_complete_i),
         .cdma_exception_0(cdma_exception_o),
         .cdma_rdy_0(cdma_rdy_o),
-        .req_rd_dma_0(req_rd_dma),  // D-Cache 控制器輸出的 uncached/DMA 讀請求
-        .req_wr_dma_0(req_wr_dma),  // D-Cache 控制器輸出的 uncached/DMA 寫請求
+        .req_rd_dma_0(req_rd_dma),  
+        .req_wr_dma_0(req_wr_dma),  
         
         // 時脈與重置
         .cpu_clk(cpu_clk_i),
@@ -239,11 +239,5 @@ module mem_sys_top (
         .s_axi_arid(axi_id_c), 
         .s_axi_awid(axi_id_c)
     );
-    
-    // ----------------------------------------------------
-    // 5. 連線調整 (已不需要)
-    // ----------------------------------------------------
-    // 註解掉多餘的連線調整，保持簡潔
-    // assign icache_mem_addr_w = u_icache_plus.mem_addr;
     
 endmodule
