@@ -387,9 +387,21 @@ module dcache_plus(
     assign dcache_rdy_o = (cs == IDLE);
     
     //cpu data out
-    always@(*)begin
-        cpu_data_o = match0 ? cpu_data_o0 : cpu_data_o1; 
+    //always@(*)begin
+    //    cpu_data_o = match0 ? cpu_data_o0 : cpu_data_o1; 
+    //end
+    
+    always@(posedge clk or negedge rst_n)begin
+        if(!rst_n)
+            cpu_data_o <= 0;
+        else if(cs == IDLE)
+            cpu_data_o <= hit ? (match0 ? cpu_data_o0 : cpu_data_o1) : 0;
+        else if(cs == RECOMP)
+            cpu_data_o <= match0 ? cpu_data_o0 : cpu_data_o1;
+        else
+            cpu_data_o <= 0;
     end
+    
     // instance construction //
     lru_1b lru_arr(clk, do_lru, cache_idx_i, lru);
 	
