@@ -52,6 +52,7 @@ module icache_plus(
 	wire [4:0]cache_ofs;
     
     // hit_miss & replacement policy //
+    reg [1:0]vld_out_inst;
 	wire [18:0]tag_0,tag_1;
 	wire vld_0,vld_1;
     wire match1 = vld_1 & (tag_i == tag_1);
@@ -74,7 +75,7 @@ module icache_plus(
         if(!rst_n) begin
             cs <= IDLE;
             {wr1, wr0} <= 2'b00;
-            cpu_inst_o <= 0;
+            vld_out_inst <= 0;
             req_rm <= 0;
             fifo_en <= 0;
             {wr_vld1 ,wr_vld0} <= 2'b00;
@@ -90,7 +91,7 @@ module icache_plus(
                         vld_i <= 0;
                         if(invalidate_i)begin
                             cs <= IDLE;
-                            cpu_inst_o <= 0;
+                            vld_out_inst <= 0;
                             fifo_en <= 0;
                             if(match0|match1)
                                 {wr_vld1 ,wr_vld0} <= match1 ? 2'b10 : 2'b01;
@@ -101,13 +102,13 @@ module icache_plus(
                             cs <= IDLE;
                             fifo_en <= 1;
                             {wr_vld1 ,wr_vld0} <= 2'b00;
-                            cpu_inst_o <= match0 ? cpu_inst_0 : cpu_inst_1;
+                            vld_out_inst <= {match1, match0};
                         end
                         else begin
                             cs <= RM;
                             fifo_en <= 0;
                             {wr_vld1 ,wr_vld0} <= 2'b00;
-                            cpu_inst_o <= 0;
+                            vld_out_inst <= 0;
                             mem_addr <= {tag_i, idx_i, ofs_i};//{tag_i, idx_i, 5'd0};
                             req_rm <= 1; 
                         end
@@ -158,6 +159,15 @@ module icache_plus(
                       end
             endcase
 	    end
+    end
+    
+    always@(*)begin
+        if(vld_out_inst[0])
+            cpu_inst_o =  cpu_inst_0;
+        else if(vld_out_inst[1])
+            cpu_inst_o =  cpu_inst_1;
+        else
+            cpu_inst_o = 0;
     end
     
         // Instance construction //
