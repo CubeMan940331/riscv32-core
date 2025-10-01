@@ -96,6 +96,7 @@ module dcache_plus(
     wire is_dty = lru ? dty_1 : dty_0;
 
     // hit_miss & replacement policy //
+    reg [1:0]vld_out_data;
 	wire vld_0,vld_1;
     wire match1 = vld_1 & (tag_i == tag_1);
     wire match0 = vld_0 & (tag_i == tag_0);
@@ -393,13 +394,20 @@ module dcache_plus(
     
     always@(posedge clk or negedge rst_n)begin
         if(!rst_n)
-            cpu_data_o <= 0;
+            vld_out_data <= 0;
         else if(cs == IDLE)
-            cpu_data_o <= hit ? (match0 ? cpu_data_o0 : cpu_data_o1) : 0;
+            vld_out_data <= hit ? {match1, match0} : 0;
         else if(cs == RECOMP)
-            cpu_data_o <= match0 ? cpu_data_o0 : cpu_data_o1;
+            vld_out_data <= {match1, match0};
+    end
+    
+    always@(*)begin
+        if(vld_out_data[0])
+            cpu_data_o = cpu_data_o0;
+        else if(vld_out_data[1])
+            cpu_data_o = cpu_data_o1;
         else
-            cpu_data_o <= 0;
+            cpu_data_o = 0;
     end
     
     // instance construction //
