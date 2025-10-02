@@ -7,18 +7,28 @@
 module mmu
 #(
      parameter  MMU_SUPPORT = 1 
-    ,parameter  ADDR_MIN = 32'h80000000
-    ,parameter  ADDR_MAX = 32'hffffffff
-    ,parameter  ICACHE_ADDR_MIN = 32'h80000000
-    ,parameter  ICACHE_ADDR_MAX = 32'h80010000
+    ,parameter  D_ADDR_MIN = 32'h80000000
+    ,parameter  D_ADDR_MAX = 32'hffffffff
+    ,parameter  I_ADDR_MIN = 32'h80000000
+    ,parameter  I_ADDR_MAX = 32'h80010000
+    ,parameter  D_BYPASS_ADDR_MIN = 32'h0
+    ,parameter  D_BYPASS_ADDR_MAX = 32'h0
+    ,parameter  I_BYPASS_ADDR_MIN = 32'h0
+    ,parameter  I_BYPASS_ADDR_MAX = 32'h0
 )
 (
      input          clk_i
     ,input          rst_i
     ,input  [31:0]  satp_i
+    ,input  [1:0]   priv_i
 
+    // Fetch Interface
     ,input  [31:0]  fetch_pc_i
     ,input          fetch_rd_i
+    ,output [31:0]  fetch_out_value_o
+    ,output         fetch_out_valid_o
+    
+    // LSU Interface
     ,input  [31:0]  lsu_in_addr_i
     ,input  [31:0]  lsu_in_data_i
     ,input          lsu_in_rd_i
@@ -27,16 +37,12 @@ module mmu
     ,input          lsu_in_flush_i
     ,input          lsu_in_invalidate_i
     ,input          lsu_in_writeback_i
-
-    ,input  [31:0]  dcache_in_value_i
-    ,input          dcache_in_valid_i
-    ,input  [31:0]  icache_in_value_i
-    ,input          icache_in_valid_i
-
-    ,output [31:0]  fetch_out_value_o
-    ,output         fetch_out_valid_o
     ,output [31:0]  lsu_out_value_o
     ,output         lsu_out_valid_o
+
+    // Dcache Interface
+    ,input  [31:0]  dcache_in_value_i
+    ,input          dcache_in_valid_i
 
     ,output [31:0]  dcache_addr_o
     ,output [31:0]  dcache_value_o
@@ -46,12 +52,21 @@ module mmu
     ,output         dcache_flush_o
     ,output         dcache_invalidate_o
     ,output         dcache_writeback_o
+
+    // Icache Interface
+    ,input  [31:0]  icache_in_value_i
+    ,input          icache_in_valid_i
     ,output [31:0]  icache_addr_o
     ,output         icache_rd_o
 
+    // exception 
     ,output         load_fault_o
     ,output         store_fault_o
     ,output         inst_fault_o
+
+    // Memory Decoder
+    ,output         d_cachable_o
+    ,output         i_cachable_o
 );
 
 generate
@@ -90,14 +105,13 @@ reg [ 3:0] dcache_mask_r;
 
 // with addr error detection
 
-// wire cache_interupt = ((dcache_addr_r >= ICACHE_ADDR_MIN) && (dcache_addr_r <= ICACHE_ADDR_MAX));
-// wire icache_addr_error = !((icache_addr_r >= ADDR_MIN) && (icache_addr_r <= ADDR_MAX));
-// wire dcache_addr_error = !((dcache_addr_r >= ADDR_MIN) && (dcache_addr_r <= ADDR_MAX)) || cache_interupt;
+// wire cache_interupt = ((dcache_addr_r >= I_ADDR_MIN) && (dcache_addr_r <= I_ADDR_MAX));
+// wire icache_addr_error = !((icache_addr_r >= D_ADDR_MIN) && (icache_addr_r <= D_ADDR_MAX));
+// wire dcache_addr_error = !((dcache_addr_r >= D_ADDR_MIN) && (dcache_addr_r <= D_ADDR_MAX)) || cache_interupt;
 
 // wire req_d_rd = lsu_in_rd_i && ~dcache_addr_error;
 // wire req_d_wr = lsu_in_wr_i && ~dcache_addr_error;
 // wire req_i_rd = fetch_rd_i && ~icache_addr_error;
-
 // wire vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte) && ~dcache_addr_error;
 // wire vm_d_wr = lsu_in_wr_i && dtlb_hit && ~dcache_addr_error;
 // wire vm_i_rd = fetch_rd_i && itlb_hit && ~icache_addr_error;
@@ -106,12 +120,11 @@ reg [ 3:0] dcache_mask_r;
 wire req_d_rd = lsu_in_rd_i;
 wire req_d_wr = lsu_in_wr_i;
 wire req_i_rd = fetch_rd_i;
-
 wire vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte);
 wire vm_d_wr = lsu_in_wr_i && dtlb_hit;
 wire vm_i_rd = fetch_rd_i && itlb_hit;
 
-
+// control cache output signal
 wire dcache_rd_c = (vm_enable)? vm_d_rd : req_d_rd;
 wire dcache_wr_c = (vm_enable)? vm_d_wr : req_d_wr;
 wire icache_rd_c = (vm_enable)? vm_i_rd : req_i_rd;
@@ -170,13 +183,27 @@ always @(*)begin
         dcache_mask_r = 4'h0;
 end
 
+// fault signal
 assign load_fault_o     = lsu_in_rd_i   && ( ptw_pte_fault_o || (!dtlb_entry_o[`PAGE_READ]  && dtlb_hit));
 assign store_fault_o    = lsu_in_wr_i && ( ptw_pte_fault_o || (!dtlb_entry_o[`PAGE_WRITE] && dtlb_hit));
 assign inst_fault_o     = fetch_rd_i    && ( ptw_pte_fault_o || (!itlb_entry_o[`PAGE_EXEC]  && itlb_hit));
 
+// Dcache others signal
 assign dcache_invalidate_o  = lsu_in_invalidate_i;
 assign dcache_flush_o       = lsu_in_flush_i;
 assign dcache_writeback_o   = lsu_in_writeback_i;
+
+// Dcache Decoder (cachable control)
+// check memory address is in bypass range
+assign d_cachable_o = (dcache_addr_r >= D_BYPASS_ADDR_MIN) && (dcache_addr_r <= D_BYPASS_ADDR_MAX);
+assign i_cachable_o = (icache_addr_r >= I_BYPASS_ADDR_MIN) && (icache_addr_r <= I_BYPASS_ADDR_MAX);
+
+
+// ---------------------------------------
+// Privilege Control
+//----------------------------------------
+
+
 
 // ---------------------------------------
 // TLB
@@ -306,6 +333,7 @@ assign icache_addr_o = fetch_pc_i;
 assign load_fault_o = 0;
 assign store_fault_o = 0;
 assign inst_fault_o = 0;
+assign cachable_o = 0;
 
 end
 endgenerate
