@@ -7,14 +7,14 @@
 module mmu
 #(
      parameter  MMU_SUPPORT = 1 
-    ,parameter  D_ADDR_MIN = 32'h80000000
-    ,parameter  D_ADDR_MAX = 32'hffffffff
-    ,parameter  I_ADDR_MIN = 32'h80000000
-    ,parameter  I_ADDR_MAX = 32'h80010000
-    ,parameter  D_BYPASS_ADDR_MIN = 32'h0
-    ,parameter  D_BYPASS_ADDR_MAX = 32'h0
-    ,parameter  I_BYPASS_ADDR_MIN = 32'h0
-    ,parameter  I_BYPASS_ADDR_MAX = 32'h0
+    ,parameter  D_ADDR_MIN = 32'h60000000
+    ,parameter  D_ADDR_MAX = 32'h67FFFFFF
+    ,parameter  I_ADDR_MIN = 32'h60000000
+    ,parameter  I_ADDR_MAX = 32'h67FFFFFF
+    ,parameter  D_BYPASS_ADDR_MIN = 32'h20000000
+    ,parameter  D_BYPASS_ADDR_MAX = 32'h20000FFF
+    // ,parameter  I_BYPASS_ADDR_MIN = 32'h0
+    // ,parameter  I_BYPASS_ADDR_MAX = 32'h0
 )
 (
      input          clk_i
@@ -66,7 +66,7 @@ module mmu
 
     // Memory Decoder
     ,output         d_cachable_o
-    ,output         i_cachable_o
+    // ,output         i_cachable_o
 );
 
 generate
@@ -106,23 +106,23 @@ reg [ 3:0] dcache_mask_r;
 // with addr error detection
 
 // wire cache_interupt = ((dcache_addr_r >= I_ADDR_MIN) && (dcache_addr_r <= I_ADDR_MAX));
-// wire icache_addr_error = !((icache_addr_r >= D_ADDR_MIN) && (icache_addr_r <= D_ADDR_MAX));
-// wire dcache_addr_error = !((dcache_addr_r >= D_ADDR_MIN) && (dcache_addr_r <= D_ADDR_MAX)) || cache_interupt;
+wire icache_addr_error = !((icache_addr_r >= D_ADDR_MIN) && (icache_addr_r <= D_ADDR_MAX));
+wire dcache_addr_error = !((dcache_addr_r >= D_ADDR_MIN) && (dcache_addr_r <= D_ADDR_MAX)) || cache_interupt;
 
-// wire req_d_rd = lsu_in_rd_i && ~dcache_addr_error;
-// wire req_d_wr = lsu_in_wr_i && ~dcache_addr_error;
-// wire req_i_rd = fetch_rd_i && ~icache_addr_error;
-// wire vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte) && ~dcache_addr_error;
-// wire vm_d_wr = lsu_in_wr_i && dtlb_hit && ~dcache_addr_error;
-// wire vm_i_rd = fetch_rd_i && itlb_hit && ~icache_addr_error;
+wire req_d_rd = lsu_in_rd_i && ~dcache_addr_error;
+wire req_d_wr = lsu_in_wr_i && ~dcache_addr_error;
+wire req_i_rd = fetch_rd_i && ~icache_addr_error;
+wire vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte) && ~dcache_addr_error;
+wire vm_d_wr = lsu_in_wr_i && dtlb_hit && ~dcache_addr_error;
+wire vm_i_rd = fetch_rd_i && itlb_hit && ~icache_addr_error;
 
 // without addr error detection
-wire req_d_rd = lsu_in_rd_i;
-wire req_d_wr = lsu_in_wr_i;
-wire req_i_rd = fetch_rd_i;
-wire vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte);
-wire vm_d_wr = lsu_in_wr_i && dtlb_hit;
-wire vm_i_rd = fetch_rd_i && itlb_hit;
+// wire req_d_rd = lsu_in_rd_i;
+// wire req_d_wr = lsu_in_wr_i;
+// wire req_i_rd = fetch_rd_i;
+// wire vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte);
+// wire vm_d_wr = lsu_in_wr_i && dtlb_hit;
+// wire vm_i_rd = fetch_rd_i && itlb_hit;
 
 // control cache output signal
 wire dcache_rd_c = (vm_enable)? vm_d_rd : req_d_rd;
@@ -196,7 +196,7 @@ assign dcache_writeback_o   = lsu_in_writeback_i;
 // Dcache Decoder (cachable control)
 // check memory address is in bypass range
 assign d_cachable_o = (dcache_addr_r >= D_BYPASS_ADDR_MIN) && (dcache_addr_r <= D_BYPASS_ADDR_MAX);
-assign i_cachable_o = (icache_addr_r >= I_BYPASS_ADDR_MIN) && (icache_addr_r <= I_BYPASS_ADDR_MAX);
+// assign i_cachable_o = (icache_addr_r >= I_BYPASS_ADDR_MIN) && (icache_addr_r <= I_BYPASS_ADDR_MAX);
 
 
 // ---------------------------------------
