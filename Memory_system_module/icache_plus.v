@@ -65,7 +65,7 @@ module icache_plus(
     parameter IDLE = 0, RM = 1, UPDATE = 2, EXP = 3;
     reg [1:0] cs;
     
-    assign icache_rdy_o = (cs == IDLE);
+    assign icache_rdy_o = (cs == IDLE) & (hit | invalidate_i);
     assign cache_tag = (cs == IDLE) ? tag_i : mem_addr[31:13];
     assign cache_idx = (cs == IDLE) ? idx_i : mem_addr[12:5];
     assign cache_ofs = (cs == IDLE) ? ofs_i : mem_addr[4:0];
@@ -130,16 +130,16 @@ module icache_plus(
                             mem_data <= rm_data;
                             {wr1,wr0} <= fifo ? 2'b10 : 2'b01;
                             {wr_vld1 ,wr_vld0} <= fifo ? 2'b10 : 2'b01;
-                            case(mem_addr[4:2])
-                                7 : cpu_inst_o <= rm_data[255 : 224];
-                                6 : cpu_inst_o <= rm_data[223 : 192];
-                                5 : cpu_inst_o <= rm_data[191 : 160];
-                                4 : cpu_inst_o <= rm_data[159 : 128];
-                                3 : cpu_inst_o <= rm_data[127 : 96];
-                                2 : cpu_inst_o <= rm_data[95 : 64];
-                                1 : cpu_inst_o <= rm_data[63 : 32];
-                                0 : cpu_inst_o <= rm_data[31 : 0];
-                            endcase
+//                            case(mem_addr[4:2])
+//                              7 : cpu_inst_o <= rm_data[255 : 224];
+//                                6 : cpu_inst_o <= rm_data[223 : 192];
+//                                5 : cpu_inst_o <= rm_data[191 : 160];
+//                                4 : cpu_inst_o <= rm_data[159 : 128];
+//                                3 : cpu_inst_o <= rm_data[127 : 96];
+//                               2 : cpu_inst_o <= rm_data[95 : 64];
+//                                1 : cpu_inst_o <= rm_data[63 : 32];
+//                                0 : cpu_inst_o <= rm_data[31 : 0];
+//                            endcase
                         end
                         else if(rm_complete ^ rm_success)begin
                             cs <= EXP;
