@@ -132,7 +132,7 @@ module dcache_plus(
 			hold_data_i      <= 0;
 			hold_wb          <= 0;
 			hold_mask        <= 0;end
-		else if(cs == IDLE)begin //或用 state判斷???
+		else if(cs == IDLE)begin 
 			hold_cpu_wr      <=  cpu_req_wr;
             hold_tag_i       <=  tag_i;
             hold_idx_i       <=  idx_i;
@@ -160,13 +160,6 @@ module dcache_plus(
     
     
     
-//        .cpu_wr(cpu_wr[0]),
-//        .mem_wr(mem_wr[0]),
-//		.wr_vld(wr_vld[0]),
-//		.wr_dty(wr_dty[0]),
-//		.vld_i(vld_i),
-//		.dty_i(dty_i),
-	
 	// state transfer & cache update//
     always@(*)begin
         do_lru = 0;
@@ -237,8 +230,8 @@ module dcache_plus(
 			            ns = IDLE;
                         cpu_wr = hold_cpu_wr ? (match0 ? 2'b01 : 2'b10) : 2'b00; 
                         do_lru = 1;
-			        end                ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-		    WM_ALL_SET :                     //WM_ALL finish when setting dty==0 & vld ==1
+			        end                
+		    WM_ALL_SET :                     
                     if(skip_wb)begin
 			            ns = (wmall_cnt==1023) ?  IDLE : WM_ALL_SET;
 						wr_dty = wmall_cnt[0] ? 2'b10 : 2'b01;
@@ -410,10 +403,12 @@ module dcache_plus(
             cpu_data_o = 0;
     end
     
+
+    
     // instance construction //
     lru_1b lru_arr(clk, do_lru, cache_idx_i, lru);
 	
-	//需要補上wr_vld, wr_dty, vld_i, dty_i
+	
     way_32Bx512 way0(
         .clk(clk),
         .cpu_wr(cpu_wr[0]),
