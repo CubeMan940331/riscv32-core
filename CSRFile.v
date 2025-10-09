@@ -61,13 +61,18 @@ module CSRFile (
 
     ,output         csr_branch_o
     ,output [31:0]  csr_target_o
-
+    
     // CSR registers
     ,output [1:0]   priv_o
     ,output [31:0]  mstatus_o
     ,output [31:0]  satp_o
 
     ,output [31:0]  interrupt_o
+
+    // memory interface
+    ,input  [31:0] d_mem_addr_i
+    ,input         d_mem_wr_en_i
+    ,input         d_mem_rd_en_i
 );
 
 // utilities
@@ -582,6 +587,191 @@ end
 
 assign csr_branch_o = csr_branch_r;
 assign csr_target_o = csr_target_r;
+
+//-----------------------------------------------------------------
+// PMP check
+//-----------------------------------------------------------------
+wire [63:0] pmp_matched;
+wire [126:0] pmp_matched_internal /*verilator split_var*/;
+
+wire [63:0] pmp_pc_matched;
+wire [126:0] pmp_pc_matched_internal /*verilator split_var*/;
+
+wire [63:0] pmp_x_nok; // 1 not ok, 0 ok
+wire [63:0] pmp_x_deney; // with priv check
+wire [126:0] pmp_x_deney_internal /*verilator split_var*/;
+
+wire [63:0] pmp_w_nok;
+wire [63:0] pmp_w_deney;
+wire [126:0] pmp_w_deney_internal /*verilator split_var*/;
+
+wire [63:0] pmp_r_nok;
+wire [63:0] pmp_r_deney;
+wire [126:0] pmp_r_deney_internal /*verilator split_var*/;
+
+// helper functions
+function automatic pmp_L;
+    input [7:0] cfg; begin pmp_L = cfg[7]; end
+endfunction
+function automatic [1:0] pmp_A;
+    input [7:0] cfg; begin pmp_A = cfg[4:3]; end
+endfunction
+function automatic pmp_X;
+    input [7:0] cfg; begin pmp_X = cfg[2]; end
+endfunction
+function automatic pmp_W;
+    input [7:0] cfg; begin pmp_W = cfg[1]; end
+endfunction
+function automatic pmp_R;
+    input [7:0] cfg; begin pmp_R = cfg[0]; end
+endfunction
+function automatic [7:0] get_pmpcfg;
+    input integer idx;
+    reg [31:0] word;
+    reg [1:0]  which;
+    begin
+        word  = csr_pmpcfg_q[idx >> 2];
+        which = idx[1:0];
+        get_pmpcfg = word[(which*8) +: 8];
+    end
+endfunction
+function automatic integer count_trailing_ones;
+    input [31:0] v;
+    integer k;
+    begin
+        k = 0;
+        while ((k < 32) && (v[k] == 1'b1)) begin
+            k = k + 1;
+        end
+        count_trailing_ones = k;
+    end
+endfunction
+
+function automatic pmp_match(
+    input integer idx,
+    input [31:0] addr
+);
+    reg [31:0] napot_mask;
+    integer trailing_ones;
+    begin
+        case (pmp_A(get_pmpcfg(idx)))
+            // OFF
+            2'b00: pmp_match = 1'b0;
+            // TOR
+            2'b01: begin
+                if(idx==0) pmp_match = (addr < csr_pmpaddr_q[idx]);
+                else pmp_match = (
+                    addr >= csr_pmpaddr_q[idx-1] &&
+                    addr < csr_pmpaddr_q[idx]
+                );
+            end
+            // NA4
+            2'b10: pmp_match = (addr == csr_pmpaddr_q[idx]);
+            // NAPOT
+            2'b11: begin
+                trailing_ones = count_trailing_ones(csr_pmpaddr_q[idx]);
+                if (trailing_ones >= 31) pmp_match = 1'b1; // covers all memory
+                else begin
+                    napot_mask = ~((32'h1 << (trailing_ones + 1)) - 1);
+                    pmp_match = (
+                        (csr_pmpaddr_q[idx] & napot_mask) ==
+                        (addr & napot_mask)
+                    );
+                end
+            end
+        endcase
+    end
+endfunction
+
+genvar gen_i;
+// matching
+generate
+    for (gen_i = 0; gen_i < 64; gen_i = gen_i + 1) begin
+        assign pmp_matched[gen_i] = pmp_match(gen_i, {2'h0, d_mem_addr_i[31:2]});
+        assign pmp_matched_internal[gen_i+63] = pmp_matched[gen_i];
+    end
+endgenerate
+// pc matching
+generate
+    for (gen_i = 0; gen_i < 64; gen_i = gen_i + 1) begin
+        assign pmp_pc_matched[gen_i] = pmp_match(gen_i, {2'h0, exception_pc_i[31:2]});
+        assign pmp_pc_matched_internal[gen_i+63]=pmp_pc_matched[gen_i];
+    end
+endgenerate
+// x check
+generate
+    for(gen_i=0; gen_i<64; gen_i=gen_i+1) begin
+        assign pmp_x_nok[gen_i] = !pmp_X(get_pmpcfg(gen_i));
+        assign pmp_x_deney[gen_i] = pmp_L(get_pmpcfg(gen_i)) ? pmp_x_nok[gen_i]: (priv_o!=2'b11 && pmp_x_nok[gen_i]);
+        assign pmp_x_deney_internal[gen_i+63] = pmp_x_deney[gen_i];
+    end
+endgenerate
+// w check
+generate
+    for(gen_i=0; gen_i<64; gen_i=gen_i+1) begin
+        assign pmp_w_nok[gen_i] = d_mem_wr_en_i && !pmp_W(get_pmpcfg(gen_i));
+        assign pmp_w_deney[gen_i] = pmp_L(get_pmpcfg(gen_i)) ? pmp_w_nok[gen_i]: (priv_o!=2'b11 && pmp_w_nok[gen_i]);
+        assign pmp_w_deney_internal[gen_i+63] = pmp_w_deney[gen_i];
+    end
+endgenerate
+// r check
+generate
+    for(gen_i=0; gen_i<64; gen_i=gen_i+1) begin
+        assign pmp_r_nok[gen_i] = d_mem_rd_en_i && !pmp_R(get_pmpcfg(gen_i));
+        assign pmp_r_deney[gen_i] = pmp_L(get_pmpcfg(gen_i)) ? pmp_r_nok[gen_i]: (priv_o!=2'b11 && pmp_r_nok[gen_i]);
+        assign pmp_r_deney_internal[gen_i+63] = pmp_r_deney[gen_i];
+    end
+endgenerate
+
+// merge result
+// using complete binary tree
+generate
+    for(gen_i=1;gen_i<64;gen_i=gen_i+1) begin
+        // i*2;
+        // i*2+1;
+        assign pmp_matched_internal[gen_i-1] = (
+            pmp_matched_internal[gen_i*2-1] ? 
+            pmp_matched_internal[gen_i*2-1]: pmp_matched_internal[gen_i*2]
+        );
+        assign pmp_w_deney_internal[gen_i-1] = (
+            pmp_matched_internal[gen_i*2-1] ? 
+            pmp_w_deney_internal[gen_i*2-1]: pmp_w_deney_internal[gen_i*2]
+        );
+        assign pmp_r_deney_internal[gen_i-1] = (
+            pmp_matched_internal[gen_i*2-1] ? 
+            pmp_r_deney_internal[gen_i*2-1]: pmp_r_deney_internal[gen_i*2]
+        );
+        
+        assign pmp_pc_matched_internal[gen_i-1] = (
+            pmp_pc_matched_internal[gen_i*2-1] ?
+            pmp_pc_matched_internal[gen_i*2-1] : pmp_pc_matched_internal[gen_i*2]
+        );
+        assign pmp_x_deney_internal[gen_i-1] = (
+            pmp_pc_matched_internal[gen_i*2-1] ?
+            pmp_x_deney_internal[gen_i*2-1]: pmp_x_deney_internal[gen_i*2]
+        );
+    end
+endgenerate
+
+// generate exception
+reg [1:0] pmp_exception_q;
+always @(*) begin
+    pmp_exception_q = 0;
+    if( // fetch fault
+        (pmp_pc_matched_internal[0] && pmp_x_deney_internal[0]) ||
+        (!pmp_pc_matched_internal[0] && priv_o!=2'b11)
+    ) pmp_exception_q=2'b01;
+    else if( // store fault
+        (pmp_matched_internal[0] && pmp_w_deney_internal[0]) ||
+        (!pmp_matched_internal[0] && priv_o!=2'b11 && d_mem_wr_en_i)
+    ) pmp_exception_q=2'b10;
+    else if( // load fault
+        (pmp_matched_internal[0] && pmp_r_deney_internal[0]) ||
+        (!pmp_matched_internal[0] && priv_o!=2'b11 && d_mem_rd_en_i)
+    ) pmp_exception_q=2'b11;
+end
+
+// end of pmp check
 
 `ifdef verilator
 function [31:0] get_mcycle; /*verilator public*/

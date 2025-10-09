@@ -661,6 +661,10 @@ CSR m_CSR(
     
     .csr_rd_data_o(csr_rd_data),
     .csr_satp_o(csr_satp_out)
+
+    ,.d_mem_addr_i(d_mem_addr)
+    ,.d_mem_rd_en_i(d_mem_rd_en)
+    ,.d_mem_wr_en_i(d_mem_wr_en)
 );
 
 assign SYS_done = SYS_start;
