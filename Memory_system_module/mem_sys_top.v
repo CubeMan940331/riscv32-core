@@ -19,39 +19,37 @@
 //
 //////////////////////////////////////////////////////////////////////////////////
 module mem_sys_top (
-    // ----------------------------------------------------
-    // 1. 外部引腳
-    // ----------------------------------------------------
-    // A. DDR2 物理接口
+    // A. DDR2 
     output [12:0] DDR2_0_addr, output [2:0] DDR2_0_ba, output DDR2_0_cas_n,
     output [0:0] DDR2_0_ck_n, output [0:0] DDR2_0_ck_p, output [0:0] DDR2_0_cke,
     output [0:0] DDR2_0_cs_n, output [1:0] DDR2_0_dm, inout  [15:0] DDR2_0_dq,
     inout  [1:0] DDR2_0_dqs_n, inout  [1:0] DDR2_0_dqs_p, output [0:0] DDR2_0_odt,
     output DDR2_0_ras_n, output DDR2_0_we_n,
     
-    // B. 系統時脈與重置
+    // B. 
     input sys_rst_n_i,
     input mig_ref_clk_i,
     input mig_sys_clk_i,
     input cpu_clk_i,
     
-    // C. 系統狀態輸出
+    // C. 
     output mmcm_locked_o,
     output init_calib_complete_o, output ui_addn_clk_o,
     output ui_clk_sync_rst_o, output rom_rst_busy_o, output sram_busy_o,
 
     // ----------------------------------------------------
-    // 2. CPU 核心接口
+    // 1. CPU 
     // ----------------------------------------------------
-    // A. CDMA 控制介面
+    // A. CDMA 
     input [31:0] cpu_cdma_addr_i,
     input [31:0] cpu_cdma_data_i,
     output [31:0] cpu_cdma_data_o,
     input except_complete_i,
     output cdma_rdy_o,
     output cdma_exception_o,
+    output cdma_introut_o,
     
-    // B. D-Cache 介面
+    // B. D-Cache 
     input  cpu_req_wr_i,
     input  cpu_req_rd_i,
     input  cacheable_i,
@@ -68,21 +66,20 @@ module mem_sys_top (
     input  dcache_flush_i,
     input  dcache_writeback_i,
     
-    // C. I-Cache 介面
+    // C. I-Cache 
     input  [18:0] itag_i,
     input  [7:0] iidx_i,
     input  [4:0] iofs_i,
     input  icache_invalidate_i,
     output icache_rdy_o,
-    output [31:0] cpu_inst_o,
     output icache_exception_o,
-    input  icache_except_complete_i
+    input  icache_except_complete_i,
+    
+    // E. IF-Selector 
+    output if_ready_o,
+    output [31:0] inst_o
 );
 
-    // ----------------------------------------------------
-    // 3. 內部連線
-    // ----------------------------------------------------
-    
     wire req_wr_d, req_rd_d;
     wire req_wr_dma, req_rd_dma;
     
@@ -99,23 +96,20 @@ module mem_sys_top (
     wire icache_rm_complete_w;
     wire icache_rm_success_w;
     wire [255:0] icache_rm_data_w;
-
-    // AXI ID 專用線路，用於消除 BlackBox 警告
+    wire [31:0] pc_i;
+    wire [31:0] inst_icache_o;
+    wire [31:0] inst_bootrom_o;
     wire [3:0] axi_id_c = 4'b0000;
     
-    // ----------------------------------------------------
-    // 4. 實例化模組
-    // ----------------------------------------------------
-    
-    // A. D-Cache 請求控制器
+    // A. D-Cache 
     dcache_dma_ctrl u_dcache_dma_ctrl (
         .cpu_req_wr_i(cpu_req_wr_i),
         .cpu_req_rd_i(cpu_req_rd_i),
         .cacheable_i(cacheable_i),
         .req_wr_dma(req_wr_dma),
         .req_rd_dma(req_rd_dma),
-        .req_wr_d(req_wr_d), // D-Cache (Cacheable) 寫請求
-        .req_rd_d(req_rd_d)  // D-Cache (Cacheable) 讀請求
+        .req_wr_d(req_wr_d), 
+        .req_rd_d(req_rd_d)  
     );
     
     // B. D-Cache 核心
@@ -123,7 +117,7 @@ module mem_sys_top (
         .clk(cpu_clk_i),
         .rst_n(sys_rst_n_i),
         
-        // CPU 接口
+        // CPU 
         .tag_i(dtag_i),
         .idx_i(didx_i),
         .word_ofs_i(dword_ofs_i),
@@ -136,12 +130,12 @@ module mem_sys_top (
         .exception(dcache_exception_o),
         .except_complete(dcache_except_complete_i),
         
-        // MMU 接口
+        // MMU 
         .invalidate_i(dcache_invalidate_i),
         .flush_i(dcache_flush_i),
         .writeback_i(dcache_writeback_i),
         
-        // Mem 接口
+        // Mem 
         .mem_addr(dcache_mem_addr_w),
         .rm_rdy(dcache_rm_rdy_w),
         .rm_data(dcache_rm_data_w),
@@ -155,7 +149,7 @@ module mem_sys_top (
         .wm_complete(dcache_wm_complete_w)
     );
     
-    
+    // C. I-Cache 
     icache_plus u_icache_plus (
         .clk(cpu_clk_i),
         .rst_n(sys_rst_n_i),
@@ -164,11 +158,11 @@ module mem_sys_top (
         .ofs_i(iofs_i),
         .invalidate_i(icache_invalidate_i),
         .icache_rdy_o(icache_rdy_o),
-        .cpu_inst_o(cpu_inst_o),
+        .cpu_inst_o(inst_icache_o),
         .exception(icache_exception_o),
         .except_complete(icache_except_complete_i),
         
-        // Mem 接口
+        // Mem 
         .rm_rdy(icache_rm_rdy_w),
         .mem_addr(icache_mem_addr_w),
         .rm_success(icache_rm_success_w),
@@ -178,16 +172,15 @@ module mem_sys_top (
     );
     
     
-    
+    // D. AXI Bus 
     axi_bus u_axi_bus (
-        // 外部引腳
+        
         .DDR2_0_addr(DDR2_0_addr), .DDR2_0_ba(DDR2_0_ba), .DDR2_0_cas_n(DDR2_0_cas_n),
         .DDR2_0_ck_n(DDR2_0_ck_n), .DDR2_0_ck_p(DDR2_0_ck_p), .DDR2_0_cke(DDR2_0_cke),
         .DDR2_0_cs_n(DDR2_0_cs_n), .DDR2_0_dm(DDR2_0_dm), .DDR2_0_dq(DDR2_0_dq),
         .DDR2_0_dqs_n(DDR2_0_dqs_n), .DDR2_0_dqs_p(DDR2_0_dqs_p), .DDR2_0_odt(DDR2_0_odt),
         .DDR2_0_ras_n(DDR2_0_ras_n), .DDR2_0_we_n(DDR2_0_we_n),
         
-        // CDMA/Uncached/DMA 接口
         .cdma_addr_i_0(cpu_cdma_addr_i),
         .cdma_data_i_0(cpu_cdma_data_i),
         .cdma_data_out_0(cpu_cdma_data_o),
@@ -196,23 +189,20 @@ module mem_sys_top (
         .cdma_rdy_0(cdma_rdy_o),
         .req_rd_dma_0(req_rd_dma),  
         .req_wr_dma_0(req_wr_dma),  
+        .cdma_introut_0(cdma_introut_o),
         
-        // 時脈與重置
         .cpu_clk(cpu_clk_i),
         .mig_ref_clk(mig_ref_clk_i),
         .mig_sys_clk(mig_sys_clk_i),
         .rst_n(sys_rst_n_i),
         .sys_rst_0(sys_rst_n_i),
         
-        // 系統狀態輸出
         .mmcm_locked_0(mmcm_locked_o), 
-        .rom_rst_busy(rom_rst_busy_o),
         .sram_busy(sram_busy_o),
         .init_calib_complete_0(init_calib_complete_o),
         .ui_addn_clk_0_0(ui_addn_clk_o),
         .ui_clk_sync_rst_0(ui_clk_sync_rst_o),
         
-        // I-Cache 記憶體請求介面
         .icache_mem_addr(icache_mem_addr_w),
         .icache_req_rm(icache_req_rm_w),
         .icache_rm_complete(icache_rm_complete_w),
@@ -220,10 +210,8 @@ module mem_sys_top (
         .icache_rm_rdy(icache_rm_rdy_w),
         .icache_rm_success(icache_rm_success_w),
         
-        // 通用記憶體請求介面 (D-Cache Misses/Writebacks)
         .mem_addr_0(dcache_mem_addr_w),
         
-        // D-Cache 的 Miss/Writeback AXI Master 訊號
         .rm_vld_0(dcache_rm_vld_w),
         .rm_complete_0(dcache_rm_complete_w),
         .rm_data_0(dcache_rm_data_w),
@@ -234,10 +222,24 @@ module mem_sys_top (
         .wm_data_0(dcache_wm_data_w),
         .wm_rdy_0(dcache_wm_rdy_w),
         .wm_success_0(dcache_wm_success_w),
-
-        // AXI ID 訊號 (固定接地 0 以消除 MIG 警告)
         .s_axi_arid(axi_id_c), 
         .s_axi_awid(axi_id_c)
     );
     
+    // E. IF Selector
+    IF_selector u_if_selector(
+        .pc_i(pc_i),
+        .icache_ready_i(icache_rdy_o),
+        .inst_icache_i(inst_icache_o),
+        .inst_bootrom_i(inst_bootrom_o),
+        .if_ready_o(if_ready_o),
+        .inst_o(inst_o)
+    );
+    
+    assign pc_i = {itag_i,iidx_i,iofs_i};
+    BootROM_128KB u_bootrom (
+      .clka(cpu_clk_i),    // input wire clka
+      .addra(pc_i),  // input wire [12 : 0] addra
+      .douta(inst_bootrom_o)  // output wire [127 : 0] douta
+    );
 endmodule
