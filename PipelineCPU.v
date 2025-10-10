@@ -581,6 +581,8 @@ u_lsu (
 
 // // MMU =========================
 wire fetch_rd_f = 1;
+wire [1:0] mmu_priv = 2'b0;
+wire       mmu_d_cachable;
 
 assign i_mem_addr = mmu_icache_addr;
 assign d_mem_ctrl = mmu_dcache_mask;
@@ -589,11 +591,12 @@ assign d_mem_rd_en = mmu_dcache_rd;
 assign d_mem_addr = mmu_dcache_addr;
 assign d_mem_wr_data = mmu_dcache_data;
 
-mmu #(.MMU_SUPPORT(1))
+mmu #(.MMU_SUPPORT(1), .ADDR_ERROR_DETECT(1))
 u_mmu(
     .clk_i               (clk),
     .rst_i               (rst_n),
     .satp_i              (csr_satp_out),
+    .priv_i              (mmu_priv),
     .fetch_pc_i          (pc_out),
     .fetch_rd_i          (fetch_rd_f), 
     .lsu_in_addr_i       (lsu_mmu_addr),
@@ -624,7 +627,8 @@ u_mmu(
     .icache_rd_o         (mmu_icache_rd),
     .load_fault_o        (mmu_lsu_load_fault),
     .store_fault_o       (mmu_lsu_store_fault),
-    .inst_fault_o        (mmu_inst_fault)
+    .inst_fault_o        (mmu_inst_fault),
+    .d_cachable_o        (mmu_d_cachable)
 );
 
 // CSR =========================

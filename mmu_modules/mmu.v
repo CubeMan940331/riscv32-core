@@ -7,6 +7,7 @@
 module mmu
 #(
      parameter  MMU_SUPPORT = 1 
+    ,parameter  ADDR_ERROR_DETECT = 1
     ,parameter  D_ADDR_MIN = 32'h60000000
     ,parameter  D_ADDR_MAX = 32'h67FFFFFF
     ,parameter  I_ADDR_MIN = 32'h60000000
@@ -104,25 +105,29 @@ reg [ 3:0] dcache_mask_r;
 //----------------------------------------
 
 // with addr error detection
+if(ADDR_ERROR_DETECT)
+begin
+    // wire cache_interupt = ((dcache_addr_r >= I_ADDR_MIN) && (dcache_addr_r <= I_ADDR_MAX));
+    wire icache_addr_error = !((icache_addr_r >= D_ADDR_MIN) && (icache_addr_r <= D_ADDR_MAX));
+    wire dcache_addr_error = !((dcache_addr_r >= D_ADDR_MIN) && (dcache_addr_r <= D_ADDR_MAX));
 
-// wire cache_interupt = ((dcache_addr_r >= I_ADDR_MIN) && (dcache_addr_r <= I_ADDR_MAX));
-wire icache_addr_error = !((icache_addr_r >= D_ADDR_MIN) && (icache_addr_r <= D_ADDR_MAX));
-wire dcache_addr_error = !((dcache_addr_r >= D_ADDR_MIN) && (dcache_addr_r <= D_ADDR_MAX)) || cache_interupt;
+    wire req_d_rd = lsu_in_rd_i && ~dcache_addr_error;
+    wire req_d_wr = lsu_in_wr_i && ~dcache_addr_error;
+    wire req_i_rd = fetch_rd_i && ~icache_addr_error;
+    wire vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte) && ~dcache_addr_error;
+    wire vm_d_wr = lsu_in_wr_i && dtlb_hit && ~dcache_addr_error;
+    wire vm_i_rd = fetch_rd_i && itlb_hit && ~icache_addr_error;
 
-wire req_d_rd = lsu_in_rd_i && ~dcache_addr_error;
-wire req_d_wr = lsu_in_wr_i && ~dcache_addr_error;
-wire req_i_rd = fetch_rd_i && ~icache_addr_error;
-wire vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte) && ~dcache_addr_error;
-wire vm_d_wr = lsu_in_wr_i && dtlb_hit && ~dcache_addr_error;
-wire vm_i_rd = fetch_rd_i && itlb_hit && ~icache_addr_error;
-
-// without addr error detection
-// wire req_d_rd = lsu_in_rd_i;
-// wire req_d_wr = lsu_in_wr_i;
-// wire req_i_rd = fetch_rd_i;
-// wire vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte);
-// wire vm_d_wr = lsu_in_wr_i && dtlb_hit;
-// wire vm_i_rd = fetch_rd_i && itlb_hit;
+end else begin
+    // without addr error detection 
+    wire req_d_rd = lsu_in_rd_i;
+    wire req_d_wr = lsu_in_wr_i;
+    wire req_i_rd = fetch_rd_i;
+    wire vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte);
+    wire vm_d_wr = lsu_in_wr_i && dtlb_hit;
+    wire vm_i_rd = fetch_rd_i && itlb_hit;
+    
+end
 
 // control cache output signal
 wire dcache_rd_c = (vm_enable)? vm_d_rd : req_d_rd;
@@ -133,18 +138,18 @@ wire icache_valid;
 wire dcache_valid;
 
 mmu_cache_ctrl u_mmu_cache_ctrl(
-    .clk_i                  (clk_i),
-    .rst_i                  (rst_i),
-    .mmu_dcache_rd_i        (dcache_rd_c),
-    .mmu_dcache_wr_i        (dcache_wr_c),
-    .dcache_mmu_available_i (dcache_in_valid_i),
-    .mmu_dcache_rd_o        (dcache_rd_o),
-    .mmu_dcache_wr_o        (dcache_wr_o),
-    .dcache_valid_o         (dcache_valid),
-    .mmu_icache_rd_i        (icache_rd_c),
-    .icache_mmu_available_i (icache_in_valid_i),
-    .mmu_icache_rd_o        (icache_rd_o),
-    .icache_valid_o         (icache_valid)
+    .clk_i           (clk_i),
+    .rst_i           (rst_i),
+    .mmu_dcache_rd_i (dcache_rd_c),
+    .mmu_dcache_wr_i (dcache_wr_c),
+    .dcache_mmu_rdy_i(dcache_in_valid_i),
+    .mmu_dcache_rd_o (dcache_rd_o),
+    .mmu_dcache_wr_o (dcache_wr_o),
+    .dcache_valid_o  (dcache_valid),
+    .mmu_icache_rd_i (icache_rd_c),
+    .icache_mmu_rdy_i(icache_in_valid_i),
+    .mmu_icache_rd_o (icache_rd_o),
+    .icache_valid_o  (icache_valid)
 );
 
 assign fetch_out_value_o    = icache_in_value_i;
@@ -311,12 +316,12 @@ mmu_cache_ctrl u_mmu_cache_ctrl(
     .rst_i                  (rst_i),
     .mmu_dcache_rd_i        (lsu_in_rd_i),
     .mmu_dcache_wr_i        (lsu_in_wr_i),
-    .dcache_mmu_available_i (dcache_in_valid_i),
+    .dcache_mmu_rdy_i (dcache_in_valid_i),
     .mmu_dcache_rd_o        (dcache_rd_o),
     .mmu_dcache_wr_o        (dcache_wr_o),
     .dcache_valid_o         (lsu_out_valid_o),
     .mmu_icache_rd_i        (fetch_rd_i),
-    .icache_mmu_available_i (icache_in_valid_i),
+    .icache_mmu_rdy_i (icache_in_valid_i),
     .mmu_icache_rd_o        (icache_rd_o),
     .icache_valid_o         (fetch_out_valid_o)
 );
@@ -333,7 +338,7 @@ assign icache_addr_o = fetch_pc_i;
 assign load_fault_o = 0;
 assign store_fault_o = 0;
 assign inst_fault_o = 0;
-assign cachable_o = 0;
+assign d_cachable_o = 0;
 
 end
 endgenerate
