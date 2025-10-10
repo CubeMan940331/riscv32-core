@@ -28,6 +28,11 @@ module CSR (
     output [31:0]               csr_rd_data_o,       // read data
 
     output [31:0]               csr_satp_o
+
+    // memory interface
+    ,input  [31:0] d_mem_addr_i
+    ,input         d_mem_wr_en_i
+    ,input         d_mem_rd_en_i
 );
 
 //-----------------------------------------------------------------
@@ -60,6 +65,10 @@ CSRFile m_CSRFile(
     .mstatus_o(csr_mstatus),
     .interrupt_o(interrupt_o),
     .satp_o(csr_satp_o)
+    
+    ,.d_mem_addr_i(d_mem_addr_i)
+    ,.d_mem_rd_en_i(d_mem_rd_en_i)
+    ,.d_mem_wr_en_i(d_mem_wr_en_i)
 );
 
 //-----------------------------------------------------------------
