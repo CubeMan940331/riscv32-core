@@ -226,12 +226,7 @@ wire [31:0] EX_fwd_data2;
 wire br_flush;
 
 PipelineCtrl m_PipelineCtrl(
-<<<<<<< HEAD
-    .br_taken(bp_mispred_out || pc_sel==2'd2),
-    .i_cache_wait(!mmu_fetch_valid),
-=======
     .br_flush(br_flush),
->>>>>>> main
     
     .EX_stall(!EX_done),
 
