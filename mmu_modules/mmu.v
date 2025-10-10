@@ -104,28 +104,35 @@ reg [ 3:0] dcache_mask_r;
 // Output Control
 //----------------------------------------
 
+wire req_d_rd; 
+wire req_d_wr;
+wire req_i_rd;
+wire vm_d_rd;
+wire vm_d_wr;
+wire vm_i_rd;
+
 // with addr error detection
 if(ADDR_ERROR_DETECT)
-begin
+begin : gen_addr_error_detect
     // wire cache_interupt = ((dcache_addr_r >= I_ADDR_MIN) && (dcache_addr_r <= I_ADDR_MAX));
     wire icache_addr_error = !((icache_addr_r >= D_ADDR_MIN) && (icache_addr_r <= D_ADDR_MAX));
     wire dcache_addr_error = !((dcache_addr_r >= D_ADDR_MIN) && (dcache_addr_r <= D_ADDR_MAX));
 
-    wire req_d_rd = lsu_in_rd_i && ~dcache_addr_error;
-    wire req_d_wr = lsu_in_wr_i && ~dcache_addr_error;
-    wire req_i_rd = fetch_rd_i && ~icache_addr_error;
-    wire vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte) && ~dcache_addr_error;
-    wire vm_d_wr = lsu_in_wr_i && dtlb_hit && ~dcache_addr_error;
-    wire vm_i_rd = fetch_rd_i && itlb_hit && ~icache_addr_error;
+    assign req_d_rd = lsu_in_rd_i && ~dcache_addr_error;
+    assign req_d_wr = lsu_in_wr_i && ~dcache_addr_error;
+    assign req_i_rd = fetch_rd_i && ~icache_addr_error;
+    assign vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte) && ~dcache_addr_error;
+    assign vm_d_wr = lsu_in_wr_i && dtlb_hit && ~dcache_addr_error;
+    assign vm_i_rd = fetch_rd_i && itlb_hit && ~icache_addr_error;
 
-end else begin
+end else begin : gen_addr_directly
     // without addr error detection 
-    wire req_d_rd = lsu_in_rd_i;
-    wire req_d_wr = lsu_in_wr_i;
-    wire req_i_rd = fetch_rd_i;
-    wire vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte);
-    wire vm_d_wr = lsu_in_wr_i && dtlb_hit;
-    wire vm_i_rd = fetch_rd_i && itlb_hit;
+    assign req_d_rd = lsu_in_rd_i;
+    assign req_d_wr = lsu_in_wr_i;
+    assign req_i_rd = fetch_rd_i;
+    assign vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte);
+    assign vm_d_wr = lsu_in_wr_i && dtlb_hit;
+    assign vm_i_rd = fetch_rd_i && itlb_hit;
     
 end
 

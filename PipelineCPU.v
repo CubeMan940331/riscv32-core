@@ -591,7 +591,7 @@ assign d_mem_rd_en = mmu_dcache_rd;
 assign d_mem_addr = mmu_dcache_addr;
 assign d_mem_wr_data = mmu_dcache_data;
 
-mmu #(.MMU_SUPPORT(1), .ADDR_ERROR_DETECT(1))
+mmu #(.MMU_SUPPORT(1), .ADDR_ERROR_DETECT(0))
 u_mmu(
     .clk_i               (clk),
     .rst_i               (rst_n),
