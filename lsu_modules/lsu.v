@@ -37,7 +37,7 @@ module lsu
     ,output          mmu_dinvalidate_o
     ,output          mmu_dwriteback_o
 
-    ,output  reg [31:0]  writeback_value_o
+    ,output  [31:0]  writeback_value_o
     ,output          writeback_valid_o
 
     ,output  [5:0]   exception_o
@@ -47,7 +47,7 @@ module lsu
 //  Parameter Declaration
 // --------------------------------------------
 
-localparam DATASIZE = 77;
+localparam DATASIZE = 78;
 
 // --------------------------------------------
 //  Register Declaration
@@ -87,6 +87,7 @@ wire                resp_rd;
 wire                resp_wr;
 wire        [ 3:0]  resp_mask;
 wire        [ 2:0]  resp_u_type;
+wire                resp_addr_unaligned;
 
 // --------------------------------------------
 //  Opcode 
@@ -313,7 +314,7 @@ wire pop_q = mmu_valid_i && resp_valid_o;
 wire mem_sign = sign_inst || u_sign;
 wire mem_lb = lb_inst || u_lh;
 
-assign {resp_addr, resp_data, resp_lb, resp_lh, resp_lw, resp_signed, resp_rd, resp_wr, resp_mask, resp_u_type} = resp_data_o; 
+assign {resp_addr, resp_data, resp_lb, resp_lh, resp_lw, resp_signed, resp_rd, resp_wr, resp_mask, resp_u_type, resp_addr_unaligned} = resp_data_o; 
 
 reg pop_pre;
 always @(posedge clk_i or negedge rst_i)begin
@@ -327,9 +328,9 @@ always @(*)begin
     data_q_i = {(DATASIZE){1'b0}};
 
     if (ld_inst || u_rd)
-        data_q_i = {mem_addr_r, 32'b0, mem_lb, lh_inst, lw_inst, mem_sign, mem_rd_r, 1'b0, mem_mask_r, u_type};
+        data_q_i = {mem_addr_r, 32'b0, mem_lb, lh_inst, lw_inst, mem_sign, mem_rd_r, 1'b0, mem_mask_r, u_type, addr_unaligned};
     else if (st_inst || u_wr)
-        data_q_i = {mem_addr_r, mem_data_wr_r, mem_lb, lh_inst, lw_inst, mem_sign, 1'b0, mem_wr_r, mem_mask_r, u_type};
+        data_q_i = {mem_addr_r, mem_data_wr_r, mem_lb, lh_inst, lw_inst, mem_sign, 1'b0, mem_wr_r, mem_mask_r, u_type, addr_unaligned};
     else 
         data_q_i = {(DATASIZE){1'b0}};
 end
@@ -358,35 +359,33 @@ lsu_queue #(
 
 reg [31:0] writeback_value_r;
 reg [31:0] writeback_value_pre;
+reg [31:0] writeback_value_ma;
 reg [ 3:0] writeback_mask_pre;
 reg        resp_valid_pre;
 
-assign writeback_valid_o = {resp_valid_pre, resp_valid_o} == 2'b10;
+wire is_ma = !(resp_u_type == 3'b0);
+
+// assign writeback_valid_o = {resp_valid_pre, resp_valid_o} == 2'b10;ma
+assign writeback_valid_o = (!resp_addr_unaligned && mmu_valid_i);
+assign writeback_value_o = (is_ma)? writeback_value_ma : writeback_value_r;
 
 always @(posedge clk_i or negedge rst_i) begin
     if(!rst_i)
     begin
-        writeback_value_o <= 32'h0;
         writeback_value_pre <= 32'h0;
         resp_valid_pre <= 0;
     end
     else
     begin
-        case(resp_u_type)
-        3'h1: writeback_value_o <= {writeback_value_r[23:0], writeback_value_pre[ 7:0]};
-        3'h2: writeback_value_o <= {writeback_value_r[ 7:0], writeback_value_pre[23:0]};
-        3'h3: writeback_value_o <= {writeback_value_r[15:0], writeback_value_pre[15:0]};
-        3'h4: writeback_value_o <= {writeback_value_r[23:0], writeback_value_pre[ 7:0]};
-        default: writeback_value_o <= writeback_value_r; 
-        endcase
-
         resp_valid_pre <= resp_valid_o;
-        writeback_value_pre <= (mmu_valid_i)?writeback_value_r:writeback_value_pre; 
+        if(mmu_valid_i)
+            writeback_value_pre <= writeback_value_r;
     end
 end
 
 always @(*)begin
     writeback_value_r = 32'b0;
+    writeback_value_ma = 32'h0;
 
     case(resp_mask)
     4'b0001: writeback_value_r = {24'b0, mmu_value_i[7:0]};
@@ -406,7 +405,14 @@ always @(*)begin
         writeback_value_r = {16'hFFFF, writeback_value_r[15:0]};
     else if(resp_signed && resp_lb && writeback_value_r[7])
         writeback_value_r = {24'hFFFFFF, writeback_value_r[7:0]};
-    
+
+    case(resp_u_type)
+        3'h1: writeback_value_ma = {writeback_value_r[23:0], writeback_value_pre[ 7:0]};
+        3'h2: writeback_value_ma = {writeback_value_r[ 7:0], writeback_value_pre[23:0]};
+        3'h3: writeback_value_ma = {writeback_value_r[15:0], writeback_value_pre[15:0]};
+        3'h4: writeback_value_ma = {writeback_value_r[23:0], writeback_value_pre[ 7:0]};
+        default: writeback_value_ma = writeback_value_r; 
+    endcase
 end
 
 endmodule
