@@ -3,6 +3,7 @@
 module PipelineCtrl(
     input br_flush
 
+    ,input IF_stall
     ,input EX_stall
 
 // Pipeline control
@@ -35,6 +36,13 @@ always @(*)begin
         // clear Id, EX next clock
         ID_clear=1;
         EX_clear=1;
+    end
+    else if(IF_stall) begin
+	// freeze IF, ID
+	pc_en=0;
+	ID_en=0;
+	// insert nop to ID
+	ID_clear=1;
     end
     else if(EX_stall) begin
         // freeze IF, ID, EX
