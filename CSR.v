@@ -17,6 +17,7 @@ module CSR (
     input                       is_f_ext_i,
     input                       i_cache_exception_i,
     input  [1:0]                d_cache_exception_i,
+    input  [1:0]                dma_exception_i,
     input                       interrupt_i,
 
     input  [11:0]               csr_wr_addr_i,
@@ -127,9 +128,9 @@ always @(*) begin
         csr_exception_r = `EXCEPTION_ILLEGAL_INSTRUCTION;
     else if (interrupt_i)
         csr_exception_r = `EXCEPTION_INTERRUPT
-    else if (i_cache_exception_i || d_cache_exception_i[0])
+    else if (i_cache_exception_i || d_cache_exception_i[0] || dma_exception_i[0])
         csr_exception_r = `EXCEPTION_FAULT_LOAD
-    else if (d_cache_exception_i[i])
+    else if (d_cache_exception_i[1] || dma_exception_i[1])
         csr_exception_r = `EXCEPTION_FAULT_STORE
     else if ((inst & `INST_ECALL_MASK) == `INST_ECALL)
         csr_exception_r = `EXCEPTION_ECALL + {4'b0, csr_priv};
