@@ -15,8 +15,12 @@ module CSR (
     input                       is_fpu_done_i,
     input  [4:0]                fpu_flags_i,
     input                       is_f_ext_i,
-    input  [11:0]               csr_wr_addr_i,
+    input                       i_cache_exception_i,
+    input  [1:0]                d_cache_exception_i,
+    input  [1:0]                dma_exception_i,
+    input                       interrupt_i,
 
+    input  [11:0]               csr_wr_addr_i,
     input  [31:0]               exception_pc_i,
     input  [11:0]               csr_rd_addr_i,
 
@@ -120,14 +124,20 @@ always @(*) begin
     end
 
     // CSR time(e1) exception generation
-    if ((inst & `INST_ECALL_MASK) == `INST_ECALL)
+    if (csr_mstatus[`SR_FS_R] == `SR_FS_OFF && is_f_ext_i)
+        csr_exception_r = `EXCEPTION_ILLEGAL_INSTRUCTION;
+    else if (interrupt_i)
+        csr_exception_r = `EXCEPTION_INTERRUPT
+    else if (i_cache_exception_i || d_cache_exception_i[0] || dma_exception_i[0])
+        csr_exception_r = `EXCEPTION_FAULT_LOAD
+    else if (d_cache_exception_i[1] || dma_exception_i[1])
+        csr_exception_r = `EXCEPTION_FAULT_STORE
+    else if ((inst & `INST_ECALL_MASK) == `INST_ECALL)
         csr_exception_r = `EXCEPTION_ECALL + {4'b0, csr_priv};
-    else if ((inst & `INST_ERET_MASK) == `INST_ERET)
-        csr_exception_r = `EXCEPTION_ERET_U + {4'b0, csr_priv};
     else if ((inst & `INST_EBREAK_MASK) == `INST_EBREAK)
         csr_exception_r = `EXCEPTION_BREAKPOINT;
-    else if (csr_mstatus[`SR_FS_R] == `SR_FS_OFF && is_f_ext_i)
-        csr_exception_r = `EXCEPTION_ILLEGAL_INSTRUCTION;
+    else if ((inst & `INST_ERET_MASK) == `INST_ERET)
+        csr_exception_r = `EXCEPTION_ERET_U + {4'b0, csr_priv};
     else if (is_fpu_done_i && csr_mstatus[`SR_FS_R] != `SR_FS_OFF)
         csr_exception_r = `EXCEPTION_FPU;
     else if ((inst & `INST_IFENCE_MASK) == `INST_IFENCE)
