@@ -2,6 +2,10 @@ module Fetch (
      input clk
     ,input rst_n
 
+// inst. mem interface
+    ,output i_req_o
+    ,input i_ready_i
+
     ,input en
 // feed back from EX for bp
     ,input [31:0] EX_pc_i
@@ -17,6 +21,7 @@ module Fetch (
     ,input EX_csr_br_taken_i
     ,input [31:0] EX_csr_br_target_i
 // output
+    ,output IF_stall_o
     ,output br_flush_o
     
     ,output bp_pred_taken_o
@@ -25,6 +30,16 @@ module Fetch (
     ,output [31:0] pc_o
     ,output [31:0] pc_p4_o
 );
+reg state; // 0 ready, 1 wait
+always @(posedge clk or negedge rst_n) begin
+    if(!rst_n) state <= 0;
+    else begin
+        if(i_ready_i) state <= 0;
+        else if(!state) state <= 1;
+    end
+end
+assign i_req_o = (!state);
+assign IF_stall_o = !i_ready_i;
 
 reg [31:0] pc_in;
 

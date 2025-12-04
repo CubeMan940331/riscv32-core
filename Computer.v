@@ -2,7 +2,7 @@ module Computer(
     input clk,
     input rst_n
 );
-
+wire i_req, i_ready;
 wire [31:0] i_mem_addr;
 wire [31:0] inst;
 
@@ -23,6 +23,8 @@ m_DataMemory(
     .i_addr(i_mem_addr),
     .inst(inst),
     .i_available_o(i_mem_available),
+    .i_req_i(i_req),
+    .i_ready_o(i_ready),
     
     .wr_en(d_mem_wr_en),
     .rd_en(d_mem_rd_en),
@@ -40,6 +42,8 @@ PipelineCPU m_core0(
     .i_mem_addr(i_mem_addr),
     .inst(inst),
     .i_mem_available(i_mem_available),
+    .i_req(i_req),
+    .i_ready(i_ready),
     
     .d_mem_ctrl(d_mem_ctrl),
     .d_mem_addr(d_mem_addr),

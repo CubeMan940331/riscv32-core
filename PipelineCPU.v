@@ -6,6 +6,8 @@ module PipelineCPU (
     output [31:0] i_mem_addr,
     input  [31:0] inst,
     input         i_mem_available,
+    output i_req,
+    input i_ready,
 
     output [3:0] d_mem_ctrl,
     output d_mem_wr_en,
@@ -24,6 +26,9 @@ wire [31:0]pc_out;
 wire [31:0]pc_p4;
 
 assign i_mem_addr = pc_out;
+
+// IF =========================
+wire IF_stall;
 
 // ID_Reg =====================
 wire ID_clear;
@@ -228,6 +233,7 @@ wire br_flush;
 PipelineCtrl m_PipelineCtrl(
     .br_flush(br_flush),
     
+    .IF_stall(IF_stall),
     .EX_stall(!EX_done),
 
     .pc_en(pc_en),
@@ -253,7 +259,10 @@ Fetch m_Fetch(
      .clk(clk)
     ,.rst_n(rst_n) 
     ,.en(pc_en)
-    
+// inst. mem interface
+    ,.i_req_o(i_req)
+    ,.i_ready_i(i_ready)
+// feed back from EX
     ,.EX_pc_i(EX_pc_out)
 
     ,.EX_bp_pred_taken_i(EX_bp_pred_taken_out)
@@ -267,6 +276,7 @@ Fetch m_Fetch(
     ,.EX_csr_br_taken_i(csr_br_taken)
     ,.EX_csr_br_target_i(csr_br_target)
 // output
+    ,.IF_stall_o(IF_stall)
     ,.br_flush_o(br_flush)
 
     ,.bp_pred_taken_o(bp_pred_taken_out)
