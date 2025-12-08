@@ -23,8 +23,6 @@ module mmu
     ,input  [31:0]  satp_i
     ,input  [1:0]   priv_i
 
-    // Fetch Interface
-    
     // LSU Interface
     ,input  [31:0]  fetch_pc_i
     ,input          fetch_rd_i
@@ -210,7 +208,6 @@ assign dcache_writeback_o   = lsu_in_writeback_i;
 // Dcache Decoder (cachable control)
 // check memory address is in bypass range
 assign d_cachable_o = (dcache_addr_r >= D_BYPASS_ADDR_MIN) && (dcache_addr_r <= D_BYPASS_ADDR_MAX);
-// assign i_cachable_o = (icache_addr_r >= I_BYPASS_ADDR_MIN) && (icache_addr_r <= I_BYPASS_ADDR_MAX);
 
 // icache other signal
 assign icache_invalidate_o = 0;

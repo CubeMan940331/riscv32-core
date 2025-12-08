@@ -556,7 +556,7 @@ u_lsu (
     .rst_i             (rst_n),
 
     // Instruction
-    .fetch_rd_i        (pc_en),
+    .fetch_rd_i        (1'b1),
     .fetch_pc_i        (pc_out),
     .fetch_valid_o     (lsu_fetch_valid),
     .fetch_inst_o      (lsu_fetch_inst),

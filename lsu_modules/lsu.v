@@ -124,7 +124,6 @@ wire sign_inst = ex_mem_ctrl_i[3] && ex_mem_rd_i;
 wire ld_inst = (lb_inst || lh_inst || lw_inst);
 wire st_inst = (sb_inst || sh_inst || sw_inst);
 
-
 wire csrrw_inst = ((opcode_inst_i & `INST_CSRRW_MASK) == `INST_CSRRW);
 
 // CSRRW Instruction
@@ -142,6 +141,10 @@ assign mmu_dinvalidate_o = dinvalidate && csrrw_inst;
 //  Error Detection
 // --------------------------------------------
 
+wire fetch_misaligned;
+
+assign fetch_misaligned = !(fetch_pc_i[1:0] == 2'b00);
+
 reg unaligned_1_r;
 reg unaligned_2_r; 
 
@@ -158,7 +161,9 @@ always @(*)begin
 end
 
 
-assign exception_o = (resp_rd && mmu_read_excpt_i)?`EXCEPTION_PAGE_FAULT_LOAD:
+
+assign exception_o = (fetch_rd_i && fetch_misaligned)?`EXCEPTION_MISALIGNED_FETCH: 
+                     (resp_rd && mmu_read_excpt_i)?`EXCEPTION_PAGE_FAULT_LOAD:
                      (resp_wr && mmu_write_excpt_i)?`EXCEPTION_PAGE_FAULT_STORE:
                      6'h0;
 
@@ -233,10 +238,8 @@ end
 
 assign mmu_addr_o   = {resp_addr[31:2],2'b00};
 assign mmu_data_o   = resp_data;
-// assign mmu_rd_o     = resp_valid_o && resp_rd && !mmu_valid_i;
-assign mmu_rd_o     = resp_valid_o && resp_rd;
-// assign mmu_wr_o     = resp_valid_o && resp_wr && !mmu_valid_i;
-assign mmu_wr_o     = resp_valid_o && resp_wr;
+assign mmu_rd_o     = resp_valid_o && resp_rd && !mmu_valid_i;
+assign mmu_wr_o     = resp_valid_o && resp_wr && !mmu_valid_i;
 assign mmu_mask_o   = (mmu_wr_o)?resp_mask: (mmu_rd_o)?4'hf: 4'h0;
 
 // --------------------------------------------
