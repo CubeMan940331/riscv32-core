@@ -24,12 +24,10 @@ module mmu
     ,input  [1:0]   priv_i
 
     // Fetch Interface
-    ,input  [31:0]  fetch_pc_i
-    ,input          fetch_rd_i
-    ,output [31:0]  fetch_out_value_o
-    ,output         fetch_out_valid_o
     
     // LSU Interface
+    ,input  [31:0]  fetch_pc_i
+    ,input          fetch_rd_i
     ,input  [31:0]  lsu_in_addr_i
     ,input  [31:0]  lsu_in_data_i
     ,input          lsu_in_rd_i
@@ -38,6 +36,9 @@ module mmu
     ,input          lsu_in_flush_i
     ,input          lsu_in_invalidate_i
     ,input          lsu_in_writeback_i
+
+    ,output [31:0]  fetch_out_value_o
+    ,output         fetch_out_valid_o
     ,output [31:0]  lsu_out_value_o
     ,output         lsu_out_valid_o
 
@@ -45,29 +46,30 @@ module mmu
     ,input  [31:0]  dcache_in_value_i
     ,input          dcache_in_valid_i
 
-    ,output [31:0]  dcache_addr_o
-    ,output [31:0]  dcache_value_o
-    ,output         dcache_rd_o
-    ,output         dcache_wr_o
-    ,output [ 3:0]  dcache_mask_o
-    ,output         dcache_flush_o
+    ,output [31:0]  dcache_addr_o      
+    ,output [31:0]  dcache_value_o     
+    ,output         dcache_rd_o        
+    ,output         dcache_wr_o        
+    ,output [ 3:0]  dcache_mask_o      
+    ,output         dcache_flush_o     
     ,output         dcache_invalidate_o
-    ,output         dcache_writeback_o
+    ,output         dcache_writeback_o 
+    ,output         d_cachable_o       
 
     // Icache Interface
     ,input  [31:0]  icache_in_value_i
     ,input          icache_in_valid_i
     ,output [31:0]  icache_addr_o
     ,output         icache_rd_o
+    ,output         icache_invalidate_o       // new
 
     // exception 
-    ,output         load_fault_o
-    ,output         store_fault_o
-    ,output         inst_fault_o
-
-    // Memory Decoder
-    ,output         d_cachable_o
-    // ,output         i_cachable_o
+    ,input          dcache_exception_i        // new
+    ,input          icache_exception_i        // new
+    
+    ,output         read_except_o             // dcache_exception    
+    ,output         write_except_o            // dcache_exception
+    ,output         exe_except_o              // icache_exception
 );
 
 generate
@@ -196,9 +198,9 @@ always @(*)begin
 end
 
 // fault signal
-assign load_fault_o     = lsu_in_rd_i   && ( ptw_pte_fault_o || (!dtlb_entry_o[`PAGE_READ]  && dtlb_hit));
-assign store_fault_o    = lsu_in_wr_i && ( ptw_pte_fault_o || (!dtlb_entry_o[`PAGE_WRITE] && dtlb_hit));
-assign inst_fault_o     = fetch_rd_i    && ( ptw_pte_fault_o || (!itlb_entry_o[`PAGE_EXEC]  && itlb_hit));
+assign read_except_o     = lsu_in_rd_i && ( ptw_pte_fault_o || (!dtlb_entry_o[`PAGE_READ]  && dtlb_hit));
+assign write_except_o    = lsu_in_wr_i && ( ptw_pte_fault_o || (!dtlb_entry_o[`PAGE_WRITE] && dtlb_hit));
+assign exe_except_o      = fetch_rd_i  && ( ptw_pte_fault_o || (!itlb_entry_o[`PAGE_EXEC]  && itlb_hit));
 
 // Dcache others signal
 assign dcache_invalidate_o  = lsu_in_invalidate_i;
@@ -210,6 +212,8 @@ assign dcache_writeback_o   = lsu_in_writeback_i;
 assign d_cachable_o = (dcache_addr_r >= D_BYPASS_ADDR_MIN) && (dcache_addr_r <= D_BYPASS_ADDR_MAX);
 // assign i_cachable_o = (icache_addr_r >= I_BYPASS_ADDR_MIN) && (icache_addr_r <= I_BYPASS_ADDR_MAX);
 
+// icache other signal
+assign icache_invalidate_o = 0;
 
 // ---------------------------------------
 // Privilege Control
@@ -342,9 +346,9 @@ assign dcache_flush_o = lsu_in_flush_i;
 assign dcache_writeback_o = lsu_in_writeback_i;
 assign dcache_invalidate_o = lsu_in_invalidate_i;
 assign icache_addr_o = fetch_pc_i;
-assign load_fault_o = 0;
-assign store_fault_o = 0;
-assign inst_fault_o = 0;
+assign read_except_o = 0;
+assign write_except_o = 0;
+assign exe_except_o   = 0;
 assign d_cachable_o = 0;
 
 end

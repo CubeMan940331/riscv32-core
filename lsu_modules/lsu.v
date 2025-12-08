@@ -12,7 +12,15 @@ module lsu
 (   
      input           clk_i
     ,input           rst_i
-    ,input   [31:0]  opcode_opcode_i
+
+    // fetch Interface
+    ,input         fetch_rd_i
+    ,input  [31:0] fetch_pc_i
+    ,output        fetch_valid_o
+    ,output [31:0] fetch_inst_o
+
+    // data Interface
+    ,input   [31:0]  opcode_inst_i
     ,input   [31:0]  opcode_ra_data_i
     ,input   [31:0]  opcode_rb_data_i
     ,input   [31:0]  opcode_fp_data_i
@@ -23,10 +31,16 @@ module lsu
     ,input           ex_mem_wr_i
     ,input   [ 3:0]  ex_mem_ctrl_i
 
+    // mmu interface
+    // Icache
+    ,input           mmu_i_valid_i
+    ,input   [31:0]  mmu_i_inst_i
+    ,output          mmu_i_rd_o
+    ,output  [31:0]  mmu_i_pc_o
+
+    // Dcache
     ,input   [31:0]  mmu_value_i
     ,input           mmu_valid_i
-    ,input           mmu_load_fault
-    ,input           mmu_store_fault
 
     ,output  [31:0]  mmu_addr_o
     ,output  [31:0]  mmu_data_o
@@ -37,9 +51,15 @@ module lsu
     ,output          mmu_dinvalidate_o
     ,output          mmu_dwriteback_o
 
+    // writeback interface
     ,output  [31:0]  writeback_value_o
     ,output          writeback_valid_o
 
+    // exception
+    ,input           mmu_read_excpt_i
+    ,input           mmu_write_excpt_i
+    ,input           mmu_exe_excpt_i
+    
     ,output  [5:0]   exception_o
 );
 
@@ -105,14 +125,14 @@ wire ld_inst = (lb_inst || lh_inst || lw_inst);
 wire st_inst = (sb_inst || sh_inst || sw_inst);
 
 
-wire csrrw_inst = ((opcode_opcode_i & `INST_CSRRW_MASK) == `INST_CSRRW);
+wire csrrw_inst = ((opcode_inst_i & `INST_CSRRW_MASK) == `INST_CSRRW);
 
 // CSRRW Instruction
 wire dflush, dwriteback, dinvalidate;
 
-assign dflush       = opcode_valid_i && (opcode_opcode_i[31:20] == `CSR_DFLUSH);
-assign dwriteback   = opcode_valid_i && (opcode_opcode_i[31:20] == `CSR_DWRITEBACK);
-assign dinvalidate  = opcode_valid_i && (opcode_opcode_i[31:20] == `CSR_DINVALIDATE);
+assign dflush       = opcode_valid_i && (opcode_inst_i[31:20] == `CSR_DFLUSH);
+assign dwriteback   = opcode_valid_i && (opcode_inst_i[31:20] == `CSR_DWRITEBACK);
+assign dinvalidate  = opcode_valid_i && (opcode_inst_i[31:20] == `CSR_DINVALIDATE);
 
 assign mmu_dflush_o = dflush && csrrw_inst;
 assign mmu_dwriteback_o = dwriteback && csrrw_inst;
@@ -138,8 +158,8 @@ always @(*)begin
 end
 
 
-assign exception_o = (resp_rd && mmu_load_fault)?`EXCEPTION_PAGE_FAULT_LOAD:
-                     (resp_wr && mmu_store_fault)?`EXCEPTION_PAGE_FAULT_STORE:
+assign exception_o = (resp_rd && mmu_read_excpt_i)?`EXCEPTION_PAGE_FAULT_LOAD:
+                     (resp_wr && mmu_write_excpt_i)?`EXCEPTION_PAGE_FAULT_STORE:
                      6'h0;
 
 // --------------------------------------------
@@ -213,8 +233,10 @@ end
 
 assign mmu_addr_o   = {resp_addr[31:2],2'b00};
 assign mmu_data_o   = resp_data;
-assign mmu_rd_o     = resp_valid_o && resp_rd && !mmu_valid_i;
-assign mmu_wr_o     = resp_valid_o && resp_wr && !mmu_valid_i;
+// assign mmu_rd_o     = resp_valid_o && resp_rd && !mmu_valid_i;
+assign mmu_rd_o     = resp_valid_o && resp_rd;
+// assign mmu_wr_o     = resp_valid_o && resp_wr && !mmu_valid_i;
+assign mmu_wr_o     = resp_valid_o && resp_wr;
 assign mmu_mask_o   = (mmu_wr_o)?resp_mask: (mmu_rd_o)?4'hf: 4'h0;
 
 // --------------------------------------------
@@ -414,5 +436,14 @@ always @(*)begin
         default: writeback_value_ma = writeback_value_r; 
     endcase
 end
+
+// --------------------------------------------
+//  Icache Interface
+// --------------------------------------------
+
+assign fetch_inst_o = mmu_i_inst_i;
+assign fetch_valid_o = mmu_i_valid_i;
+assign mmu_i_pc_o = fetch_pc_i;
+assign mmu_i_rd_o = fetch_rd_i;
 
 endmodule
