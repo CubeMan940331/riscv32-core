@@ -21,7 +21,13 @@ module PipelineCPU (
     output        d_mem_cacheable,
     input  [31:0] d_mem_rd_data,
     input         d_mem_available,
-    input         d_mem_exception
+    input  [1:0]  d_mem_exception,
+
+    output [31:0] cdma_data_o,
+    output [31:0] cdma_addr_o,
+    input         cdma_rdy_i,
+    input  [31:0] cdma_data_i,
+    input  [1:0]  cdma_exception_i
 );
 //wires
 //================================================================
@@ -278,6 +284,13 @@ Fetch m_Fetch(
     ,.pc_p4_o(pc_p4)
 );
 
+reg [31:0] pc_out_r;
+reg [31:0] pc_p4_r;
+always @(posedge clk or negedge rst_n)begin
+    pc_out_r <= pc_out;
+    pc_p4_r <= pc_p4;
+end
+
 Decode m_ID(
     .clk(clk),
     .rst_n(rst_n),
@@ -287,6 +300,8 @@ Decode m_ID(
 
     .pc_i(pc_out),
     .pc_p4_i(pc_p4),
+    // .pc_i(pc_out_r),
+    // .pc_p4_i(pc_p4_r),
     .inst_i(lsu_fetch_inst),
 
     .bp_pred_taken_i(bp_pred_taken_out),
@@ -598,6 +613,9 @@ u_lsu (
 // // MMU =========================
 wire [1:0] mmu_priv = 2'b0; // temp setting
 
+assign cdma_data_o = d_mem_wr_data;
+assign cdma_addr_o = d_mem_addr;
+
 mmu #(.MMU_SUPPORT(1), .ADDR_ERROR_DETECT(0))
 u_mmu(
     .clk_i               (clk),
@@ -635,6 +653,10 @@ u_mmu(
     .dcache_invalidate_o (d_mem_invalidate),
     .dcache_writeback_o  (d_mem_writeback),
     .d_cachable_o        (d_mem_cacheable),
+
+    // cdma interface
+    .cdma_data_i         (cdma_data_i),
+    .cdma_rdy_i          (cdma_rdy_i),
     
     // instruction cache interface
     .icache_in_value_i   (inst),
@@ -646,6 +668,7 @@ u_mmu(
     // exception
     .icache_exception_i  (i_mem_exception),
     .dcache_exception_i  (d_mem_exception),
+    .cdma_exception_i    (cdma_exception_i),
     .read_except_o       (mmu_lsu_rd_except),
     .write_except_o      (mmu_lsu_wr_except),
     .exe_except_o        (mmu_lsu_ex_except)

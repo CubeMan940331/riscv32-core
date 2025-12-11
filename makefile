@@ -11,7 +11,7 @@ CFLAGS    := -std=c++17
 
 all: $(OBJ_DIR)/V$(TOP)
 
-$(OBJ_DIR)/V$(TOP).mk: $(wildcard *.v) $(TB)
+$(OBJ_DIR)/V$(TOP).mk: $(wildcard *.v) $(TB) mmu_modules/*.v lsu_modules/*.v
 	$(VERILATOR) $(VFLAGS) $(TOP).v --exe $(TB) -CFLAGS $(CFLAGS)
 
 verilate: $(OBJ_DIR)/V$(TOP).mk

@@ -17,7 +17,7 @@ wire d_mem_flush;
 wire d_mem_writeback;
 wire d_mem_invalidate;
 wire d_mem_cacheable;
-wire d_mem_exception = 0;
+wire [1:0] d_mem_exception = 2'b0;
 wire [3:0] d_mem_ctrl;
 wire [31:0] d_mem_addr;
 wire [31:0] d_mem_wr_data;
@@ -29,6 +29,7 @@ m_DataMemory(
     .clk(clk),
     
     .i_addr(i_mem_addr),
+    .i_rd(i_mem_rd),
     .inst(inst),
     .i_available_o(i_mem_available),
     
@@ -63,7 +64,13 @@ PipelineCPU m_core0(
     .d_mem_flush(d_mem_flush),
     .d_mem_cacheable(d_mem_cacheable),
     .d_mem_available(d_mem_available),
-    .d_mem_exception(d_mem_exception)
+    .d_mem_exception(d_mem_exception),
+    
+    .cdma_data_o(),
+    .cdma_addr_o(),
+    .cdma_rdy_i(1'b0),
+    .cdma_data_i(32'b0),
+    .cdma_exception_i(2'b0)
 );
 
 endmodule

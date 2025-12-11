@@ -160,8 +160,6 @@ always @(*)begin
         unaligned_1_r = (mem_addr_r[1:0] == 2'b11);
 end
 
-
-
 assign exception_o = (fetch_rd_i && fetch_misaligned)?`EXCEPTION_MISALIGNED_FETCH: 
                      (resp_rd && mmu_read_excpt_i)?`EXCEPTION_PAGE_FAULT_LOAD:
                      (resp_wr && mmu_write_excpt_i)?`EXCEPTION_PAGE_FAULT_STORE:
@@ -238,8 +236,8 @@ end
 
 assign mmu_addr_o   = {resp_addr[31:2],2'b00};
 assign mmu_data_o   = resp_data;
-assign mmu_rd_o     = resp_valid_o && resp_rd && !mmu_valid_i;
-assign mmu_wr_o     = resp_valid_o && resp_wr && !mmu_valid_i;
+assign mmu_rd_o     = resp_valid_o && resp_rd;
+assign mmu_wr_o     = resp_valid_o && resp_wr;
 assign mmu_mask_o   = (mmu_wr_o)?resp_mask: (mmu_rd_o)?4'hf: 4'h0;
 
 // --------------------------------------------
