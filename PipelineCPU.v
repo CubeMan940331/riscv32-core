@@ -185,7 +185,9 @@ wire        lsu_mmu_dinvalidafte;
 wire        lsu_mmu_dwriteback;
 wire [31:0] lsu_writeback_value_o;
 wire        lsu_writeback_valid_o;
-wire [ 5:0] lsu_exception_o;
+wire        except_inst_ma;
+wire        except_page_fault_load;
+wire        except_page_fault_store;
 
 // MMU =========================
 wire [31:0] mmu_sapt;
@@ -607,7 +609,9 @@ u_lsu (
     .mmu_read_excpt_i  (mmu_lsu_rd_except),
     .mmu_write_excpt_i (mmu_lsu_wr_except),
     .mmu_exe_excpt_i   (mmu_lsu_ex_except),
-    .exception_o       (lsu_exception_o)
+    .except_inst_ma    (except_inst_ma),
+    .except_page_fault_load(except_page_fault_load),
+    .except_page_fault_store(except_page_fault_store)
 );
 
 // // MMU =========================
@@ -699,6 +703,9 @@ CSR m_CSR(
     .csr_wr_addr_i(EX_csr_addr_out),
     
     .exception_pc_i(EX_pc_out),
+    .except_inst_ma_i(except_inst_ma),
+    .except_page_fault_load_i(except_page_fault_load),
+    .except_page_fault_store_i(except_page_fault_store),
     .csr_rd_addr_i(EX_csr_addr_out),
 
     .csr_branch_o(csr_br_taken),

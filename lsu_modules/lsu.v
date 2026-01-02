@@ -60,7 +60,9 @@ module lsu
     ,input           mmu_write_excpt_i
     ,input           mmu_exe_excpt_i
     
-    ,output  [5:0]   exception_o
+    ,output          except_inst_ma
+    ,output          except_page_fault_load
+    ,output          except_page_fault_store
 );
 
 // --------------------------------------------
@@ -160,10 +162,10 @@ always @(*)begin
         unaligned_1_r = (mem_addr_r[1:0] == 2'b11);
 end
 
-assign exception_o = (fetch_rd_i && fetch_misaligned)?`EXCEPTION_MISALIGNED_FETCH: 
-                     (resp_rd && mmu_read_excpt_i)?`EXCEPTION_PAGE_FAULT_LOAD:
-                     (resp_wr && mmu_write_excpt_i)?`EXCEPTION_PAGE_FAULT_STORE:
-                     6'h0;
+assign except_inst_ma = (fetch_rd_i && fetch_misaligned);
+assign except_page_fault_load = (resp_rd && mmu_read_excpt_i);
+assign except_page_fault_store = (resp_wr && mmu_write_excpt_i);
+
 
 // --------------------------------------------
 //  Unaligned Control
