@@ -7,7 +7,7 @@ CYAN="\033[1;36m"
 RESET="\033[0m"
 
 # Compile testbench executable
-if ! make; then
+if ! (make -j8); then
     echo -e "${RED}Build failed. Stopping.${RESET}"
     exit 1
 fi

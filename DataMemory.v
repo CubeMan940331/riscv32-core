@@ -21,9 +21,10 @@ module DataMemory
 );
 
 reg [7:0] mem [0:SIZE-1] /* verilator public */;
-/*
+
 assign inst = i_addr<SIZE ? {mem[i_addr+3], mem[i_addr+2], mem[i_addr+1], mem[i_addr+0]}: 32'h0;
-*/
+assign i_ready_o = i_req_i;
+/*
 reg [31:0] inst_r;
 always @(posedge clk, negedge rst_n) begin
     if(!rst_n) begin
@@ -37,6 +38,7 @@ always @(posedge clk, negedge rst_n) begin
     end
 end
 assign inst = inst_r;
+*/
 
 assign i_available_o = 1;
 assign available_o = 1;

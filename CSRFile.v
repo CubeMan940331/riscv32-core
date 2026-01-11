@@ -394,9 +394,9 @@ always @(*) begin
             `EXCEPTION_PAGE_FAULT_INST:     csr_mtval_r = exception_pc_i;
             `EXCEPTION_ILLEGAL_INSTRUCTION,
             `EXCEPTION_MISALIGNED_LOAD,
-            `EXCEPTION_FAULT_LOAD,          csr_mtval_r = exception_addr_i; // for d-cache
+            `EXCEPTION_FAULT_LOAD:          csr_mtval_r = exception_addr_i; // for d-cache
             `EXCEPTION_MISALIGNED_STORE,
-            `EXCEPTION_FAULT_STORE,         csr_mtval_r = exception_addr_i; // for d-cache
+            `EXCEPTION_FAULT_STORE:         csr_mtval_r = exception_addr_i; // for d-cache
             `EXCEPTION_PAGE_FAULT_LOAD,
             `EXCEPTION_PAGE_FAULT_STORE:    csr_mtval_r = exception_addr_i;
             default:                        csr_mtval_r = 32'b0;

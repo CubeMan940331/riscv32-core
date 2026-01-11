@@ -151,6 +151,7 @@ wire EX_fetch_invalid_out;
 wire EX_start, EX_done;
 // ALU ========================
 wire [31:0] ALU_out;
+wire ALU_exception;
 
 // BranchCmp ==================
 wire br_taken; // indicate inst branch
@@ -488,6 +489,7 @@ Exec m_EX(
     // ALU
     .ALU_ctrl_o(EX_ALU_ctrl_out),
     .ALU_o(ALU_out),
+    .ALU_exception_o(ALU_exception),
     // MUL/DIV
     .is_MUL_DIV_o(EX_is_MUL_DIV_out),
     .MUL_DIV_ctrl_o(EX_MUL_DIV_ctrl_out),
@@ -659,6 +661,13 @@ CSR m_CSR(
     .is_fpu_done_i(FPU_done),
     .fpu_flags_i(FPU_flags),
     .is_f_ext_i(EX_is_f_ext),
+    
+    .alu_exception_i(ALU_exception),
+    .i_cache_exception_i(0),
+    .d_cache_exception_i(0),
+    .dma_exception_i(0),
+    .interrupt_i(0),
+
     .csr_wr_addr_i(EX_csr_addr_out),
     
     .exception_pc_i(EX_pc_out),

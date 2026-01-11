@@ -106,6 +106,7 @@ module Exec(
     // ALU
     ,output wire [3:0]  ALU_ctrl_o
     ,output wire [31:0] ALU_o
+    ,output wire ALU_exception_o
     // Branch
     ,output wire        br_taken_o
 
@@ -327,7 +328,10 @@ ALU_top m_ALU(
     .ALU_ctrl(ALU_ctrl_o),
     .a(ALU_src1),
     .b(ALU_src2),
-    .out(ALU_o)
+    .is_imm_i(ALU_sel2_o),
+    
+    .out(ALU_o),
+    .exception_o(ALU_exception_o)
 );
 assign ALU_done = ALU_start;
 
