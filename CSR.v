@@ -127,11 +127,11 @@ always @(*) begin
     if (csr_mstatus[`SR_FS_R] == `SR_FS_OFF && is_f_ext_i)
         csr_exception_r = `EXCEPTION_ILLEGAL_INSTRUCTION;
     else if (interrupt_i)
-        csr_exception_r = `EXCEPTION_INTERRUPT
+        csr_exception_r = `EXCEPTION_INTERRUPT;
     else if (i_cache_exception_i || d_cache_exception_i[0] || dma_exception_i[0])
-        csr_exception_r = `EXCEPTION_FAULT_LOAD
+        csr_exception_r = `EXCEPTION_FAULT_LOAD;
     else if (d_cache_exception_i[1] || dma_exception_i[1])
-        csr_exception_r = `EXCEPTION_FAULT_STORE
+        csr_exception_r = `EXCEPTION_FAULT_STORE;
     else if ((inst & `INST_ECALL_MASK) == `INST_ECALL)
         csr_exception_r = `EXCEPTION_ECALL + {4'b0, csr_priv};
     else if ((inst & `INST_EBREAK_MASK) == `INST_EBREAK)

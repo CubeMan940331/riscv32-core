@@ -32,9 +32,8 @@ always @(posedge clk, negedge rst_n) begin
     end
     else begin
         inst_r <= i_req_i ? (i_addr<SIZE ? {mem[i_addr+3], mem[i_addr+2], mem[i_addr+1], mem[i_addr+0]}: 32'h0):
-            32'h0;
-        if(i_req_i) i_ready_o <= 1;
-        else i_ready_o <= 0;
+            inst_r;
+        i_ready_o <= i_req_i;
     end
 end
 assign inst = inst_r;
