@@ -15,6 +15,7 @@ module CSR (
     input                       is_fpu_done_i,
     input  [4:0]                fpu_flags_i,
     input                       is_f_ext_i,
+    input                       pc_misalign_i,
     input                       alu_exception_i,
     input                       i_cache_exception_i,
     input  [1:0]                d_cache_exception_i,
@@ -127,6 +128,8 @@ always @(*) begin
     // CSR time(e1) exception generation
     if (csr_mstatus[`SR_FS_R] == `SR_FS_OFF && is_f_ext_i)
         csr_exception_r = `EXCEPTION_ILLEGAL_INSTRUCTION;
+    else if (pc_misalign_i)
+        csr_exception_r = `EXCEPTION_MISALIGNED_FETCH;
     else if (alu_exception_i)
         csr_exception_r = `EXCEPTION_ILLEGAL_INSTRUCTION;
     else if (interrupt_i)

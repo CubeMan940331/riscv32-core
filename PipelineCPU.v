@@ -148,6 +148,8 @@ wire [1:0] EX_bypass_sel_out;
 // Fence
 wire EX_fetch_invalid_out;
 
+wire EX_pc_missalign_out;
+
 wire EX_start, EX_done;
 // ALU ========================
 wire [31:0] ALU_out;
@@ -271,7 +273,7 @@ Fetch m_Fetch(
 
     ,.EX_is_br_i(EX_is_br_out)
     ,.EX_br_taken_i(br_taken) // inst br taken
-    ,.EX_br_target_i(ALU_out)
+    ,.EX_br_target_i({ALU_out[31:2], 2'b0}) // not support compress
     ,.EX_pc_p4_i(EX_pc_p4_out)
     
     ,.EX_csr_br_taken_i(csr_br_taken)
@@ -508,6 +510,8 @@ Exec m_EX(
     .bypass_o(bypass_out),
     // fetch
     .fetch_invalid_o(EX_fetch_invalid_out)
+
+    ,.pc_missalign_o(EX_pc_missalign_out)
 // EX control ==================
     ,.csr_exception_i(csr_exception)
     ,.EX_start_o(EX_start)
@@ -662,6 +666,7 @@ CSR m_CSR(
     .fpu_flags_i(FPU_flags),
     .is_f_ext_i(EX_is_f_ext),
     
+    .pc_misalign_i(EX_pc_missalign_out),
     .alu_exception_i(ALU_exception),
     .i_cache_exception_i(0),
     .d_cache_exception_i(0),

@@ -5,7 +5,7 @@ module BranchUnit (
     input [2:0] cmp_op,
     input signed [31:0] reg_rd_data1,
     input signed [31:0] reg_rd_data2,
-    
+
     output br_taken // inst br taken
 );
 // 0 beq
@@ -29,5 +29,6 @@ always @(*)begin
 end
 
 assign br_taken = inst_br_taken;
+
 
 endmodule

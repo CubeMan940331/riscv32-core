@@ -132,6 +132,7 @@ module Exec(
 
     ,output wire fetch_invalid_o
 // exception
+    ,output pc_missalign_o
     ,input wire [5:0] csr_exception_i
 // EX control
     ,output wire EX_start_o
@@ -363,5 +364,7 @@ assign Br_done = Br_start;
 assign EX_done_o = (!pc_valid_o) | (!is_impl_o) |
     ALU_done | Br_done | LSU_done_i | FPU_done_i |
     SYS_done_i | bypass_done | MUL_DIV_done_i;
+
+assign pc_missalign_o = br_taken_o && ALU_o[1];
 
 endmodule

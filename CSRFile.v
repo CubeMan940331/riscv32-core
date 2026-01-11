@@ -386,17 +386,17 @@ always @(*) begin
         csr_mstatus_r[`SR_SD_R]   = (csr_mstatus_r[`SR_FS_R] == `SR_FS_DIRTY) || (csr_mstatus_r[`SR_XS_R] == `SR_XS_DIRTY);
         csr_priv_r                = `PRIV_MACHINE;
         csr_mepc_r                = exception_pc_i;
-        csr_mcause_r              = {28'b0, exception_i[3:0]}; // need to check if this is correct
+        csr_mcause_r              = {28'b0, exception_i[3:0]};
         // Bad address / PC
         case (exception_i)
-            `EXCEPTION_MISALIGNED_FETCH,
             `EXCEPTION_FAULT_FETCH,
             `EXCEPTION_PAGE_FAULT_INST:     csr_mtval_r = exception_pc_i;
+            `EXCEPTION_MISALIGNED_FETCH,
             `EXCEPTION_ILLEGAL_INSTRUCTION,
             `EXCEPTION_MISALIGNED_LOAD,
-            `EXCEPTION_FAULT_LOAD:          csr_mtval_r = exception_addr_i; // for d-cache
+            `EXCEPTION_FAULT_LOAD,
             `EXCEPTION_MISALIGNED_STORE,
-            `EXCEPTION_FAULT_STORE:         csr_mtval_r = exception_addr_i; // for d-cache
+            `EXCEPTION_FAULT_STORE,
             `EXCEPTION_PAGE_FAULT_LOAD,
             `EXCEPTION_PAGE_FAULT_STORE:    csr_mtval_r = exception_addr_i;
             default:                        csr_mtval_r = 32'b0;
