@@ -35,7 +35,7 @@ for target in $(tail -n +2 $file_dir$test_list); do
     fi
 
     tohost_addr=$(
-        riscv32-unknown-elf-objdump -t $target | 
+        cat "$file_dir$test_name.dump" | 
         grep ' tohost$' | cut -c2-8
     )
     if [ -n "$tohost_addr" ]; then
