@@ -195,7 +195,7 @@ always @(*) begin
         `CSR_MHARTID:   csr_rd_data_r = cpu_id_i;
         // Trap Setup
         // no need in S-mode
-        `CSR_MSTATUS:   csr_rd_data_r = {csr_mstatus_q[31:13], (csr_mstatus_q[12:11] == 2'b11) ? 2'b11 : 2'b00, csr_mstatus_q[10:0]} & `CSR_MSTATUS_MASK;
+        `CSR_MSTATUS:   csr_rd_data_r = csr_mstatus_q & `CSR_MSTATUS_MASK;
         `CSR_MISA:      csr_rd_data_r = misa_i;
         `CSR_MEDELEG:   csr_rd_data_r = csr_medeleg_q & `CSR_MEDELEG_MASK;
         `CSR_MIDELEG:   csr_rd_data_r = csr_mideleg_q & `CSR_MIDELEG_MASK;
@@ -373,7 +373,7 @@ always @(*) begin
             csr_priv_r          = csr_mstatus_q[`SR_MPP_R];
             csr_mstatus_r[`SR_MIE_R] = csr_mstatus_q[`SR_MPIE_R];
             csr_mstatus_r[`SR_MPIE_R] = 1'b1; // previous is enabled
-            csr_mstatus_r[`SR_MPP_R] = `SR_MPP_M;
+            csr_mstatus_r[`SR_MPP_R] = `SR_MPP_U; // clear to least-priviledged supported mode
         end else begin
         // placeholder for sret handling
         end
