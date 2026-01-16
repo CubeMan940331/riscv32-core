@@ -79,34 +79,12 @@ int main(int argc, char **argv){
         dump_file=mem_file.substr(0,sep_pos)+".vcd";
     }
     
-    bool is_set_stop_pc=false;
-    int stop_pc;
+    bool is_set_tohost_addr=false;
+    uint32_t tohost_addr;
     if(argc>2){
         try{
-            stop_pc=stoi(argv[2]);
-            is_set_stop_pc=true;
-        }
-        catch(...){}
-    }
-    
-    bool is_set_pass_pc=false;
-    bool is_reach_pass_pc=false;
-    int pass_pc;
-    if(argc>3){
-        try{
-            pass_pc=stoi(argv[3]);
-            is_set_pass_pc=true;
-        }
-        catch(...){}
-    }
-    
-    bool is_set_fail_pc=false;
-    bool is_reach_fail_pc=false;
-    int fail_pc;
-    if(argc>4){
-        try{
-            fail_pc=stoi(argv[4]);
-            is_set_fail_pc=true;
+            tohost_addr=stoul(argv[2]);
+            is_set_tohost_addr=true;
         }
         catch(...){}
     }
@@ -130,23 +108,18 @@ int main(int argc, char **argv){
     }
     do_cycle(contextp, m_trace, top);
 
+    IData mem_data;
     top->rst_n = 1;
     for(int i=0; i<MAX_CYCLE; ++i){
-        if(
-            is_set_fail_pc &&
-            top->Computer->m_core0->WB_pc_valid_out &&
-            top->Computer->m_core0->WB_pc_out==fail_pc
-        ) is_reach_fail_pc=true;
-        else if(
-            is_set_pass_pc &&
-            top->Computer->m_core0->WB_pc_valid_out &&
-            top->Computer->m_core0->WB_pc_out==pass_pc
-        ) is_reach_pass_pc=true;
-        else if(
-            is_set_stop_pc &&
-            top->Computer->m_core0->WB_pc_valid_out &&
-            top->Computer->m_core0->WB_pc_out==stop_pc
-        ) break;
+        if(is_set_tohost_addr){
+            if(
+                top->Computer->d_mem_addr==tohost_addr &&
+                top->Computer->d_mem_wr_en
+            ){
+                mem_data = top->Computer->d_mem_wr_data;
+                break;
+            }
+        }
         do_cycle(contextp, m_trace, top);
     }
 
@@ -154,8 +127,10 @@ int main(int argc, char **argv){
     top->final();
     m_trace->close();
 
-    if(is_reach_pass_pc) cout<<"Yes\n";
-    else if(is_reach_fail_pc) cout<<"No\n";
+    if(is_set_tohost_addr){
+        if(mem_data==1) cout<<"Yes\n";
+        else cout<<"No\n";
+    }
     else cout<<"Done\n";
 
     return 0;

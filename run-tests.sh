@@ -34,6 +34,14 @@ for target in $(tail -n +2 $file_dir$test_list); do
         ext="Zicsr"
     fi
 
+    tohost_addr=$(
+        riscv32-unknown-elf-objdump -t $target | 
+        grep ' tohost$' | cut -c2-8
+    )
+    if [ -n "$tohost_addr" ]; then
+        tohost_addr=$(printf "%d" "0x$tohost_addr")
+    fi
+
     stop_pc=$(grep '<write_tohost>:' "$file_dir$test_name.dump" | cut -c 2-8)
     if [ -n "$stop_pc" ]; then
         stop_pc=$(printf "%d" "0x$stop_pc")
@@ -49,7 +57,8 @@ for target in $(tail -n +2 $file_dir$test_list); do
         fail_pc=$(printf "%d" "0x$fail_pc")
     fi
 
-    output=$(./obj_dir/VComputer "$mem_file" "$stop_pc" "$pass_pc" "$fail_pc")
+    # output=$(./obj_dir/VComputer "$mem_file" "$stop_pc" "$pass_pc" "$fail_pc")
+    output=$(./obj_dir/VComputer "$mem_file" "$tohost_addr")
 
     if [ -z "${ext_results[$ext]}" ]; then
         ext_results[$ext]=1  # assume pass until proven fail

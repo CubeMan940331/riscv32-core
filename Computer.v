@@ -6,14 +6,14 @@ wire i_req, i_ready;
 wire [31:0] i_mem_addr;
 wire [31:0] inst;
 
-wire d_mem_wr_en;
-wire d_mem_rd_en;
+wire d_mem_wr_en /* verilator public */;
+wire d_mem_rd_en /* verilator public */;
 wire d_mem_available;
 wire i_mem_available;
 wire [3:0] d_mem_ctrl;
-wire [31:0] d_mem_addr;
-wire [31:0] d_mem_wr_data;
-wire [31:0] d_mem_rd_data;
+wire [31:0] d_mem_addr /* verilator public */;
+wire [31:0] d_mem_wr_data /* verilator public */;
+wire [31:0] d_mem_rd_data /* verilator public */;
 
 DataMemory #(.SIZE(65536))
 m_DataMemory(
