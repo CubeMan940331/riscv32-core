@@ -278,6 +278,8 @@ Fetch m_Fetch(
     
     ,.EX_csr_br_taken_i(csr_br_taken)
     ,.EX_csr_br_target_i(csr_br_target)
+    ,.EX_done_i(EX_done)
+    ,.EX_pc_valid_i(EX_pc_valid_out)
 // output
     ,.IF_stall_o(IF_stall)
     ,.br_flush_o(br_flush)

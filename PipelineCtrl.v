@@ -1,56 +1,29 @@
-// control pipeline register
-// stall or insert nop
 module PipelineCtrl(
-    input br_flush
+    input  wire br_flush,
+    input  wire IF_stall,
+    input  wire EX_stall,
 
-    ,input IF_stall
-    ,input EX_stall
+    output wire pc_en,
 
-// Pipeline control
-    ,output reg pc_en
-    
-    ,output reg ID_en
-    ,output reg ID_clear
+    output wire ID_en,
+    output wire ID_clear,
 
-    ,output reg EX_en
-    ,output reg EX_clear
+    output wire EX_en,
+    output wire EX_clear,
 
-    ,output reg WB_en
-    ,output reg WB_clear
+    output wire WB_en,
+    output wire WB_clear
 );
 
-always @(*)begin
-    pc_en=1;
+// Enables
+assign pc_en = ~EX_stall;
+assign ID_en = ~EX_stall;
+assign EX_en = ~EX_stall;
+assign WB_en = 1'b1;
 
-    ID_en=1;
-    ID_clear=0;
+// Clears
+assign ID_clear = IF_stall | br_flush;
+assign EX_clear = br_flush;
+assign WB_clear = EX_stall;
 
-    EX_en=1;
-    EX_clear=0;
-
-    WB_en=1;
-    WB_clear=0;
-
-    if(br_flush)begin
-        // branch determined at EX stage
-        // clear Id, EX next clock
-        ID_clear=1;
-        EX_clear=1;
-    end
-    else if(IF_stall) begin
-	// freeze IF, ID
-	pc_en=0;
-	ID_en=0;
-	// insert nop to ID
-	ID_clear=1;
-    end
-    else if(EX_stall) begin
-        // freeze IF, ID, EX
-        pc_en=0;
-        ID_en=0;
-        EX_en=0;
-        // insert nop to WB next clock
-        WB_clear=1;
-    end
-end
 endmodule

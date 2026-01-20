@@ -66,7 +66,7 @@ for target in $(tail -n +2 $file_dir$test_list); do
 
     if [[ "$output" != "Yes" ]]; then
         ext_results[$ext]=0
-        ext_details[$ext]+=$(printf "%-30s %-16s %s\n" "$test_name" "pass_pc=$pass_pc" "$output\n")
+        ext_details[$ext]+=$(printf "%-30s %s\n" "$test_name" "$output\n")
     fi
 done
 
