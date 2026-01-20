@@ -36,6 +36,9 @@ reg rst_done;
 reg first_req;
 
 reg [1:0] state, state_nx; // 0 ready, 2 wait mem, 3 wait pipeline
+localparam F_READY = 0;
+localparam F_WAIT_MEM = 2;
+localparam F_WAIT_PIPE = 3;
 
 reg [31:0] pc_in_r;
 wire [31:0] pc_in;
@@ -64,37 +67,37 @@ always @(posedge clk, negedge rst_n) begin
     else state <= state_nx;
 end
 always @(*) case (state)
-    0: begin
+    F_READY: begin
         if(br_flush_w) begin
             // need another memory access
-            if(i_ready_i) state_nx = 0;
-            else state_nx = 2; // wait current request to finish
+            if(i_ready_i) state_nx = F_READY;
+            else state_nx = F_WAIT_MEM; // wait current request to finish
         end
         else begin
-            if(i_ready_i && en) state_nx = 0;
-            else if(i_ready_i) state_nx = 3;
-            else state_nx = 2;
+            if(i_ready_i && en) state_nx = F_READY;
+            else if(i_ready_i) state_nx = F_WAIT_PIPE;
+            else state_nx = F_WAIT_MEM;
         end
     end
-    2: begin
+    F_WAIT_MEM: begin
         if(br_flush_w) begin
-            if(i_ready_i) state_nx = 0;
-            else state_nx = 2;
+            if(i_ready_i) state_nx = F_READY;
+            else state_nx = F_WAIT_MEM;
         end
         else begin
-            if(i_ready_i && en) state_nx = 0;
-            else if(i_ready_i) state_nx = 3;
-            else state_nx = 2;
+            if(i_ready_i && en) state_nx = F_READY;
+            else if(i_ready_i) state_nx = F_WAIT_PIPE;
+            else state_nx = F_WAIT_MEM;
         end
     end
-    3: begin
-        if(br_flush_w) state_nx = 0;
+    F_WAIT_PIPE: begin
+        if(br_flush_w) state_nx = F_READY;
         else begin
-            if(en) state_nx = 0;
-            else state_nx = 3;
+            if(en) state_nx = F_READY;
+            else state_nx = F_WAIT_PIPE;
         end
     end
-    default: state_nx = 0;
+    default: state_nx = F_READY;
 endcase
 
 BP_top m_bp(
