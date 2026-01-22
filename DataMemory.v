@@ -7,6 +7,8 @@ module DataMemory
 	input  wire [31:0] i_addr,
 	output wire [31:0] inst,
     output wire        i_available_o,
+    input  wire        i_req_i,
+    output reg         i_ready_o,
     
 	input  wire        wr_en,   // 1 = store
     input  wire        rd_en,    // 1 = load
@@ -19,7 +21,61 @@ module DataMemory
 );
 
 reg [7:0] mem [0:SIZE-1] /* verilator public */;
-assign inst = i_addr<SIZE ? {mem[i_addr+3], mem[i_addr+2], mem[i_addr+1], mem[i_addr+0]}: 32'h0;
+
+// assign inst = i_addr<SIZE ? {mem[i_addr+3], mem[i_addr+2], mem[i_addr+1], mem[i_addr+0]}: 32'h0;
+// assign i_ready_o = i_req_i;
+
+// reg [31:0] inst_r;
+// always @(posedge clk, negedge rst_n) begin
+//     if(!rst_n) begin
+//         inst_r <= 32'h0;
+//         i_ready_o <= 0;
+//     end
+//     else begin
+//         inst_r <= i_req_i ? (i_addr<SIZE ? {mem[i_addr+3], mem[i_addr+2], mem[i_addr+1], mem[i_addr+0]}: 32'h0):
+//             inst_r;
+//         i_ready_o <= i_req_i;
+//     end
+// end
+// assign inst = inst_r;
+
+reg [31:0] inst_r;
+
+reg [2:0]  vld_pipe;
+reg [31:0] addr0, addr1, addr2;
+
+always @(posedge clk or negedge rst_n) begin
+  if(!rst_n) begin
+    inst_r    <= 32'h0;
+    i_ready_o <= 1'b0;
+
+    vld_pipe  <= 3'b000;
+    addr0     <= 32'h0;
+    addr1     <= 32'h0;
+    addr2     <= 32'h0;
+  end else begin
+    // shift valid
+    vld_pipe <= {vld_pipe[1:0], i_req_i};
+
+    // shift address alongside the valid
+    addr2 <= addr1;
+    addr1 <= addr0;
+    addr0 <= i_addr;
+
+    // response after 3 cycles
+    i_ready_o <= vld_pipe[2];
+
+    if (vld_pipe[2]) begin
+      inst_r <= (addr2 < SIZE) ?
+        {mem[addr2+3], mem[addr2+2], mem[addr2+1], mem[addr2+0]} :
+        32'h0;
+    end
+  end
+end
+
+assign inst = inst_r;
+
+
 assign i_available_o = 1;
 assign available_o = 1;
 always @(posedge clk) begin

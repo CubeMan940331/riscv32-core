@@ -6,6 +6,8 @@ module PipelineCPU (
     output [31:0] i_mem_addr,
     input  [31:0] inst,
     input         i_mem_available,
+    output i_req,
+    input i_ready,
 
     output [3:0] d_mem_ctrl,
     output d_mem_wr_en,
@@ -24,6 +26,9 @@ wire [31:0]pc_out;
 wire [31:0]pc_p4;
 
 assign i_mem_addr = pc_out;
+
+// IF =========================
+wire IF_stall;
 
 // ID_Reg =====================
 wire ID_clear;
@@ -143,9 +148,12 @@ wire [1:0] EX_bypass_sel_out;
 // Fence
 wire EX_fetch_invalid_out;
 
+wire EX_pc_missalign_out;
+
 wire EX_start, EX_done;
 // ALU ========================
 wire [31:0] ALU_out;
+wire ALU_exception;
 
 // BranchCmp ==================
 wire br_taken; // indicate inst branch
@@ -228,6 +236,7 @@ wire br_flush;
 PipelineCtrl m_PipelineCtrl(
     .br_flush(br_flush),
     
+    .IF_stall(IF_stall),
     .EX_stall(!EX_done),
 
     .pc_en(pc_en),
@@ -253,7 +262,10 @@ Fetch m_Fetch(
      .clk(clk)
     ,.rst_n(rst_n) 
     ,.en(pc_en)
-    
+// inst. mem interface
+    ,.i_req_o(i_req)
+    ,.i_ready_i(i_ready)
+// feed back from EX
     ,.EX_pc_i(EX_pc_out)
 
     ,.EX_bp_pred_taken_i(EX_bp_pred_taken_out)
@@ -261,12 +273,15 @@ Fetch m_Fetch(
 
     ,.EX_is_br_i(EX_is_br_out)
     ,.EX_br_taken_i(br_taken) // inst br taken
-    ,.EX_br_target_i(ALU_out)
+    ,.EX_br_target_i({ALU_out[31:2], 2'b0}) // not support compress
     ,.EX_pc_p4_i(EX_pc_p4_out)
     
     ,.EX_csr_br_taken_i(csr_br_taken)
     ,.EX_csr_br_target_i(csr_br_target)
+    ,.EX_done_i(EX_done)
+    ,.EX_pc_valid_i(EX_pc_valid_out)
 // output
+    ,.IF_stall_o(IF_stall)
     ,.br_flush_o(br_flush)
 
     ,.bp_pred_taken_o(bp_pred_taken_out)
@@ -478,6 +493,7 @@ Exec m_EX(
     // ALU
     .ALU_ctrl_o(EX_ALU_ctrl_out),
     .ALU_o(ALU_out),
+    .ALU_exception_o(ALU_exception),
     // MUL/DIV
     .is_MUL_DIV_o(EX_is_MUL_DIV_out),
     .MUL_DIV_ctrl_o(EX_MUL_DIV_ctrl_out),
@@ -496,6 +512,8 @@ Exec m_EX(
     .bypass_o(bypass_out),
     // fetch
     .fetch_invalid_o(EX_fetch_invalid_out)
+
+    ,.pc_missalign_o(EX_pc_missalign_out)
 // EX control ==================
     ,.csr_exception_i(csr_exception)
     ,.EX_start_o(EX_start)
@@ -649,6 +667,14 @@ CSR m_CSR(
     .is_fpu_done_i(FPU_done),
     .fpu_flags_i(FPU_flags),
     .is_f_ext_i(EX_is_f_ext),
+    
+    .pc_misalign_i(EX_pc_missalign_out),
+    .alu_exception_i(ALU_exception),
+    .i_cache_exception_i(0),
+    .d_cache_exception_i(0),
+    .dma_exception_i(0),
+    .interrupt_i(0),
+
     .csr_wr_addr_i(EX_csr_addr_out),
     
     .exception_pc_i(EX_pc_out),
