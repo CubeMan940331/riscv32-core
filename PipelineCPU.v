@@ -3,12 +3,11 @@ module PipelineCPU (
     input clk,
     input rst_n,
 
-    output        i_mem_rd,
     output [31:0] i_mem_addr,
-    output        i_mem_invalidate,
     input  [31:0] inst,
-    input         i_mem_available,
-    input         i_mem_exception,
+    output i_req,
+    input i_ready,
+    input i_mem_exception,
 
     output [3:0]  d_mem_ctrl,
     output        d_mem_wr_en,
@@ -38,6 +37,10 @@ wire [31:0]pc_out;
 wire [31:0]pc_p4;
 
 // assign i_mem_addr = pc_out;
+
+// IF =========================
+wire IF_stall;
+wire fetch_req;
 
 // ID_Reg =====================
 wire ID_clear;
@@ -157,9 +160,12 @@ wire [1:0] EX_bypass_sel_out;
 // Fence
 wire EX_fetch_invalid_out;
 
+wire EX_pc_missalign_out;
+
 wire EX_start, EX_done;
 // ALU ========================
 wire [31:0] ALU_out;
+wire ALU_exception;
 
 // BranchCmp ==================
 wire br_taken; // indicate inst branch
@@ -169,6 +175,7 @@ wire MUL_DIV_start, MUL_DIV_done;
 wire [31:0] MUL_DIV_out;
 
 // LSU =========================
+/* verilator lint_off UNOPTFLAT */
 wire LSU_start, LSU_done;
 
 wire        lsu_fetch_valid;
@@ -238,6 +245,7 @@ wire br_flush;
 PipelineCtrl m_PipelineCtrl(
     .br_flush(br_flush),
     
+    .IF_stall(IF_stall),
     .EX_stall(!EX_done),
 
     .pc_en(pc_en),
@@ -263,7 +271,10 @@ Fetch m_Fetch(
      .clk(clk)
     ,.rst_n(rst_n) 
     ,.en(pc_en)
-    
+// inst. mem interface
+    ,.i_req_o(fetch_req)
+    ,.i_ready_i(lsu_fetch_valid)
+// feed back from EX
     ,.EX_pc_i(EX_pc_out)
 
     ,.EX_bp_pred_taken_i(EX_bp_pred_taken_out)
@@ -271,12 +282,15 @@ Fetch m_Fetch(
 
     ,.EX_is_br_i(EX_is_br_out)
     ,.EX_br_taken_i(br_taken) // inst br taken
-    ,.EX_br_target_i(ALU_out)
+    ,.EX_br_target_i({ALU_out[31:2], 2'b0}) // not support compress
     ,.EX_pc_p4_i(EX_pc_p4_out)
     
     ,.EX_csr_br_taken_i(csr_br_taken)
     ,.EX_csr_br_target_i(csr_br_target)
+    ,.EX_done_i(EX_done)
+    ,.EX_pc_valid_i(EX_pc_valid_out)
 // output
+    ,.IF_stall_o(IF_stall)
     ,.br_flush_o(br_flush)
 
     ,.bp_pred_taken_o(bp_pred_taken_out)
@@ -285,13 +299,6 @@ Fetch m_Fetch(
     ,.pc_o(pc_out)
     ,.pc_p4_o(pc_p4)
 );
-
-reg [31:0] pc_out_r;
-reg [31:0] pc_p4_r;
-always @(posedge clk or negedge rst_n)begin
-    pc_out_r <= pc_out;
-    pc_p4_r <= pc_p4;
-end
 
 Decode m_ID(
     .clk(clk),
@@ -302,8 +309,6 @@ Decode m_ID(
 
     .pc_i(pc_out),
     .pc_p4_i(pc_p4),
-    // .pc_i(pc_out_r),
-    // .pc_p4_i(pc_p4_r),
     .inst_i(lsu_fetch_inst),
 
     .bp_pred_taken_i(bp_pred_taken_out),
@@ -496,6 +501,7 @@ Exec m_EX(
     // ALU
     .ALU_ctrl_o(EX_ALU_ctrl_out),
     .ALU_o(ALU_out),
+    .ALU_exception_o(ALU_exception),
     // MUL/DIV
     .is_MUL_DIV_o(EX_is_MUL_DIV_out),
     .MUL_DIV_ctrl_o(EX_MUL_DIV_ctrl_out),
@@ -514,6 +520,8 @@ Exec m_EX(
     .bypass_o(bypass_out),
     // fetch
     .fetch_invalid_o(EX_fetch_invalid_out)
+
+    ,.pc_missalign_o(EX_pc_missalign_out)
 // EX control ==================
     ,.csr_exception_i(csr_exception)
     ,.EX_start_o(EX_start)
@@ -573,7 +581,7 @@ u_lsu (
     .rst_i             (rst_n),
 
     // Instruction
-    .fetch_rd_i        (1'b1),
+    .fetch_rd_i        (fetch_req),
     .fetch_pc_i        (pc_out),
     .fetch_valid_o     (lsu_fetch_valid),
     .fetch_inst_o      (lsu_fetch_inst),
@@ -664,10 +672,10 @@ u_mmu(
     
     // instruction cache interface
     .icache_in_value_i   (inst),
-    .icache_in_valid_i   (i_mem_available),
+    .icache_in_valid_i   (i_ready),
     .icache_addr_o       (i_mem_addr),
-    .icache_rd_o         (i_mem_rd),
-    .icache_invalidate_o (i_mem_invalidate),
+    .icache_rd_o         (i_req),
+    .icache_invalidate_o (),
 
     // exception
     .icache_exception_i  (i_mem_exception),
@@ -700,6 +708,14 @@ CSR m_CSR(
     .is_fpu_done_i(FPU_done),
     .fpu_flags_i(FPU_flags),
     .is_f_ext_i(EX_is_f_ext),
+    
+    .pc_misalign_i(EX_pc_missalign_out),
+    .alu_exception_i(ALU_exception),
+    .i_cache_exception_i(0),
+    .d_cache_exception_i(0),
+    .dma_exception_i(0),
+    .interrupt_i(0),
+
     .csr_wr_addr_i(EX_csr_addr_out),
     
     .exception_pc_i(EX_pc_out),

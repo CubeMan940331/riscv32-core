@@ -106,6 +106,7 @@ module Exec(
     // ALU
     ,output wire [3:0]  ALU_ctrl_o
     ,output wire [31:0] ALU_o
+    ,output wire ALU_exception_o
     // Branch
     ,output wire        br_taken_o
 
@@ -131,6 +132,7 @@ module Exec(
 
     ,output wire fetch_invalid_o
 // exception
+    ,output pc_missalign_o
     ,input wire [5:0] csr_exception_i
 // EX control
     ,output wire EX_start_o
@@ -327,7 +329,10 @@ ALU_top m_ALU(
     .ALU_ctrl(ALU_ctrl_o),
     .a(ALU_src1),
     .b(ALU_src2),
-    .out(ALU_o)
+    .is_imm_i(ALU_sel2_o),
+    
+    .out(ALU_o),
+    .exception_o(ALU_exception_o)
 );
 assign ALU_done = ALU_start;
 
@@ -359,5 +364,7 @@ assign Br_done = Br_start;
 assign EX_done_o = (!pc_valid_o) | (!is_impl_o) |
     ALU_done | Br_done | LSU_done_i | FPU_done_i |
     SYS_done_i | bypass_done | MUL_DIV_done_i;
+
+assign pc_missalign_o = br_taken_o && ALU_o[1];
 
 endmodule
