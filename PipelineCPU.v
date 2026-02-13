@@ -6,6 +6,7 @@ module PipelineCPU (
     output [31:0] i_mem_addr,
     input  [31:0] inst,
     output i_req,
+    output i_mem_invalidate,
     input i_ready,
     input i_mem_exception,
 
@@ -673,7 +674,7 @@ mmu u_mmu(
     .icache_in_valid_i   (i_ready),
     .icache_addr_o       (i_mem_addr),
     .icache_rd_o         (i_req),
-    .icache_invalidate_o (),
+    .icache_invalidate_o (i_mem_invalidate),
 
     // exception
     .icache_exception_i  (i_mem_exception),

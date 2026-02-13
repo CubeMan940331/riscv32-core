@@ -10,6 +10,7 @@ module mmu
     ,parameter  D_ADDR_MAX = 32'hFFFFFFFF
     ,parameter  I_ADDR_MIN = 32'h60000000
     ,parameter  I_ADDR_MAX = 32'hFFFFFFFF
+    ,parameter  SUPPORT_CDMA = 1
 )
 (
      input          clk_i
@@ -132,14 +133,27 @@ reg rdy_i;
 reg [31:0] data_i;
 reg [1:0] d_execption_i;
 
-always @(posedge clk_i or negedge rst_i)begin
-    if(~rst_i)begin
-        d_cacheable_pre <= 1;
-    end else begin
-        d_cacheable_pre <= d_cachable_o;
-        // d_cacheable_pre <= 1'b1;
+generate 
+if(SUPPORT_CDMA) begin : gen_cdma_support
+    // support for cdma and dcache selection    
+    always @(posedge clk_i or negedge rst_i)begin
+        if(~rst_i)begin
+            d_cacheable_pre <= 1;
+        end else begin
+            d_cacheable_pre <= d_cachable_o;
+        end
+    end
+end else begin : gen_only_dcache
+    // always choose dcache input
+    always @(posedge clk_i or negedge rst_i)begin
+        if(~rst_i)begin
+            d_cacheable_pre <= 1;
+        end else begin
+            d_cacheable_pre <= 1'b1;    
+        end
     end
 end
+endgenerate
 
 always @(*)begin
     if(d_cacheable_pre)begin
