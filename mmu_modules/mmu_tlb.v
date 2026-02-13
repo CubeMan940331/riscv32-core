@@ -14,6 +14,7 @@ module mmu_tlb
     ,input                  update_i
 
     ,output                 hit_o
+    ,output                 valid_o
     ,output [31:0]          entry_o
 );
 
@@ -23,6 +24,7 @@ reg                 tlb_valid_r;
 
 assign hit_o   =  (addr_i == vpn_q) && tlb_valid_r;
 assign entry_o = entry_q;
+assign valid_o = tlb_valid_r;
 
 always @(posedge clk_i or negedge  rst_i)begin
     if(~rst_i)begin

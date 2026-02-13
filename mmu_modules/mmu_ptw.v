@@ -13,12 +13,13 @@ module mmu_ptw(
     ,input  [31:0]  resp_data_i     // page table return value
     ,input          resp_valid_i
     ,input          pte_errow_i     // page table fault
+    ,input    [2:0] req_target_i    
 
     ,output [31:0]  pte_addr_o      // physical address of page table entry
     ,output [31:0]  pte_value_o     // page table entry value
     ,output         update_o        // state is update
     ,output         ptw_work_o
-    ,output         pte_fault_o
+    ,output  [2:0]  pte_fault_o     // 0: read_fault, 1:write_fault, 2:exe_fault
 );
 
 // State 
@@ -33,7 +34,8 @@ reg [STATE_W-1:0] fsm_state;
 reg [31:0] pte_addr_r;
 reg [31:0] pte_value_r;
 reg [31:0] req_addr_r;
-reg        pte_fault_r;
+reg  [2:0] pte_fault_r;
+reg  [2:0] pte_target_r;
 
 wire        vm_enable   = satp_i[`SATP_MODE_R];
 wire [ 8:0] vm_asid     = satp_i[`SATP_ASID_R];
@@ -60,6 +62,7 @@ always @(posedge clk_i or negedge rst_i)begin
         pte_value_r <= 32'b0;   
         req_addr_r  <= 32'b0;
         pte_fault_r <= 0;
+        pte_target_r <= 0;
     end
     else 
     begin
@@ -72,6 +75,7 @@ always @(posedge clk_i or negedge rst_i)begin
                 fsm_state   <= STATE_LEVEL_FIRST;
                 req_addr_r  <= req_addr_i;
                 pte_addr_r  <= vm_ppn + {20'b0, req_addr_i[31:22],2'b0};
+                pte_target_r <= req_target_i;
             end
             else
             begin
@@ -89,7 +93,7 @@ always @(posedge clk_i or negedge rst_i)begin
                 pte_addr_r  <= 32'b0;
                 pte_value_r <= 32'b0;
                 fsm_state   <= STATE_UPDATE;
-                pte_fault_r <= 1;
+                pte_fault_r <= pte_target_r;
             end
             else if(!pte_active)
             begin
@@ -110,7 +114,7 @@ always @(posedge clk_i or negedge rst_i)begin
                 pte_addr_r  <= 32'b0;
                 pte_value_r <= 32'b0;
                 fsm_state   <= STATE_UPDATE;
-                pte_fault_r <= 1;
+                pte_fault_r <= pte_target_r;
             end
             else
             begin

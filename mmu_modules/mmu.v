@@ -6,18 +6,10 @@
 
 module mmu
 #(
-     parameter  MMU_SUPPORT = 1 
-    ,parameter  ADDR_ERROR_DETECT = 1
-    ,parameter  ADDR_MAX = 32'hFFFFFFFF
-    ,parameter  ADDR_MIN = 32'h00000000
-    // ,parameter  D_ADDR_MIN = 32'h60000000
-    // ,parameter  D_ADDR_MAX = 32'h67FFFFFF
-    // ,parameter  I_ADDR_MIN = 32'h60000000
-    // ,parameter  I_ADDR_MAX = 32'h67FFFFFF
-    ,parameter  D_BYPASS_ADDR_MIN = 32'h20000000
-    ,parameter  D_BYPASS_ADDR_MAX = 32'h20000FFF
-    // ,parameter  I_BYPASS_ADDR_MIN = 32'h0
-    // ,parameter  I_BYPASS_ADDR_MAX = 32'h0
+     parameter  D_ADDR_MIN = 32'h60000000
+    ,parameter  D_ADDR_MAX = 32'hFFFFFFFF
+    ,parameter  I_ADDR_MIN = 32'h60000000
+    ,parameter  I_ADDR_MAX = 32'hFFFFFFFF
 )
 (
      input          clk_i
@@ -36,6 +28,7 @@ module mmu
     ,input          lsu_in_flush_i
     ,input          lsu_in_invalidate_i
     ,input          lsu_in_writeback_i
+    ,input          lsu_in_i_invalidate_i
 
     ,output [31:0]  fetch_out_value_o
     ,output         fetch_out_valid_o
@@ -67,14 +60,14 @@ module mmu
     ,input          icache_in_valid_i
     ,output [31:0]  icache_addr_o
     ,output         icache_rd_o
-    ,output         icache_invalidate_o       // new
+    ,output         icache_invalidate_o
 
     // exception 
-    ,input  [1:0]   dcache_exception_i        // new
-    ,input          icache_exception_i        // new
-    ,output         read_except_o             // dcache_exception    
-    ,output         write_except_o            // dcache_exception
-    ,output         exe_except_o              // icache_exception
+    ,input  [1:0]   dcache_exception_i
+    ,input          icache_exception_i
+    ,output         read_except_o     
+    ,output         write_except_o
+    ,output         exe_except_o  
 );
 
 localparam PPN_SIZE             = 20;
@@ -84,8 +77,8 @@ wire dtlb_req = lsu_in_rd_i || lsu_in_wr_i;
 
 wire [31:0] itlb_entry_o;
 wire [31:0] dtlb_entry_o;
-wire        itlb_hit;
-wire        dtlb_hit;
+wire itlb_hit, dtlb_hit;
+wire itlb_valid, dtlb_valid;
 
 reg  [31:0] update_entry;
 wire        is_pte;
@@ -97,7 +90,7 @@ wire [31:0] vm_ppn      = {satp_i[`SATP_PPN_R],12'b0};
 
 wire [31:0] ptw_pte_addr_o;
 wire [31:0] ptw_pte_value_o;
-wire        ptw_pte_fault_o;
+wire  [2:0] ptw_pte_fault_o;
 
 reg [31:0] dcache_addr_r;
 reg [31:0] icache_addr_r;
@@ -113,16 +106,6 @@ wire req_i_rd;
 wire vm_d_rd;
 wire vm_d_wr;
 wire vm_i_rd;
-
-// with addr error detection (dcache & icache)
-// wire icache_addr_error = !((icache_addr_r >= D_ADDR_MIN) && (icache_addr_r <= D_ADDR_MAX));
-// wire dcache_addr_error = !((dcache_addr_r >= D_ADDR_MIN) && (dcache_addr_r <= D_ADDR_MAX));
-// assign req_d_rd = lsu_in_rd_i && ~dcache_addr_error;
-// assign req_d_wr = lsu_in_wr_i && ~dcache_addr_error;
-// assign req_i_rd = fetch_rd_i && ~icache_addr_error;
-// assign vm_d_rd = ((lsu_in_rd_i && (dtlb_hit)) || is_pte) && ~dcache_addr_error;
-// assign vm_d_wr = lsu_in_wr_i && dtlb_hit && ~dcache_addr_error;
-// assign vm_i_rd = fetch_rd_i && itlb_hit && ~icache_addr_error;
 
 // without addr error detection 
 assign req_d_rd = lsu_in_rd_i;
@@ -140,22 +123,21 @@ wire icache_rd_c = (vm_enable)? vm_i_rd : req_i_rd;
 wire icache_valid;
 wire dcache_valid;
 
-// ---------------------------------------
-// Input Selection
-//----------------------------------------
+// ============================== //
+//      Data Input Selection      //
+// ============================== //
 
 reg d_cacheable_pre;    // select current input is cdma or dcache
-
 reg rdy_i;
 reg [31:0] data_i;
 reg [1:0] d_execption_i;
 
 always @(posedge clk_i or negedge rst_i)begin
     if(~rst_i)begin
-        d_cacheable_pre <= 0;
+        d_cacheable_pre <= 1;
     end else begin
-        // d_cacheable_pre <= d_cachable_o;
-        d_cacheable_pre <= 1'b1;
+        d_cacheable_pre <= d_cachable_o;
+        // d_cacheable_pre <= 1'b1;
     end
 end
 
@@ -226,23 +208,40 @@ always @(*)begin
         dcache_mask_r = 4'h0;
 end
 
-// fault signal
-assign read_except_o     = lsu_in_rd_i && ( ptw_pte_fault_o || (!dtlb_entry_o[`PAGE_READ]  && dtlb_hit));
-assign write_except_o    = lsu_in_wr_i && ( ptw_pte_fault_o || (!dtlb_entry_o[`PAGE_WRITE] && dtlb_hit));
-assign exe_except_o      = (fetch_rd_i && ( ptw_pte_fault_o || (!itlb_entry_o[`PAGE_EXEC]  && itlb_hit))) ||
-                           (fetch_rd_i && icache_exception_i);
-
 // Dcache others signal
+/* verilator lint_off CMPCONST */
 assign dcache_invalidate_o  = lsu_in_invalidate_i;
 assign dcache_flush_o       = lsu_in_flush_i;
 assign dcache_writeback_o   = lsu_in_writeback_i;
-
-// Dcache Decoder (cachable control)
-// check memory address is in bypass range
-assign d_cachable_o = (dcache_addr_r >= D_BYPASS_ADDR_MIN) && (dcache_addr_r <= D_BYPASS_ADDR_MAX);
+assign d_cachable_o         = (dcache_addr_r >= D_ADDR_MIN) && (dcache_addr_r <= D_ADDR_MAX);
 
 // icache other signal
-assign icache_invalidate_o = 0;
+assign icache_invalidate_o = lsu_in_i_invalidate_i;
+
+// ============================= //
+//      Page Fault Exeption      //
+// ============================= //
+
+// exception register
+reg read_except_r;
+reg write_except_r;
+reg exe_except_r;
+
+assign read_except_o = read_except_r;
+assign write_except_o = write_except_r;
+assign exe_except_o = exe_except_r;
+
+always @(posedge clk_i or negedge rst_i)begin
+    if(~rst_i)begin
+        read_except_r <= 1'b0;
+        write_except_r <= 1'b0;
+        exe_except_r <= 1'b0; 
+    end else begin
+        read_except_r <= ptw_pte_fault_o[0] || (~dtlb_entry_o[`PAGE_READ] && dtlb_valid && lsu_in_rd_i);
+        write_except_r <= ptw_pte_fault_o[1] || (~dtlb_entry_o[`PAGE_READ] && dtlb_valid && lsu_in_wr_i);
+        exe_except_r <= ptw_pte_fault_o[2] || (~itlb_entry_o[`PAGE_EXEC] && itlb_valid && fetch_rd_i);
+    end
+end
 
 // ---------------------------------------
 // Privilege Control
@@ -266,6 +265,7 @@ mmu_tlb #(
     .entry_i  (update_entry),
     .update_i (is_update && itlb_req),
     .hit_o    (itlb_hit),
+    .valid_o  (itlb_valid),
     .entry_o  (itlb_entry_o)
 );
 
@@ -278,6 +278,7 @@ mmu_tlb #(
     .entry_i  (update_entry),
     .update_i (is_update && dtlb_req),
     .hit_o    (dtlb_hit),
+    .valid_o  (dtlb_valid),
     .entry_o  (dtlb_entry_o)
 );
 
@@ -319,8 +320,7 @@ wire [31:0] ptw_resp_data_i  = data_i;
 wire        ptw_resp_valid_i = dcache_valid;
 wire        ptw_req_valid_i  = (itlb_miss || dtlb_miss) && vm_enable;
 wire [31:0] ptw_req_addr_i   = ptw_req_addr_r;
-// wire        ptw_error_i      = dcache_addr_error && dcache_rd_o; 
-wire        ptw_error_i = 0;
+wire        ptw_error_i      = d_execption_i[0];
 
 always @(*)begin
     ptw_req_addr_r = 32'h0;
@@ -340,6 +340,7 @@ mmu_ptw ptw(
     .resp_data_i  (ptw_resp_data_i),
     .resp_valid_i (ptw_resp_valid_i),
     .pte_errow_i  (ptw_error_i),
+    .req_target_i ({itlb_req, lsu_in_wr_i, lsu_in_rd_i}),
     .pte_addr_o   (ptw_pte_addr_o),
     .pte_value_o  (ptw_pte_value_o),
     .update_o     (is_update),

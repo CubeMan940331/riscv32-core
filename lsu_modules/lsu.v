@@ -6,8 +6,7 @@
 
 module lsu
 #(
-     parameter LENGTH   = 32
-    ,parameter DEPTH    = 8
+     parameter QUEUE_LEN   = 2
 )
 (   
      input           clk_i
@@ -50,6 +49,7 @@ module lsu
     ,output          mmu_dflush_o
     ,output          mmu_dinvalidate_o
     ,output          mmu_dwriteback_o
+    ,output          mmu_iinvalidate_o
 
     // writeback interface
     ,output  [31:0]  writeback_value_o
@@ -130,14 +130,18 @@ wire csrrw_inst = ((opcode_inst_i & `INST_CSRRW_MASK) == `INST_CSRRW);
 
 // CSRRW Instruction
 wire dflush, dwriteback, dinvalidate;
+wire iinvalidate;
 
 assign dflush       = opcode_valid_i && (opcode_inst_i[31:20] == `CSR_DFLUSH);
 assign dwriteback   = opcode_valid_i && (opcode_inst_i[31:20] == `CSR_DWRITEBACK);
 assign dinvalidate  = opcode_valid_i && (opcode_inst_i[31:20] == `CSR_DINVALIDATE);
+assign iinvalidate  = opcode_valid_i && ((opcode_inst_i & `INST_IFENCE_MASK) == `INST_IFENCE); 
+
 
 assign mmu_dflush_o = dflush && csrrw_inst;
 assign mmu_dwriteback_o = dwriteback && csrrw_inst;
 assign mmu_dinvalidate_o = dinvalidate && csrrw_inst;
+assign mmu_iinvalidate_o = iinvalidate;
 
 // --------------------------------------------
 //  Error Detection
@@ -162,9 +166,9 @@ always @(*)begin
         unaligned_1_r = (mem_addr_r[1:0] == 2'b11);
 end
 
-assign except_inst_ma = (fetch_rd_i && fetch_misaligned);
-assign except_page_fault_load = (resp_rd && mmu_read_excpt_i);
-assign except_page_fault_store = (resp_wr && mmu_write_excpt_i);
+assign except_inst_ma = fetch_misaligned;
+assign except_page_fault_load = mmu_read_excpt_i;
+assign except_page_fault_store = mmu_write_excpt_i;
 
 
 // --------------------------------------------
@@ -363,8 +367,8 @@ end
 // LSU Queue Unit
 lsu_queue #(
     .DATASIZE(DATASIZE), 
-    .LENGTH(LENGTH), 
-    .DEPTH(DEPTH)
+    .LENGTH(QUEUE_LEN), 
+    .DEPTH(QUEUE_LEN)
 ) LDQ (
     .clk_i(clk_i),
     .rst_i(rst_i),

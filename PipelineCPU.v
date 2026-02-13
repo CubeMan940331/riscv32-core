@@ -36,8 +36,6 @@ wire pc_en;
 wire [31:0]pc_out;
 wire [31:0]pc_p4;
 
-// assign i_mem_addr = pc_out;
-
 // IF =========================
 wire IF_stall;
 wire fetch_req;
@@ -175,7 +173,6 @@ wire MUL_DIV_start, MUL_DIV_done;
 wire [31:0] MUL_DIV_out;
 
 // LSU =========================
-/* verilator lint_off UNOPTFLAT */
 wire LSU_start, LSU_done;
 
 wire        lsu_fetch_valid;
@@ -190,6 +187,7 @@ wire [ 3:0] lsu_mmu_mask;
 wire        lsu_mmu_dflush;
 wire        lsu_mmu_dinvalidafte;
 wire        lsu_mmu_dwriteback;
+wire        lsu_mmu_iinvalidate;
 wire [31:0] lsu_writeback_value_o;
 wire        lsu_writeback_valid_o;
 wire        except_inst_ma;
@@ -575,8 +573,7 @@ FPU_top m_FPU(
 // LSU =========================
 assign LSU_done = lsu_writeback_valid_o;
 
-lsu #( .DEPTH(2) ) 
-u_lsu (
+lsu u_lsu (
     .clk_i             (clk),
     .rst_i             (rst_n),
 
@@ -610,6 +607,7 @@ u_lsu (
     .mmu_dflush_o      (lsu_mmu_dflush),
     .mmu_dinvalidate_o (lsu_mmu_dinvalidafte),
     .mmu_dwriteback_o  (lsu_mmu_dwriteback),
+    .mmu_iinvalidate_o (lsu_mmu_iinvalidate),
     .writeback_value_o (lsu_writeback_value_o),
     .writeback_valid_o (lsu_writeback_valid_o),
 
@@ -628,8 +626,7 @@ wire [1:0] mmu_priv = 2'b0; // temp setting
 assign cdma_data_o = d_mem_wr_data;
 assign cdma_addr_o = d_mem_addr;
 
-mmu #(.MMU_SUPPORT(1), .ADDR_ERROR_DETECT(0))
-u_mmu(
+mmu u_mmu(
     .clk_i               (clk),
     .rst_i               (rst_n),
     .satp_i              (csr_satp_out),
@@ -646,6 +643,7 @@ u_mmu(
     .lsu_in_flush_i      (lsu_mmu_dflush),
     .lsu_in_invalidate_i (lsu_mmu_dinvalidafte),
     .lsu_in_writeback_i  (lsu_mmu_dwriteback),
+    .lsu_in_i_invalidate_i(lsu_mmu_iinvalidate),
     
     .fetch_out_value_o   (mmu_lsu_inst),
     .fetch_out_valid_o   (mmu_lsu_i_valid),
