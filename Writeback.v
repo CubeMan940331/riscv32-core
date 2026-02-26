@@ -37,6 +37,9 @@ module Writeback (
 );
 
 // WB_Reg =====================
+wire EX_reg_wr_en_w;
+wire EX_freg_wr_en_w;
+
 wire WB_is_impl_out;
 wire WB_pc_valid_out /* verilator public */;
 wire [31:0] WB_pc_out /* verilator public */;
@@ -54,6 +57,19 @@ wire [31:0] WB_bypass_out;
 wire        WB_reg_wr_en_out;
 wire        WB_freg_wr_en_out;
 wire [2:0]  WB_reg_w_sel_out;
+
+assign EX_reg_wr_en_w = (
+    reg_wr_en_i &
+    pc_valid_i &
+    is_impl_i &
+    !((exception_i&`EXCEPTION_TYPE_MASK) == `EXCEPTION_EXCEPTION)
+);
+assign EX_freg_wr_en_w = (
+    freg_wr_en_i &
+    pc_valid_i &
+    is_impl_i &
+    !((exception_i&`EXCEPTION_TYPE_MASK) == `EXCEPTION_EXCEPTION)
+);
 
 WB_Reg m_WB_Reg(
     .clk(clk),
@@ -76,8 +92,8 @@ WB_Reg m_WB_Reg(
     .csr_rd_data_i(csr_rd_data_i),
     
     // control_in
-    .reg_wr_en_i(reg_wr_en_i),
-    .freg_wr_en_i(freg_wr_en_i),
+    .reg_wr_en_i(EX_reg_wr_en_w),
+    .freg_wr_en_i(EX_freg_wr_en_w),
     .reg_w_sel_i(reg_w_sel_i),
     // ===================================
     // data_out
@@ -102,18 +118,8 @@ WB_Reg m_WB_Reg(
 assign is_impl_o = WB_is_impl_out;
 assign pc_valid_o = WB_pc_valid_out;
 assign pc_o = WB_pc_out;
-assign reg_wr_en_o = (
-    WB_reg_wr_en_out &
-    WB_pc_valid_out &
-    WB_is_impl_out &
-    !((WB_exception_out&`EXCEPTION_TYPE_MASK) == `EXCEPTION_EXCEPTION)
-);
-assign freg_wr_en_o = (
-    WB_freg_wr_en_out &
-    WB_pc_valid_out &
-    WB_is_impl_out &
-    !((WB_exception_out&`EXCEPTION_TYPE_MASK) == `EXCEPTION_EXCEPTION)
-);
+assign reg_wr_en_o =  WB_reg_wr_en_out;
+assign freg_wr_en_o = WB_freg_wr_en_out;
 assign rd_o = WB_rd_out;
 
 // writeback select
