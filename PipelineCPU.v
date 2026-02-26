@@ -8,6 +8,7 @@ module PipelineCPU (
     output i_req,
     input i_ready,
     input i_mem_exception,
+    input i_interrupt,
 
     output [3:0]  d_mem_ctrl,
     output        d_mem_wr_en,
@@ -751,7 +752,7 @@ CSR m_CSR(
     .i_cache_exception_i(0),
     .d_cache_exception_i(0),
     .dma_exception_i(0),
-    .interrupt_i(0),
+    .interrupt_i(i_interrupt),
 
     .csr_wr_addr_i(EX_csr_addr_out),
     
