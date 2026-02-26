@@ -1,23 +1,22 @@
 module DataMemory
 #(parameter SIZE = 65536)          // in BYTES (must be >= maximum address+4)
 (
-    input  wire        rst_n,      // active-low asynchronous reset
-    input  wire        clk,        // rising-edge clock
+  input  wire        rst_n,      // active-low asynchronous reset
+  input  wire        clk,        // rising-edge clock
 
 	input  wire [31:0] i_addr,
 	output wire [31:0] inst,
-    output wire        i_available_o,
-    input  wire        i_req_i,
-    output reg         i_ready_o,
-    
+  input  wire        i_req_i,
+  output wire        i_ready_o,
+  
 	input  wire        wr_en,   // 1 = store
-    input  wire        rd_en,    // 1 = load
-    input  wire [3:0]  ctrl,    // [3]=sign , [2]=word , [1]=half , [0]=byte
+  input  wire        rd_en,    // 1 = load
+  input  wire [3:0]  ctrl,    // [3]=sign , [2]=word , [1]=half , [0]=byte
     
 	input  wire [31:0] address,    // byte address
-    input  wire [31:0] data_i,  // store data (little-endian)
-    output reg  [31:0] data_o,    // load data (extended)
-	output wire 	   available_o
+  input  wire [31:0] data_i,  // store data (little-endian)
+  output reg  [31:0] data_o,    // load data (extended)
+	output reg 	   available_o
 );
 
 reg [7:0] mem [0:SIZE-1] /* verilator public */;
@@ -41,21 +40,20 @@ reg [7:0] mem [0:SIZE-1] /* verilator public */;
 
 reg [31:0] inst_r;
 
-reg [2:0]  vld_pipe;
+reg [3:0]  vld_pipe;
 reg [31:0] addr0, addr1, addr2;
 
 always @(posedge clk or negedge rst_n) begin
   if(!rst_n) begin
     inst_r    <= 32'h0;
-    i_ready_o <= 1'b0;
 
-    vld_pipe  <= 3'b000;
+    vld_pipe  <= 4'b000;
     addr0     <= 32'h0;
     addr1     <= 32'h0;
     addr2     <= 32'h0;
   end else begin
     // shift valid
-    vld_pipe <= {vld_pipe[1:0], i_req_i};
+    vld_pipe <= {vld_pipe[2:0], i_req_i};
 
     // shift address alongside the valid
     addr2 <= addr1;
@@ -63,7 +61,6 @@ always @(posedge clk or negedge rst_n) begin
     addr0 <= i_addr;
 
     // response after 3 cycles
-    i_ready_o <= vld_pipe[2];
 
     if (vld_pipe[2]) begin
       inst_r <= (addr2 < SIZE) ?
@@ -74,10 +71,8 @@ always @(posedge clk or negedge rst_n) begin
 end
 
 assign inst = inst_r;
+assign i_ready_o = ~|(vld_pipe[3:0]) || vld_pipe[3];
 
-
-assign i_available_o = 1;
-assign available_o = 1;
 always @(posedge clk) begin
     // if (wr_en) begin
     //     // SW
@@ -98,6 +93,8 @@ always @(posedge clk) begin
     //     end
     // end
 
+    available_o <= 1'b1;
+
 	if(ctrl[3] && wr_en)
 		mem[address+3] <= data_i[31:24];
 	if(ctrl[2] && wr_en)
@@ -106,6 +103,8 @@ always @(posedge clk) begin
 		mem[address+1] <= data_i[15:8];
 	if(ctrl[0] && wr_en)
 		mem[address  ] <= data_i[7:0];
+
+    // inst <= i_addr<SIZE ? {mem[i_addr+3], mem[i_addr+2], mem[i_addr+1], mem[i_addr+0]}: 32'h0;
 end
 
 // --------------------------------------------------------

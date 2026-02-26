@@ -5,17 +5,28 @@ module PipelineCPU (
 
     output [31:0] i_mem_addr,
     input  [31:0] inst,
-    input         i_mem_available,
     output i_req,
     input i_ready,
+    input i_mem_exception,
 
-    output [3:0] d_mem_ctrl,
-    output d_mem_wr_en,
-    output d_mem_rd_en,
+    output [3:0]  d_mem_ctrl,
+    output        d_mem_wr_en,
+    output        d_mem_rd_en,
     output [31:0] d_mem_addr,
     output [31:0] d_mem_wr_data,
+    output        d_mem_writeback,
+    output        d_mem_invalidate,
+    output        d_mem_flush,
+    output        d_mem_cacheable,
     input  [31:0] d_mem_rd_data,
-    input         d_mem_available
+    input         d_mem_available,
+    input  [1:0]  d_mem_exception,
+
+    output [31:0] cdma_data_o,
+    output [31:0] cdma_addr_o,
+    input         cdma_rdy_i,
+    input  [31:0] cdma_data_i,
+    input  [1:0]  cdma_exception_i
 );
 //wires
 //================================================================
@@ -25,10 +36,11 @@ wire pc_en;
 wire [31:0]pc_out;
 wire [31:0]pc_p4;
 
-assign i_mem_addr = pc_out;
+// assign i_mem_addr = pc_out;
 
 // IF =========================
 wire IF_stall;
+wire fetch_req;
 
 // ID_Reg =====================
 wire ID_clear;
@@ -163,8 +175,13 @@ wire MUL_DIV_start, MUL_DIV_done;
 wire [31:0] MUL_DIV_out;
 
 // LSU =========================
+/* verilator lint_off UNOPTFLAT */
 wire LSU_start, LSU_done;
 
+wire        lsu_fetch_valid;
+wire [31:0] lsu_fetch_inst;
+wire [31:0] lsu_mmu_pc;
+wire        lsu_mmu_i_rd;
 wire [31:0] lsu_mmu_addr;
 wire [31:0] lsu_mmu_data;
 wire        lsu_mmu_rd;
@@ -175,29 +192,21 @@ wire        lsu_mmu_dinvalidafte;
 wire        lsu_mmu_dwriteback;
 wire [31:0] lsu_writeback_value_o;
 wire        lsu_writeback_valid_o;
-wire [ 5:0] lsu_exception_o;
+wire        except_inst_ma;
+wire        except_page_fault_load;
+wire        except_page_fault_store;
 
 // MMU =========================
 wire [31:0] mmu_sapt;
 wire [31:0] mmu_fetch_value;
 wire        mmu_fetch_valid;
-wire        mmu_inst_fault;
+wire        mmu_lsu_ex_except;
+wire [31:0] mmu_lsu_inst;
+wire        mmu_lsu_i_valid;
 wire [31:0] mmu_lsu_data;
-wire        mmu_lsu_valid;
-wire        mmu_lsu_load_fault;
-wire        mmu_lsu_store_fault;
-wire [31:0] mmu_dcache_addr;    
-wire [31:0] mmu_dcache_data;
-wire        mmu_dcache_rd;
-wire        mmu_dcache_wr;
-wire [ 3:0] mmu_dcache_mask;
-wire        mmu_dcache_flush;
-wire        mmu_dcache_writeback;
-wire        mmu_dcache_invalidate;
-wire [31:0] mmu_icache_addr;
-wire        mmu_icache_rd;
-
-wire        icache_mmu_valid_in;
+wire        mmu_lsu_d_valid;
+wire        mmu_lsu_rd_except;
+wire        mmu_lsu_wr_except;
 
 // CSR =========================
 wire SYS_start, SYS_done;
@@ -263,8 +272,8 @@ Fetch m_Fetch(
     ,.rst_n(rst_n) 
     ,.en(pc_en)
 // inst. mem interface
-    ,.i_req_o(i_req)
-    ,.i_ready_i(i_ready)
+    ,.i_req_o(fetch_req)
+    ,.i_ready_i(lsu_fetch_valid)
 // feed back from EX
     ,.EX_pc_i(EX_pc_out)
 
@@ -300,8 +309,7 @@ Decode m_ID(
 
     .pc_i(pc_out),
     .pc_p4_i(pc_p4),
-    // .inst_i(mmu_fetch_value),
-    .inst_i(inst),
+    .inst_i(lsu_fetch_inst),
 
     .bp_pred_taken_i(bp_pred_taken_out),
     .bp_pred_target_i(bp_pred_target_out),
@@ -571,7 +579,19 @@ lsu #( .DEPTH(2) )
 u_lsu (
     .clk_i             (clk),
     .rst_i             (rst_n),
-    .opcode_opcode_i   (EX_inst_out),
+
+    // Instruction
+    .fetch_rd_i        (fetch_req),
+    .fetch_pc_i        (pc_out),
+    .fetch_valid_o     (lsu_fetch_valid),
+    .fetch_inst_o      (lsu_fetch_inst),
+    .mmu_i_valid_i     (mmu_lsu_i_valid),
+    .mmu_i_inst_i      (mmu_lsu_inst),
+    .mmu_i_rd_o        (lsu_mmu_i_rd),
+    .mmu_i_pc_o        (lsu_mmu_pc),
+
+    // Data
+    .opcode_inst_i     (EX_inst_out),
     .opcode_ra_data_i  (EX_fwd_data1),
     .opcode_rb_data_i  (EX_fwd_data2),
     .opcode_fp_data_i  (EX_freg_fwd_data2),
@@ -581,9 +601,7 @@ u_lsu (
     .ex_mem_wr_i       (EX_mem_wr_en_out),
     .ex_mem_ctrl_i     (EX_mem_ctrl_out),
     .mmu_value_i       (mmu_lsu_data),
-    .mmu_valid_i       (mmu_lsu_valid),
-    .mmu_load_fault    (mmu_lsu_load_fault),
-    .mmu_store_fault   (mmu_lsu_store_fault),
+    .mmu_valid_i       (mmu_lsu_d_valid),
     .mmu_addr_o        (lsu_mmu_addr),
     .mmu_data_o        (lsu_mmu_data),
     .mmu_rd_o          (lsu_mmu_rd),
@@ -594,26 +612,32 @@ u_lsu (
     .mmu_dwriteback_o  (lsu_mmu_dwriteback),
     .writeback_value_o (lsu_writeback_value_o),
     .writeback_valid_o (lsu_writeback_valid_o),
-    .exception_o       (lsu_exception_o)
+
+    // Exception 
+    .mmu_read_excpt_i  (mmu_lsu_rd_except),
+    .mmu_write_excpt_i (mmu_lsu_wr_except),
+    .mmu_exe_excpt_i   (mmu_lsu_ex_except),
+    .except_inst_ma    (except_inst_ma),
+    .except_page_fault_load(except_page_fault_load),
+    .except_page_fault_store(except_page_fault_store)
 );
 
 // // MMU =========================
-wire fetch_rd_f = 1;
+wire [1:0] mmu_priv = 2'b0; // temp setting
 
-// assign i_mem_addr = mmu_icache_addr;
-assign d_mem_ctrl = mmu_dcache_mask;
-assign d_mem_wr_en = mmu_dcache_wr;
-assign d_mem_rd_en = mmu_dcache_rd;
-assign d_mem_addr = mmu_dcache_addr;
-assign d_mem_wr_data = mmu_dcache_data;
+assign cdma_data_o = d_mem_wr_data;
+assign cdma_addr_o = d_mem_addr;
 
-mmu #(.MMU_SUPPORT(1))
+mmu #(.MMU_SUPPORT(1), .ADDR_ERROR_DETECT(0))
 u_mmu(
     .clk_i               (clk),
     .rst_i               (rst_n),
     .satp_i              (csr_satp_out),
-    .fetch_pc_i          (pc_out),
-    .fetch_rd_i          (fetch_rd_f), 
+    .priv_i              (mmu_priv),
+
+    // lsu interface
+    .fetch_pc_i          (lsu_mmu_pc),
+    .fetch_rd_i          (lsu_mmu_i_rd), 
     .lsu_in_addr_i       (lsu_mmu_addr),
     .lsu_in_data_i       (lsu_mmu_data),
     .lsu_in_rd_i         (lsu_mmu_rd),
@@ -622,27 +646,44 @@ u_mmu(
     .lsu_in_flush_i      (lsu_mmu_dflush),
     .lsu_in_invalidate_i (lsu_mmu_dinvalidafte),
     .lsu_in_writeback_i  (lsu_mmu_dwriteback),
+    
+    .fetch_out_value_o   (mmu_lsu_inst),
+    .fetch_out_valid_o   (mmu_lsu_i_valid),
+    .lsu_out_value_o     (mmu_lsu_data),
+    .lsu_out_valid_o     (mmu_lsu_d_valid),
+
+    // data cache interface
     .dcache_in_value_i   (d_mem_rd_data),
     .dcache_in_valid_i   (d_mem_available),
+
+    .dcache_addr_o       (d_mem_addr),
+    .dcache_value_o      (d_mem_wr_data),
+    .dcache_rd_o         (d_mem_rd_en),
+    .dcache_wr_o         (d_mem_wr_en),
+    .dcache_mask_o       (d_mem_ctrl),
+    .dcache_flush_o      (d_mem_flush),
+    .dcache_invalidate_o (d_mem_invalidate),
+    .dcache_writeback_o  (d_mem_writeback),
+    .d_cachable_o        (d_mem_cacheable),
+
+    // cdma interface
+    .cdma_data_i         (cdma_data_i),
+    .cdma_rdy_i          (cdma_rdy_i),
+    
+    // instruction cache interface
     .icache_in_value_i   (inst),
-    .icache_in_valid_i   (i_mem_available),
-    .fetch_out_value_o   (mmu_fetch_value),
-    .fetch_out_valid_o   (mmu_fetch_valid),
-    .lsu_out_value_o     (mmu_lsu_data),
-    .lsu_out_valid_o     (mmu_lsu_valid),
-    .dcache_addr_o       (mmu_dcache_addr),
-    .dcache_value_o      (mmu_dcache_data),
-    .dcache_rd_o         (mmu_dcache_rd),
-    .dcache_wr_o         (mmu_dcache_wr),
-    .dcache_mask_o       (mmu_dcache_mask),
-    .dcache_flush_o      (mmu_dcache_flush),
-    .dcache_invalidate_o (mmu_dcache_invalidate),
-    .dcache_writeback_o  (mmu_dcache_writeback),
-    .icache_addr_o       (mmu_icache_addr),
-    .icache_rd_o         (mmu_icache_rd),
-    .load_fault_o        (mmu_lsu_load_fault),
-    .store_fault_o       (mmu_lsu_store_fault),
-    .inst_fault_o        (mmu_inst_fault)
+    .icache_in_valid_i   (i_ready),
+    .icache_addr_o       (i_mem_addr),
+    .icache_rd_o         (i_req),
+    .icache_invalidate_o (),
+
+    // exception
+    .icache_exception_i  (i_mem_exception),
+    .dcache_exception_i  (d_mem_exception),
+    .cdma_exception_i    (cdma_exception_i),
+    .read_except_o       (mmu_lsu_rd_except),
+    .write_except_o      (mmu_lsu_wr_except),
+    .exe_except_o        (mmu_lsu_ex_except)
 );
 
 // CSR =========================
@@ -678,6 +719,9 @@ CSR m_CSR(
     .csr_wr_addr_i(EX_csr_addr_out),
     
     .exception_pc_i(EX_pc_out),
+    .except_inst_ma_i(except_inst_ma),
+    .except_page_fault_load_i(except_page_fault_load),
+    .except_page_fault_store_i(except_page_fault_store),
     .csr_rd_addr_i(EX_csr_addr_out),
 
     .csr_branch_o(csr_br_taken),

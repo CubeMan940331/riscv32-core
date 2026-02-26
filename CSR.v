@@ -26,6 +26,10 @@ module CSR (
     input  [31:0]               exception_pc_i,
     input  [11:0]               csr_rd_addr_i,
 
+    input                       except_inst_ma_i,
+    input                       except_page_fault_load_i,
+    input                       except_page_fault_store_i,
+
     output                      csr_branch_o,
     output [31:0]               csr_target_o,
     output [31:0]               interrupt_o,
@@ -151,6 +155,12 @@ always @(*) begin
     else if (!inst_valid || csr_fault_w)
         csr_exception_r = `EXCEPTION_ILLEGAL_INSTRUCTION;
         // Fence / MMU settings cause a pipeline flush TODO: SATP_update_w
+    else if (except_inst_ma_i)
+        csr_exception_r = `EXCEPTION_MISALIGNED_FETCH;
+    else if (except_page_fault_load_i)
+        csr_exception_r = `EXCEPTION_PAGE_FAULT_LOAD;
+    else if (except_page_fault_store_i)
+        csr_exception_r = `EXCEPTION_PAGE_FAULT_STORE;
     else
         csr_exception_r = `EXCEPTION_W'b0; // no exception
     
