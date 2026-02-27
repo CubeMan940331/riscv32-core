@@ -34,9 +34,9 @@ wire valid  = ~empty;
 
 integer i;
 
-assign data_o   = (empty)? data_i : ram_q[rd_ptr];
+assign data_o = ram_q[rd_ptr];
 assign accept_o = accept;
-assign valid_o  = valid || (push_i && empty);
+assign valid_o = valid;
 
 always @(posedge clk_i or negedge rst_i) begin
     if (~rst_i) begin

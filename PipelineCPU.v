@@ -9,6 +9,7 @@ module PipelineCPU (
     output i_mem_invalidate,
     input i_ready,
     input i_mem_exception,
+    input i_interrupt,
 
     output [3:0]  d_mem_ctrl,
     output        d_mem_wr_en,
@@ -552,23 +553,60 @@ MUL_DIV_top m_MUL_DIV_top(
 
 // FPU =========================
 wire [4:0] FPU_flags;
+reg fifo_FPU_start;
+// add fifo to avoid timing violation
+reg [31:0] fifo_FPU_op_a, fifo_FPU_op_b, fifo_FPU_op_c;
+reg [6:0] fifo_opcode;
+reg [6:0] fifo_func7;
+reg [2:0] fifo_func3;
+reg [2:0] fifo_frm;
+reg [4:0] fifo_rs2;
+always @(posedge clk) begin
+    fifo_FPU_start <= FPU_start;
+    fifo_FPU_op_a <= FPU_in1;
+    fifo_FPU_op_b <= EX_freg_fwd_data2;
+    fifo_FPU_op_c <= EX_freg_fwd_data3;
+
+    fifo_opcode <= EX_inst_out[6:0];
+    fifo_func7 <= EX_inst_out[31:25];
+    fifo_func3 <= EX_inst_out[14:12];
+    fifo_rs2 <= EX_inst_out[24:20];
+    fifo_frm <= csr_rd_data[2:0];
+end
+
+wire [31:0] FPU_out_w;
+wire [4:0] FPU_flags_w;
+wire FPU_done_w;
+reg [31:0] fifo_FPU_out;
+reg [4:0] fifo_FPU_flags;
+reg fifo_FPU_done;
+always @(posedge clk) begin
+    fifo_FPU_out <= FPU_out_w;
+    fifo_FPU_flags <= FPU_flags_w;
+    fifo_FPU_done <= FPU_done_w;
+end
+assign FPU_out = fifo_FPU_out;
+assign FPU_flags = fifo_FPU_flags;
+assign FPU_done = fifo_FPU_done;
+
 FPU_top m_FPU(
     .clk(clk),
     .rst_n(rst_n),
-    .FPU_start(FPU_start),
+    .FPU_start(fifo_FPU_start),
 
-    .opcode(EX_inst_out[6:0]),
-    .func7(EX_inst_out[31:25]),         // func7 code to select the function
-    .func3(EX_inst_out[14:12]),         // Rounding mode for arithmetic operations (if 111 swap to frm)
-    .frm(csr_rd_data[2:0]),             // Rounding mode (dynamic from frm)
-    .rs2(EX_inst_out[24:20]),           // For selecting convert type
+    .opcode(fifo_opcode),
+    .func7(fifo_func7),         // func7 code to select the function
+    .func3(fifo_func3),         // Rounding mode for arithmetic operations (if 111 swap to frm)
+    .frm(fifo_frm),             // Rounding mode (dynamic from frm)
+    .rs2(fifo_rs2),           // For selecting convert type
 
-    .operand_a(FPU_in1),                // Operand A 
-    .operand_b(EX_freg_fwd_data2),      // Operand B 
-    .operand_c(EX_freg_fwd_data3),      // Operand C
-    .result_out(FPU_out),               // Result of the operation
-    .fflags(FPU_flags),
-    .FPU_done(FPU_done)
+    .operand_a(fifo_FPU_op_a),      // Operand A 
+    .operand_b(fifo_FPU_op_b),      // Operand B 
+    .operand_c(fifo_FPU_op_c),      // Operand C
+    
+    .result_out(FPU_out_w),               // Result of the operation
+    .fflags(FPU_flags_w),
+    .FPU_done(FPU_done_w)
 );
 
 // LSU =========================
@@ -713,7 +751,7 @@ CSR m_CSR(
     .i_cache_exception_i(0),
     .d_cache_exception_i(0),
     .dma_exception_i(0),
-    .interrupt_i(0),
+    .interrupt_i(i_interrupt),
 
     .csr_wr_addr_i(EX_csr_addr_out),
     

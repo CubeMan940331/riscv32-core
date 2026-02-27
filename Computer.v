@@ -48,6 +48,7 @@ PipelineCPU m_core0(
     .i_req(i_req),
     .i_ready(i_ready),
     .i_mem_exception(1'b0),
+    .i_interrupt(0),
     .i_mem_invalidate(),
     
     .d_mem_ctrl(d_mem_ctrl),
