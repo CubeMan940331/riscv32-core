@@ -8,55 +8,150 @@ module mmu_cache_ctrl(
 
     ,input mmu_dcache_rd_i
     ,input mmu_dcache_wr_i
-    ,input dcache_mmu_rdy_i
+    ,input [31:0] mmu_dcache_addr_i
+    ,input [31:0] mmu_dcache_wr_data_i
+    ,input [3:0] mmu_dcache_mask_i
+    ,input mmu_cachable_i
     ,output mmu_dcache_rd_o
     ,output mmu_dcache_wr_o
+    ,output reg [31:0] mmu_dcache_addr_o
+    ,output reg [31:0] mmu_dcache_wr_data_o
+    ,output reg [3:0] mmu_dcache_mask_o
+    ,output reg mmu_cachable_o
+
+    ,input dcache_mmu_rdy_i
+    ,input [31:0] dcache_wb_data_i
     ,output dcache_valid_o
+    ,output reg [31:0] dcache_wb_data_o
 
     ,input mmu_icache_rd_i
     ,input icache_mmu_rdy_i
+    ,input [31:0] mmu_icache_addr_i
     ,output mmu_icache_rd_o
+    ,output reg [31:0] mmu_icache_addr_o
     ,output icache_valid_o
 );
 
-reg i_cache_rd_r;
-assign mmu_icache_rd_o = mmu_icache_rd_i && icache_mmu_rdy_i && !i_cache_rd_r;
-assign icache_valid_o = icache_mmu_rdy_i && i_cache_rd_r;
+localparam FSM_W = 2;
+localparam FSM_IDLE = 0;
+localparam FSM_MEM = 1;
+localparam FSM_WB = 2;
 
-reg d_cache_req_r;
-assign mmu_dcache_rd_o = mmu_dcache_rd_i && dcache_mmu_rdy_i && !d_cache_req_r;
-assign mmu_dcache_wr_o = mmu_dcache_wr_i && dcache_mmu_rdy_i && !d_cache_req_r;
-assign dcache_valid_o = dcache_mmu_rdy_i && d_cache_req_r;
+//=====================//
+//      I-cache        //
+//=====================//
+
+reg [FSM_W-1:0] fsm_i_state_pre, fsm_i_state, fsm_i_state_next;
 
 always @(posedge clk_i or negedge rst_i)begin
-    if(!rst_i)begin
-        i_cache_rd_r <= 0;
-        d_cache_req_r <= 0;
+    if(~rst_i)begin
+        fsm_i_state <= FSM_IDLE;
+        fsm_i_state_pre <= FSM_IDLE;
     end else begin
-        i_cache_rd_r <= (i_cache_rd_r)? !icache_mmu_rdy_i : mmu_icache_rd_i;
-        d_cache_req_r <= (d_cache_req_r)? !dcache_mmu_rdy_i : (mmu_dcache_rd_i || mmu_dcache_wr_i); 
+        fsm_i_state <= fsm_i_state_next;
+        fsm_i_state_pre <= fsm_i_state;
     end
 end
 
-// I cache Control (same clock)
-// reg i_available_pre;
-// reg i_rd_r;
-// reg i_valid_r;
-// wire i_available = icache_mmu_rdy_i && i_available_pre;
+always @(*)begin
+    fsm_i_state_next = fsm_i_state;
 
-// assign icache_valid_o = i_rd_r && i_available;
-// assign mmu_icache_rd_o = mmu_icache_rd_i && i_available_pre;
+    case(fsm_i_state_next)
+    FSM_IDLE: 
+    begin
+        if(mmu_icache_rd_i)
+            fsm_i_state_next = FSM_MEM;
+        else
+            fsm_i_state_next = FSM_IDLE;
+    end
+    FSM_MEM:
+    begin
+        if(icache_mmu_rdy_i && ~mmu_icache_rd_o)
+            fsm_i_state_next = FSM_IDLE;
+        else
+            fsm_i_state_next = FSM_MEM;
+    end
+    default: fsm_i_state_next = FSM_IDLE;
+    endcase
+end
 
-// always @(posedge clk_i or negedge rst_i)begin
-//     if(!rst_i)begin
-//         i_available_pre <= 1;
-//         i_rd_r <= 0;
-//         i_valid_r <= 0;
-//     end else begin        
-//         i_rd_r <= mmu_icache_rd_i;
-//         i_valid_r <= i_rd_r && i_available;
-//         i_available_pre <= icache_mmu_rdy_i;
-//     end
-// end
+always @(posedge clk_i or negedge rst_i)begin
+    if(~rst_i)begin
+        mmu_icache_addr_o <= 32'b0;
+    end else begin
+        mmu_icache_addr_o <= mmu_icache_addr_i;
+    end
+end
+
+assign mmu_icache_rd_o = (fsm_i_state_pre == FSM_IDLE) && (fsm_i_state == FSM_MEM);
+assign icache_valid_o = (fsm_i_state == FSM_MEM) && (fsm_i_state_next == FSM_IDLE);
+
+//=====================//
+//      D-cache        //
+//=====================//
+
+reg [FSM_W-1:0] fsm_d_state_pre, fsm_d_state, fsm_d_state_next;
+reg dcache_rd_r, dcache_wr_r;
+
+always @(posedge clk_i or negedge rst_i) begin
+    if(~rst_i)begin
+        fsm_d_state <= FSM_IDLE;
+        fsm_d_state_pre <= FSM_IDLE;
+    end else begin
+        fsm_d_state <= fsm_d_state_next;
+        fsm_d_state_pre <= fsm_d_state;
+    end
+end
+
+always @(*) begin
+    fsm_d_state_next = fsm_d_state;
+
+    case(fsm_d_state_next)
+    FSM_IDLE:
+    begin
+        if(mmu_dcache_rd_i || mmu_dcache_wr_i)
+            fsm_d_state_next = FSM_MEM;
+        else
+            fsm_d_state_next = FSM_IDLE;
+    end
+    FSM_MEM:
+    begin
+        if(dcache_mmu_rdy_i && ~mmu_dcache_rd_o)
+            fsm_d_state_next = FSM_WB;
+        else
+            fsm_d_state_next = FSM_MEM;
+    end
+    FSM_WB:
+    begin
+        fsm_d_state_next = FSM_IDLE;
+    end
+    default: 
+        fsm_d_state_next = FSM_IDLE;
+    endcase
+end
+
+assign mmu_dcache_rd_o = (fsm_d_state == FSM_MEM) && (fsm_d_state_pre == FSM_IDLE) && dcache_rd_r;
+assign mmu_dcache_wr_o = (fsm_d_state == FSM_MEM) && (fsm_d_state_pre == FSM_IDLE) && dcache_wr_r;
+assign dcache_valid_o = (fsm_d_state == FSM_WB);
+
+always @(posedge clk_i or negedge rst_i)begin
+    if(~rst_i)begin
+        dcache_rd_r <= 1'b0;
+        dcache_wr_r <= 1'b0;
+        dcache_wb_data_o <= 32'b0;
+        mmu_dcache_addr_o <= 32'b0;
+        mmu_dcache_wr_data_o <= 32'b0;
+        mmu_dcache_mask_o <= 4'b0;
+        mmu_cachable_o <= 1'b1;
+    end else begin
+        dcache_rd_r <= mmu_dcache_rd_i;
+        dcache_wr_r <= mmu_dcache_wr_i;
+        dcache_wb_data_o <= dcache_wb_data_i;
+        mmu_dcache_addr_o <= mmu_dcache_addr_i;
+        mmu_dcache_wr_data_o <= mmu_dcache_wr_data_i;
+        mmu_dcache_mask_o <= mmu_dcache_mask_i;
+        mmu_cachable_o <= mmu_cachable_i;
+    end
+end
 
 endmodule
