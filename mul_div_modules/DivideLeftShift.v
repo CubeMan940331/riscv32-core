@@ -1,9 +1,10 @@
 module DivideLeftShift (
-    input [31:0] r,
-    input [31:0] d,
+    input [65:0] r_i,
+    input [33:0] d_i,
+    input [ 4:0] shift_i,
     output reg [65:0] r_o, //66
     output reg [33:0] d_o, //34
-    output reg [4:0] shift_o
+    output reg [ 4:0] shift_o
 );
     integer i;
 
@@ -12,11 +13,11 @@ module DivideLeftShift (
 
     always @(*) begin
 
-        r_o = {{34{1'b0}}, r};
-        d_o = {{2'b0}, d};
-        shift_o = 0;
+        r_o = r_i;
+        d_o = d_i;
+        shift_o = shift_i;
 
-        for (i = 0; i < 32; i = i + 1) begin
+        for (i = 0; i < 8; i = i + 1) begin
             if (~|(mask & d_o)) begin
                 r_o = r_o << 1;
                 d_o = d_o << 1;
