@@ -22,32 +22,39 @@ module WallaceMultiplier (
     wire [63:0] partial_0 [15:0];
     wire [33:0] booth [16:0];
 
-    //EX0
+    //EX1
     wire [63:0] partial_1 [7:0];
 
-    //EX1
+    //EX2
     wire [63:0] partial_2 [3:0];
 
-    //EX1
+    //EX3
     wire [63:0] partial_3 [1:0];
 
     //reg
-    wire [((64 * 8) - 1):0] partial_1_flat;
-    wire [((64 * 2) - 1):0] partial_3_flat;
-    wire [((64 * 8) - 1):0] partial_1_flat_o;
-    wire [((64 * 2) - 1):0] partial_3_flat_o;
+    wire [((64 * 16) - 1):0] partial_0_flat;
+    wire [((64 *  8) - 1):0] partial_1_flat;
+    wire [((64 *  4) - 1):0] partial_2_flat;
+    wire [((64 *  2) - 1):0] partial_3_flat;
+    
+    wire [((64 * 16) - 1):0] partial_0_flat_o;
+    wire [((64 *  8) - 1):0] partial_1_flat_o;
+    wire [((64 *  4) - 1):0] partial_2_flat_o;
+    wire [((64 *  2) - 1):0] partial_3_flat_o;
 
-    wire [63:0] partial_1_o [7:0];
-    wire [63:0] partial_3_o [1:0];
-    wire [1:0] r_sign_o [1:0];
-    wire r_higher_o [1:0];
-    wire r_start_o [1:0];
+    wire [63:0] partial_0_o [15:0];
+    wire [63:0] partial_1_o [ 7:0];
+    wire [63:0] partial_2_o [ 3:0];
+    wire [63:0] partial_3_o [ 1:0];
+    wire [1:0] r_sign_o [3:0];
+    wire r_higher_o [3:0];
+    wire r_start_o [3:0];
 
     //result
     wire [63:0] partial_sum;
     assign partial_sum = partial_3_o[0] + partial_3_o[1];
-    assign MUL_out = r_higher_o[1] ? partial_sum[63:32] : partial_sum[31:0];
-    assign MUL_done = r_start_o[1];
+    assign MUL_out = r_higher_o[3] ? partial_sum[63:32] : partial_sum[31:0];
+    assign MUL_done = r_start_o[3];
 
     Booth4Decode m_booth_decoder_0 (
         .multiplicand(multiplicand), // ALU A
@@ -97,14 +104,40 @@ module WallaceMultiplier (
         .out2(partial_0[15])
     );
 
+    generate
+        for (g_i = 0; g_i < 16; g_i = g_i + 1) begin: partial_0_flatten
+            assign partial_0_flat[(64 * (g_i + 1) - 1):(64 * g_i)] = partial_0[g_i];
+        end
+    endgenerate
+
+    MUL_Reg #(.SIZE(16)) m_MUL_0_Reg(
+        .clk(clk),
+        .rst_n(rst_n),
+        .partial_i(partial_0_flat),
+        .sign_i(sign),
+        .higher_i(higher),
+        .start_i(start),
+
+        .partial_o(partial_0_flat_o),
+        .sign_o(r_sign_o[0]),
+        .higher_o(r_higher_o[0]),
+        .start_o(r_start_o[0])
+    );
+
+    generate
+        for (g_i = 0; g_i < 16; g_i = g_i + 1) begin: partial_0_o_unflatten
+            assign partial_0_o[g_i] = partial_0_flat_o[(64 * (g_i + 1) - 1):(64 * g_i)];
+        end
+    endgenerate
+
     // 16 -> 8
     generate
         for (g_i = 0; g_i < 4; g_i = g_i + 1) begin: m_compressors_l1
             Compressor42 m_compressor (
-                .in1(partial_0[((g_i * 4) + 0)]),
-                .in2(partial_0[((g_i * 4) + 1)]),
-                .in3(partial_0[((g_i * 4) + 2)]),
-                .in4(partial_0[((g_i * 4) + 3)]),
+                .in1(partial_0_o[((g_i * 4) + 0)]),
+                .in2(partial_0_o[((g_i * 4) + 1)]),
+                .in3(partial_0_o[((g_i * 4) + 2)]),
+                .in4(partial_0_o[((g_i * 4) + 3)]),
                 .out1(partial_1[((g_i * 2) + 0)]),
                 .out2(partial_1[((g_i * 2) + 1)])
             );
@@ -117,18 +150,18 @@ module WallaceMultiplier (
         end
     endgenerate
 
-    MUL_Reg #(.SIZE(8)) m_MUL_0_Reg(
+    MUL_Reg #(.SIZE(8)) m_MUL_1_Reg(
         .clk(clk),
         .rst_n(rst_n),
         .partial_i(partial_1_flat),
-        .sign_i(sign),
-        .higher_i(higher),
-        .start_i(start),
+        .sign_i(r_sign_o[0]),
+        .higher_i(r_higher_o[0]),
+        .start_i(r_start_o[0]),
 
         .partial_o(partial_1_flat_o),
-        .sign_o(r_sign_o[0]),
-        .higher_o(r_higher_o[0]),
-        .start_o(r_start_o[0])
+        .sign_o(r_sign_o[1]),
+        .higher_o(r_higher_o[1]),
+        .start_o(r_start_o[1])
     );
 
     generate
@@ -152,12 +185,39 @@ module WallaceMultiplier (
     endgenerate
 
     generate
+        for (g_i = 0; g_i < 4; g_i = g_i + 1) begin: partial_2_flatten
+            assign partial_2_flat[(64 * (g_i + 1) - 1):(64 * g_i)] = partial_2[g_i];
+        end
+    endgenerate
+
+    MUL_Reg #(.SIZE(4)) m_MUL_2_Reg(
+        .clk(clk),
+        .rst_n(rst_n),
+        .partial_i(partial_2_flat),
+        .sign_i(r_sign_o[1]),
+        .higher_i(r_higher_o[1]),
+        .start_i(r_start_o[1]),
+
+        .partial_o(partial_2_flat_o),
+        .sign_o(r_sign_o[2]),
+        .higher_o(r_higher_o[2]),
+        .start_o(r_start_o[2])
+    );
+
+    generate
+        for (g_i = 0; g_i < 4; g_i = g_i + 1) begin: partial_2_o_unflatten
+            assign partial_2_o[g_i] = partial_2_flat_o[(64 * (g_i + 1) - 1):(64 * g_i)];
+        end
+    endgenerate
+
+    // 4 -> 2
+    generate
         for (g_i = 0; g_i < 1; g_i = g_i + 1) begin: m_compressors_l3
             Compressor42 m_compressor (
-                .in1(partial_2[((g_i * 4) + 0)]),
-                .in2(partial_2[((g_i * 4) + 1)]),
-                .in3(partial_2[((g_i * 4) + 2)]),
-                .in4(partial_2[((g_i * 4) + 3)]),
+                .in1(partial_2_o[((g_i * 4) + 0)]),
+                .in2(partial_2_o[((g_i * 4) + 1)]),
+                .in3(partial_2_o[((g_i * 4) + 2)]),
+                .in4(partial_2_o[((g_i * 4) + 3)]),
                 .out1(partial_3[((g_i * 2) + 0)]),
                 .out2(partial_3[((g_i * 2) + 1)])
             );
@@ -174,14 +234,14 @@ module WallaceMultiplier (
         .clk(clk),
         .rst_n(rst_n),
         .partial_i(partial_3_flat),
-        .sign_i(r_sign_o[0]),
-        .higher_i(r_higher_o[0]),
-        .start_i(r_start_o[0]),
+        .sign_i(r_sign_o[2]),
+        .higher_i(r_higher_o[2]),
+        .start_i(r_start_o[2]),
 
         .partial_o(partial_3_flat_o),
-        .sign_o(r_sign_o[1]),
-        .higher_o(r_higher_o[1]),
-        .start_o(r_start_o[1])
+        .sign_o(r_sign_o[3]),
+        .higher_o(r_higher_o[3]),
+        .start_o(r_start_o[3])
     );
 
     generate
