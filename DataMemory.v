@@ -71,7 +71,7 @@ always @(posedge clk or negedge rst_n) begin
 end
 
 assign inst = inst_r;
-assign i_ready_o = ~|(vld_pipe[3:0]) || vld_pipe[3];
+assign i_ready_o = vld_pipe[3];
 
 always @(posedge clk) begin
     // if (wr_en) begin
@@ -93,7 +93,7 @@ always @(posedge clk) begin
     //     end
     // end
 
-    available_o <= 1'b1;
+    available_o <= wr_en || rd_en;
 
 	if(ctrl[3] && wr_en)
 		mem[address+3] <= data_i[31:24];

@@ -2,14 +2,14 @@ module Computer(
     input clk,
     input rst_n
 );
-wire i_req, i_ready;
+wire i_req, i_mem_valid;
 wire [31:0] i_mem_addr;
 wire [31:0] inst;
 wire i_mem_available;
 
 wire d_mem_wr_en /* verilator public */;
 wire d_mem_rd_en /* verilator public */;
-wire d_mem_available;
+wire d_mem_valid;
 wire d_mem_flush;
 wire d_mem_writeback;
 wire d_mem_invalidate;
@@ -28,7 +28,7 @@ m_DataMemory(
     .i_addr(i_mem_addr),
     .inst(inst),
     .i_req_i(i_req),
-    .i_ready_o(i_ready),
+    .i_ready_o(i_mem_valid),
     
     .wr_en(d_mem_wr_en),
     .rd_en(d_mem_rd_en),
@@ -36,7 +36,7 @@ m_DataMemory(
     .address(d_mem_addr),
     .data_i(d_mem_wr_data),
     .data_o(d_mem_rd_data),
-    .available_o(d_mem_available)
+    .available_o(d_mem_valid)
 );
 
 PipelineCPU m_core0(
@@ -44,9 +44,10 @@ PipelineCPU m_core0(
     .rst_n(rst_n),
     
     .i_mem_addr(i_mem_addr),
-    .inst(inst),
+    .inst_icache_i(inst),
+    .inst_bootrom_i(inst),
     .i_req(i_req),
-    .i_ready(i_ready),
+    .i_valid(i_mem_valid),
     .i_mem_exception(1'b0),
     .i_interrupt(0),
     .i_mem_invalidate(),
@@ -60,13 +61,14 @@ PipelineCPU m_core0(
     .d_mem_writeback(d_mem_writeback),
     .d_mem_invalidate(d_mem_invalidate),
     .d_mem_flush(d_mem_flush),
-    .d_mem_cacheable(d_mem_cacheable),
-    .d_mem_available(d_mem_available),
+    .d_mem_valid(d_mem_valid),
     .d_mem_exception(d_mem_exception),
     
     .cdma_data_o(),
     .cdma_addr_o(),
-    .cdma_rdy_i(1'b0),
+    .cdma_rd_o(),
+    .cdma_wr_o(),
+    .cdma_valid_i(1'b0),
     .cdma_data_i(32'b0),
     .cdma_exception_i(2'b0)
 );

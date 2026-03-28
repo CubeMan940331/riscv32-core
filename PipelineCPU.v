@@ -4,10 +4,11 @@ module PipelineCPU (
     input rst_n,
 
     output [31:0] i_mem_addr,
-    input  [31:0] inst,
+    input  [31:0] inst_icache_i,
+    input  [31:0] inst_bootrom_i,
     output i_req,
     output i_mem_invalidate,
-    input i_ready,
+    input i_valid,
     input i_mem_exception,
     input i_interrupt,
 
@@ -19,14 +20,15 @@ module PipelineCPU (
     output        d_mem_writeback,
     output        d_mem_invalidate,
     output        d_mem_flush,
-    output        d_mem_cacheable,
     input  [31:0] d_mem_rd_data,
-    input         d_mem_available,
+    input         d_mem_valid,
     input  [1:0]  d_mem_exception,
 
     output [31:0] cdma_data_o,
     output [31:0] cdma_addr_o,
-    input         cdma_rdy_i,
+    output        cdma_rd_o,
+    output        cdma_wr_o,
+    input         cdma_valid_i,
     input  [31:0] cdma_data_i,
     input  [1:0]  cdma_exception_i
 );
@@ -691,7 +693,7 @@ mmu u_mmu(
 
     // data cache interface
     .dcache_in_value_i   (d_mem_rd_data),
-    .dcache_in_valid_i   (d_mem_available),
+    .dcache_in_valid_i   (d_mem_valid),
 
     .dcache_addr_o       (d_mem_addr),
     .dcache_value_o      (d_mem_wr_data),
@@ -701,15 +703,17 @@ mmu u_mmu(
     .dcache_flush_o      (d_mem_flush),
     .dcache_invalidate_o (d_mem_invalidate),
     .dcache_writeback_o  (d_mem_writeback),
-    .d_cachable_o        (d_mem_cacheable),
 
     // cdma interface
     .cdma_data_i         (cdma_data_i),
-    .cdma_rdy_i          (cdma_rdy_i),
+    .cdma_valid_i        (cdma_valid_i),
+    .cdma_rd_o           (cdma_rd_o),
+    .cdma_wr_o           (cdma_wr_o),
     
     // instruction cache interface
-    .icache_in_value_i   (inst),
-    .icache_in_valid_i   (i_ready),
+    .icache_in_value_i   (inst_icache_i),
+    .bootrom_in_value_i  (inst_bootrom_i),
+    .icache_in_valid_i   (i_valid),
     .icache_addr_o       (i_mem_addr),
     .icache_rd_o         (i_req),
     .icache_invalidate_o (i_mem_invalidate),

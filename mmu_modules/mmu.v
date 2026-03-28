@@ -40,24 +40,26 @@ module mmu
     ,input  [31:0]  dcache_in_value_i
     ,input          dcache_in_valid_i
 
-    ,output [31:0]  dcache_addr_o      
-    ,output [31:0]  dcache_value_o     
+    ,output [31:0]  dcache_addr_o
+    ,output [31:0]  dcache_value_o
     ,output         dcache_rd_o        
     ,output         dcache_wr_o        
     ,output [ 3:0]  dcache_mask_o      
     ,output reg     dcache_flush_o     
     ,output reg     dcache_invalidate_o
     ,output reg     dcache_writeback_o 
-    ,output         d_cachable_o            // 1: Dcache, 0: DMA
-
+ 
     // CDMA
     // only input, reuse dcache output
     ,input [31:0]   cdma_data_i
-    ,input          cdma_rdy_i
+    ,input          cdma_valid_i
     ,input [1:0]    cdma_exception_i
+    ,output         cdma_wr_o
+    ,output         cdma_rd_o
 
     // Icache Interface
     ,input  [31:0]  icache_in_value_i
+    ,input  [31:0]  bootrom_in_value_i
     ,input          icache_in_valid_i
     ,output [31:0]  icache_addr_o
     ,output         icache_rd_o
@@ -125,26 +127,39 @@ wire icache_valid;
 wire dcache_valid;
 
 // ============================== //
+//           IF Selector          //
+// ============================== //
+
+localparam MAX_ROM_ADDR = 32'h0000_1000;
+wire [31:0] fetch_value_w;
+
+assign fetch_value_w = (icache_addr_o >= MAX_ROM_ADDR)? icache_in_value_i: bootrom_in_value_i;
+
+// ============================== //
 //      Data Input Selection      //
 // ============================== //
 
+wire d_cachable_w;
+wire d_cachable;
 reg d_cacheable_pre;    // select current input is cdma or dcache
-reg rdy_i;
+reg d_valid;
 reg [31:0] data_i;
 reg [1:0] d_execption_i;
 
 generate 
 if(SUPPORT_CDMA) begin : gen_cdma_support
+    assign d_cachable = (dcache_addr_r >= D_ADDR_MIN) && (dcache_addr_r <= D_ADDR_MAX);
     // support for cdma and dcache selection    
     always @(posedge clk_i or negedge rst_i)begin
         if(~rst_i)begin
             d_cacheable_pre <= 1;
         end else begin
-            d_cacheable_pre <= d_cachable_o;
+            d_cacheable_pre <= d_cachable_w;
         end
     end
 end else begin : gen_only_dcache
     // always choose dcache input
+    assign d_cachable = 1;
     always @(posedge clk_i or negedge rst_i)begin
         if(~rst_i)begin
             d_cacheable_pre <= 1'b1;
@@ -157,11 +172,11 @@ endgenerate
 
 always @(*)begin
     if(d_cacheable_pre)begin
-        rdy_i = dcache_in_valid_i;
+        d_valid = dcache_in_valid_i;
         data_i = dcache_in_value_i;
         d_execption_i = dcache_exception_i;
     end else begin
-        rdy_i = cdma_rdy_i;
+        d_valid = cdma_valid_i;
         data_i = cdma_data_i;
         d_execption_i = cdma_exception_i;
     end
@@ -174,38 +189,45 @@ end
 wire [31:0] dcache_wb_data_value;
 wire [31:0] d_ctrl_addr;
 wire [31:0] d_ctrl_data;
-wire d_cachable;
 
 mmu_cache_ctrl u_mmu_cache_ctrl(
     .clk_i           (clk_i),
     .rst_i           (rst_i),
+
+    // mmu internal interface
     .mmu_dcache_rd_i (dcache_rd_c),
     .mmu_dcache_wr_i (dcache_wr_c),
     .mmu_dcache_addr_i(dcache_addr_r),
     .mmu_dcache_wr_data_i(lsu_in_data_i),
     .mmu_dcache_mask_i(dcache_mask_r),
     .mmu_cachable_i  (d_cachable),
-    .mmu_dcache_rd_o (dcache_rd_o),
-    .mmu_dcache_wr_o (dcache_wr_o),
-    .mmu_dcache_addr_o(dcache_addr_o),
-    .mmu_dcache_wr_data_o(dcache_value_o),
-    .mmu_dcache_mask_o(dcache_mask_o),
-    .mmu_cachable_o  (d_cachable_o),
-
-    .dcache_mmu_rdy_i(rdy_i),
-    .dcache_wb_data_i(data_i),
     .dcache_valid_o  (dcache_valid),
     .dcache_wb_data_o(dcache_wb_data_value),
 
     .mmu_icache_rd_i (icache_rd_c),
     .mmu_icache_addr_i(icache_addr_r),
-    .icache_mmu_rdy_i(icache_in_valid_i),
+
+    // mmu dcache & cdma interface
+    .mmu_dcache_rd_o (dcache_rd_o),
+    .mmu_dcache_wr_o (dcache_wr_o),
+    .mmu_dcache_addr_o(dcache_addr_o),
+    .mmu_dcache_wr_data_o(dcache_value_o),
+    .mmu_dcache_mask_o(dcache_mask_o),
+    .mmu_dcachable_o  (d_cachable_w),
+    .dcache_mmu_valid_i(d_valid),
+    .dcache_wb_data_i(data_i),
+
+    .mmu_dma_rd_o (cdma_rd_o),
+    .mmu_dma_wr_o (cdma_wr_o),
+
+    // mmu icache interface
+    .icache_mmu_valid_i(icache_in_valid_i),
+    .icache_valid_o  (icache_valid),
     .mmu_icache_addr_o(icache_addr_o),
-    .mmu_icache_rd_o (icache_rd_o),
-    .icache_valid_o  (icache_valid)
+    .mmu_icache_rd_o (icache_rd_o)
 );
 
-assign fetch_out_value_o    = icache_in_value_i;
+assign fetch_out_value_o    = fetch_value_w;
 assign fetch_out_valid_o    = (vm_enable)?(icache_valid && itlb_hit):(icache_valid);
 assign lsu_out_value_o      = dcache_wb_data_value;
 assign lsu_out_valid_o      = (vm_enable)?(dcache_valid && dtlb_hit):(dcache_valid);
@@ -238,7 +260,6 @@ end
 
 // Others signal
 /* verilator lint_off CMPCONST */
-assign d_cachable           = (dcache_addr_r >= D_ADDR_MIN) && (dcache_addr_r <= D_ADDR_MAX);
 
 always @(posedge clk_i or negedge rst_i) begin
     if(~rst_i)begin
