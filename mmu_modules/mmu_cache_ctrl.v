@@ -51,6 +51,9 @@ localparam FSM_WB = 2;
 
 reg [FSM_W-1:0] fsm_i_state_pre, fsm_i_state, fsm_i_state_next;
 
+localparam MAX_ROM_ADDR = 32'h0000_1000;
+wire is_bootrom_req = (mmu_icache_addr_i >= MAX_ROM_ADDR);
+
 always @(posedge clk_i or negedge rst_i)begin
     if(~rst_i)begin
         fsm_i_state <= FSM_IDLE;
@@ -74,7 +77,7 @@ always @(*)begin
     end
     FSM_MEM:
     begin
-        if(icache_mmu_valid_i)
+        if(icache_mmu_valid_i || is_bootrom_req)
             fsm_i_state_next = FSM_IDLE;
         else
             fsm_i_state_next = FSM_MEM;
