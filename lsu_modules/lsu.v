@@ -141,7 +141,7 @@ wire iinvalidate;
 
 assign dflush       = (opcode_inst_i[31:20] == `CSR_DFLUSH);
 assign dwriteback   = (opcode_inst_i[31:20] == `CSR_DWRITEBACK);
-assign dinvalidate  = (opcode_inst_i[31:20] == `CSR_DINVALIDATE) || ((opcode_inst_i & `INST_IFENCE_MASK) == `INST_IFENCE);
+assign dinvalidate  = (opcode_inst_i[31:20] == `CSR_DINVALIDATE);
 assign iinvalidate  = ((opcode_inst_i & `INST_IFENCE_MASK) == `INST_IFENCE);
 
 // address calculation
