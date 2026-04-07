@@ -37,7 +37,7 @@ module mmu_cache_ctrl(
     // icache
     ,input icache_mmu_valid_i
     ,output mmu_icache_rd_o
-    ,output reg [31:0] mmu_icache_addr_o
+    ,output [31:0] mmu_icache_addr_o
 );
 
 localparam FSM_W = 2;
@@ -52,7 +52,7 @@ localparam FSM_WB = 2;
 reg [FSM_W-1:0] fsm_i_state_pre, fsm_i_state, fsm_i_state_next;
 
 localparam MAX_ROM_ADDR = 32'h0000_1000;
-wire is_bootrom_req = (mmu_icache_addr_i >= MAX_ROM_ADDR);
+wire is_bootrom_req = (mmu_icache_addr_i <= MAX_ROM_ADDR);
 
 always @(posedge clk_i or negedge rst_i)begin
     if(~rst_i)begin
@@ -86,16 +86,9 @@ always @(*)begin
     endcase
 end
 
-always @(posedge clk_i or negedge rst_i)begin
-    if(~rst_i)begin
-        mmu_icache_addr_o <= 32'b0;
-    end else begin
-        mmu_icache_addr_o <= mmu_icache_addr_i;
-    end
-end
-
 assign mmu_icache_rd_o = (fsm_i_state_pre == FSM_IDLE) && (fsm_i_state == FSM_MEM);
 assign icache_valid_o = (fsm_i_state == FSM_MEM) && (fsm_i_state_next == FSM_IDLE);
+assign mmu_icache_addr_o = mmu_icache_addr_i;
 
 //=====================//
 //      D-cache        //

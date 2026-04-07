@@ -8,8 +8,6 @@ module mmu
 #(
      parameter  D_ADDR_MIN = 32'h60000000
     ,parameter  D_ADDR_MAX = 32'hFFFFFFFF
-    ,parameter  I_ADDR_MIN = 32'h60000000
-    ,parameter  I_ADDR_MAX = 32'hFFFFFFFF
     ,parameter  SUPPORT_CDMA = 1
 )
 (
@@ -148,7 +146,8 @@ reg [1:0] d_execption_i;
 
 generate 
 if(SUPPORT_CDMA) begin : gen_cdma_support
-    assign d_cachable = (dcache_addr_r >= D_ADDR_MIN) && (dcache_addr_r <= D_ADDR_MAX);
+    /* verilator lint_off CMPCONST */
+    assign d_cachable = (dcache_addr_r >= D_ADDR_MIN) && (dcache_addr_r <= D_ADDR_MAX); 
     // support for cdma and dcache selection    
     always @(posedge clk_i or negedge rst_i)begin
         if(~rst_i)begin
@@ -259,8 +258,6 @@ always @(*)begin
 end
 
 // Others signal
-/* verilator lint_off CMPCONST */
-
 always @(posedge clk_i or negedge rst_i) begin
     if(~rst_i)begin
         dcache_invalidate_o <= 1'b0;
@@ -268,10 +265,10 @@ always @(posedge clk_i or negedge rst_i) begin
         dcache_writeback_o <= 1'b0;
         icache_invalidate_o <= 1'b0;
     end else begin
-        dcache_invalidate_o <= lsu_in_i_invalidate_i;
+        dcache_invalidate_o <= lsu_in_invalidate_i;
         dcache_flush_o <= lsu_in_flush_i;
         dcache_writeback_o <= lsu_in_writeback_i;
-        icache_invalidate_o <= lsu_in_i_invalidate_i;
+        icache_invalidate_o <= lsu_in_i_invalidate_i && (icache_addr_o >= MAX_ROM_ADDR);
     end
 end
 

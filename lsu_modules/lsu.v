@@ -141,8 +141,8 @@ wire iinvalidate;
 
 assign dflush       = (opcode_inst_i[31:20] == `CSR_DFLUSH);
 assign dwriteback   = (opcode_inst_i[31:20] == `CSR_DWRITEBACK);
-assign dinvalidate  = (opcode_inst_i[31:20] == `CSR_DINVALIDATE);
-assign iinvalidate  = ((opcode_inst_i & `INST_IFENCE_MASK) == `INST_IFENCE); 
+assign dinvalidate  = (opcode_inst_i[31:20] == `CSR_DINVALIDATE) || ((opcode_inst_i & `INST_IFENCE_MASK) == `INST_IFENCE);
+assign iinvalidate  = ((opcode_inst_i & `INST_IFENCE_MASK) == `INST_IFENCE);
 
 // address calculation
 assign mem_addr_w = ra_data + ex_mem_imm_i;
@@ -216,7 +216,7 @@ always @(posedge clk_i or negedge rst_i)begin
         mmu_dflush_o        <= dflush_p & csrrw_inst_p & opcode_valid_p;
         mmu_dwriteback_o    <= dwriteback_p & csrrw_inst_p & opcode_valid_p;
         mmu_dinvalidate_o   <= dinvalidate_p & csrrw_inst_p & opcode_valid_p;
-        mmu_iinvalidate_o   <= iinvalidate_p & opcode_valid_p;
+        mmu_iinvalidate_o   <= iinvalidate_p;
     end
 end
 
