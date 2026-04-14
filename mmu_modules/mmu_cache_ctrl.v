@@ -2,7 +2,7 @@
 // Dcache Signal Control
 // -----------------------------------------------
 
-module mmu_cache_ctrl(
+module mmu_cache_ctrl (
      input clk_i
     ,input rst_i
 
@@ -13,6 +13,7 @@ module mmu_cache_ctrl(
     ,input [31:0] mmu_dcache_wr_data_i
     ,input [3:0] mmu_dcache_mask_i
     ,input mmu_cachable_i
+    ,input mmu_d_oper_i
     ,output dcache_valid_o
     ,output reg [31:0] dcache_wb_data_o
 
@@ -51,9 +52,6 @@ localparam FSM_WB = 2;
 
 reg [FSM_W-1:0] fsm_i_state_pre, fsm_i_state, fsm_i_state_next;
 
-localparam MAX_ROM_ADDR = 32'h0000_1000;
-wire is_bootrom_req = (mmu_icache_addr_i <= MAX_ROM_ADDR);
-
 always @(posedge clk_i or negedge rst_i)begin
     if(~rst_i)begin
         fsm_i_state <= FSM_IDLE;
@@ -77,7 +75,7 @@ always @(*)begin
     end
     FSM_MEM:
     begin
-        if(icache_mmu_valid_i || is_bootrom_req)
+        if(icache_mmu_valid_i)
             fsm_i_state_next = FSM_IDLE;
         else
             fsm_i_state_next = FSM_MEM;
@@ -97,6 +95,7 @@ assign mmu_icache_addr_o = mmu_icache_addr_i;
 reg [FSM_W-1:0] fsm_d_state_pre, fsm_d_state, fsm_d_state_next;
 reg dcache_rd_r, dcache_wr_r;
 reg cachable_r;
+reg d_oper_r;
 
 assign mmu_dcachable_o = cachable_r;
 
@@ -116,7 +115,7 @@ always @(*) begin
     case(fsm_d_state_next)
     FSM_IDLE:
     begin
-        if(mmu_dcache_rd_i || mmu_dcache_wr_i)
+        if(mmu_dcache_rd_i || mmu_dcache_wr_i || mmu_d_oper_i)
             fsm_d_state_next = FSM_MEM;
         else
             fsm_d_state_next = FSM_IDLE;
@@ -152,6 +151,7 @@ always @(posedge clk_i or negedge rst_i)begin
         mmu_dcache_wr_data_o <= 32'b0;
         mmu_dcache_mask_o <= 4'b0;
         cachable_r <= 1'b1;
+        d_oper_r <= 1'b0;
     end else begin
         dcache_rd_r <= mmu_dcache_rd_i;
         dcache_wr_r <= mmu_dcache_wr_i;
@@ -160,6 +160,7 @@ always @(posedge clk_i or negedge rst_i)begin
         mmu_dcache_wr_data_o <= mmu_dcache_wr_data_i;
         mmu_dcache_mask_o <= mmu_dcache_mask_i;
         cachable_r <= mmu_cachable_i;
+        d_oper_r <= mmu_d_oper_i;
     end
 end
 

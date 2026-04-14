@@ -49,8 +49,9 @@ module lsu
     ,output  reg     mmu_dflush_o
     ,output  reg     mmu_dinvalidate_o
     ,output  reg     mmu_dwriteback_o
+    ,output  reg     mmu_dzero_o
     ,output  reg     mmu_iinvalidate_o
-
+        
     // writeback interface
     ,output  [31:0]  writeback_value_o
     ,output          writeback_valid_o
@@ -59,7 +60,6 @@ module lsu
     ,input           mmu_read_excpt_i
     ,input           mmu_write_excpt_i
     ,input           mmu_exe_excpt_i
-    
     ,output          except_inst_ma
     ,output          except_page_fault_load
     ,output          except_page_fault_store
@@ -122,26 +122,27 @@ wire                resp_addr_unaligned;
 //  Opcode 
 // --------------------------------------------
 
-wire lb_inst = ex_mem_ctrl_i[0] & ex_mem_rd_i & opcode_valid_i;
-wire lh_inst = ex_mem_ctrl_i[1] & ex_mem_rd_i & opcode_valid_i;
-wire lw_inst = ex_mem_ctrl_i[2] & ex_mem_rd_i & opcode_valid_i;
-wire sb_inst = ex_mem_ctrl_i[0] & ex_mem_wr_i & opcode_valid_i;
-wire sh_inst = ex_mem_ctrl_i[1] & ex_mem_wr_i & opcode_valid_i;
-wire sw_inst = ex_mem_ctrl_i[2] & ex_mem_wr_i & opcode_valid_i;
-wire sign_inst = ex_mem_ctrl_i[3] & ex_mem_rd_i;
+wire lb_inst = (ex_mem_ctrl_i[2:0] == 3'b001) & ex_mem_rd_i & opcode_valid_i;
+wire lh_inst = (ex_mem_ctrl_i[2:0] == 3'b010) & ex_mem_rd_i & opcode_valid_i;
+wire lw_inst = (ex_mem_ctrl_i[2:0] == 3'b100) & ex_mem_rd_i & opcode_valid_i;
+wire sb_inst = (ex_mem_ctrl_i[2:0] == 3'b001) & ex_mem_wr_i & opcode_valid_i;
+wire sh_inst = (ex_mem_ctrl_i[2:0] == 3'b010) & ex_mem_wr_i & opcode_valid_i;
+wire sw_inst = (ex_mem_ctrl_i[2:0] == 3'b100) & ex_mem_wr_i & opcode_valid_i;
+wire sign_inst = ex_mem_ctrl_i[3] & (ex_mem_ctrl_i[1:0] != 2'b11) & ex_mem_rd_i;
 
 wire ld_inst = ex_mem_rd_i & opcode_valid_i;
 wire st_inst = ex_mem_wr_i & opcode_valid_i;
 
-wire csrrw_inst = ((opcode_inst_i & `INST_CSRRW_MASK) == `INST_CSRRW);
+wire csrrw_inst = ((opcode_inst_i & `INST_CSRRW_MASK) == `INST_CSRRW) & opcode_valid_i;
 
 // CSRRW Instruction
-wire dflush, dwriteback, dinvalidate;
+wire dflush, dwriteback, dinvalidate, dzero;
 wire iinvalidate;
 
-assign dflush       = (opcode_inst_i[31:20] == `CSR_DFLUSH);
-assign dwriteback   = (opcode_inst_i[31:20] == `CSR_DWRITEBACK);
-assign dinvalidate  = (opcode_inst_i[31:20] == `CSR_DINVALIDATE);
+assign dflush       = ((opcode_inst_i[31:20] == `CSR_DFLUSH) && csrrw_inst)      || ((ex_mem_ctrl_i == 4'b0011) & opcode_valid_i);
+assign dwriteback   = ((opcode_inst_i[31:20] == `CSR_DWRITEBACK) && csrrw_inst)  || ((ex_mem_ctrl_i == 4'b1011) & opcode_valid_i);
+assign dinvalidate  = ((opcode_inst_i[31:20] == `CSR_DINVALIDATE) && csrrw_inst) || ((ex_mem_ctrl_i == 4'b0111) & opcode_valid_i);
+assign dzero        = ((ex_mem_ctrl_i == 4'b1111) & opcode_valid_i);
 assign iinvalidate  = ((opcode_inst_i & `INST_IFENCE_MASK) == `INST_IFENCE);
 
 // address calculation
@@ -155,8 +156,8 @@ assign mem_addr_w_4 = ra_data + ex_mem_imm_i + 4;
 reg lb_inst_p, lh_inst_p, lw_inst_p;
 reg sb_inst_p, sh_inst_p, sw_inst_p;
 reg sign_inst_p;
-reg ld_inst_p, st_inst_p, csrrw_inst_p;
-reg dflush_p, dwriteback_p, dinvalidate_p, iinvalidate_p;
+reg ld_inst_p, st_inst_p;
+reg dflush_p, dwriteback_p, dinvalidate_p, dzero_p, iinvalidate_p;
 reg [31:0] mem_addr_p, mem_addr_4_p;
 reg [31:0] mem_data_wr_p;
 reg opcode_valid_p;
@@ -172,10 +173,10 @@ always @(posedge clk_i or negedge rst_i) begin
         sign_inst_p <= 1'b0;
         ld_inst_p <= 1'b0;
         st_inst_p <= 1'b0;
-        csrrw_inst_p <= 1'b0;
         dflush_p <= 1'b0;
         dwriteback_p <= 1'b0;
         dinvalidate_p <= 1'b0;
+        dzero_p <= 1'b0;
         iinvalidate_p <= 1'b0;
         mem_addr_p <= 32'b0;
         mem_addr_4_p <= 32'b0;
@@ -190,10 +191,10 @@ always @(posedge clk_i or negedge rst_i) begin
         sign_inst_p <= sign_inst;
         ld_inst_p <= ld_inst;
         st_inst_p <= st_inst;
-        csrrw_inst_p <= csrrw_inst;
         dflush_p <= dflush;
         dwriteback_p <= dwriteback;
         dinvalidate_p <= dinvalidate;
+        dzero_p <= dzero;
         iinvalidate_p <= iinvalidate;
         mem_addr_p <= mem_addr_w;
         mem_addr_4_p <= mem_addr_w_4;
@@ -206,18 +207,26 @@ end
 //  Dcache & Icache Control Signal
 // --------------------------------------------
 
-always @(posedge clk_i or negedge rst_i)begin
-    if(~rst_i)begin
-        mmu_dflush_o        <= 1'b0;
-        mmu_dwriteback_o    <= 1'b0;
-        mmu_dinvalidate_o   <= 1'b0;
-        mmu_iinvalidate_o   <= 1'b0;
-    end else begin
-        mmu_dflush_o        <= dflush_p & csrrw_inst_p & opcode_valid_p;
-        mmu_dwriteback_o    <= dwriteback_p & csrrw_inst_p & opcode_valid_p;
-        mmu_dinvalidate_o   <= dinvalidate_p & csrrw_inst_p & opcode_valid_p;
-        mmu_iinvalidate_o   <= iinvalidate_p;
-    end
+// always @(posedge clk_i or negedge rst_i)begin
+//     if(~rst_i)begin
+//         mmu_dflush_o        <= 1'b0;
+//         mmu_dwriteback_o    <= 1'b0;
+//         mmu_dinvalidate_o   <= 1'b0;
+//         mmu_iinvalidate_o   <= 1'b0;
+//     end else begin
+//         mmu_dflush_o        <= dflush_p;
+//         mmu_dwriteback_o    <= dwriteback_p;
+//         mmu_dinvalidate_o   <= dinvalidate_p;
+//         mmu_iinvalidate_o   <= iinvalidate_p;
+//     end
+// end
+
+always @(*)begin
+    mmu_dflush_o      = dflush_p;
+    mmu_dwriteback_o  = dwriteback_p;
+    mmu_dinvalidate_o = dinvalidate_p;
+    mmu_dzero_o       = dzero_p;
+    mmu_iinvalidate_o = iinvalidate_p;
 end
 
 // --------------------------------------------
@@ -308,7 +317,7 @@ end
 //  MMU
 // -------------------------------------------- 
 
-assign mmu_addr_o   = {resp_addr[31:2],2'b00};
+assign mmu_addr_o   = (ex_mem_ctrl_i[1:0] == 2'b11)? mem_addr_p : {resp_addr[31:2],2'b00};
 assign mmu_data_o   = resp_data;
 assign mmu_rd_o     = resp_valid_o && resp_rd;
 assign mmu_wr_o     = resp_valid_o && resp_wr;
@@ -462,6 +471,7 @@ reg        resp_valid_pre;
 
 wire is_ma = !(resp_u_type == 3'b0);
 
+// assign writeback_valid_o = (!resp_addr_unaligned && mmu_valid_i) || mmu_cache_oper_valid_i;
 assign writeback_valid_o = (!resp_addr_unaligned && mmu_valid_i);
 assign writeback_value_o = (is_ma)? writeback_value_ma : writeback_value_r;
 

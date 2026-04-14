@@ -19,6 +19,7 @@ wire [3:0] d_mem_ctrl;
 wire [31:0] d_mem_addr /* verilator public */;
 wire [31:0] d_mem_wr_data /* verilator public */;
 wire [31:0] d_mem_rd_data /* verilator public */;
+reg d_oper_resp;
 
 DataMemory #(.SIZE(65536))
 m_DataMemory(
@@ -61,7 +62,8 @@ PipelineCPU m_core0(
     .d_mem_writeback(d_mem_writeback),
     .d_mem_invalidate(d_mem_invalidate),
     .d_mem_flush(d_mem_flush),
-    .d_mem_valid(d_mem_valid),
+    .d_mem_zero(),
+    .d_mem_valid(d_mem_valid || d_oper_resp),
     .d_mem_exception(d_mem_exception),
     
     .cdma_data_o(),
@@ -72,5 +74,14 @@ PipelineCPU m_core0(
     .cdma_data_i(32'b0),
     .cdma_exception_i(2'b0)
 );
+
+
+always @(posedge clk or negedge rst_n)begin
+    if(~rst_n)begin
+        d_oper_resp <= 0;
+    end else begin
+        d_oper_resp <= d_mem_flush || d_mem_invalidate || d_mem_writeback;
+    end
+end
 
 endmodule

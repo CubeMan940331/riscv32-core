@@ -182,7 +182,12 @@ wire is_impl_w =((inst&`INST_ADDI_MASK) == `INST_ADDI)   ||
                 ((inst&`INST_FCVT_S_W_MASK) == `INST_FCVT_S_W)   ||
                 ((inst&`INST_FCVT_S_WU_MASK) == `INST_FCVT_S_WU) ||
                 ((inst&`INST_FMV_W_X_MASK) == `INST_FMV_W_X)     ||
-                ((inst&`INST_FMV_X_W_MASK) == `INST_FMV_X_W)     ;
+                ((inst&`INST_FMV_X_W_MASK) == `INST_FMV_X_W)     ||
+                // zicbom
+                ((inst&`INST_CBO_FLUSH_MASK) == `INST_CBO_FLUSH) ||
+                ((inst&`INST_CBO_INVAL_MASK) == `INST_CBO_INVAL) || 
+                ((inst&`INST_CBO_CLEAN_MASK) == `INST_CBO_CLEAN) || 
+                ((inst&`INST_CBO_ZERO_MASK) == `INST_CBO_ZERO) ;
 
 wire reg_wr_en_w = ((inst&`INST_ADDI_MASK) == `INST_ADDI)    ||
                     ((inst&`INST_SLTI_MASK) == `INST_SLTI)   ||
@@ -322,7 +327,12 @@ wire is_lsu_w = ((inst&`INST_LB_MASK) == `INST_LB)   ||
                 ((inst&`INST_SW_MASK) == `INST_SW)   ||
                 // F Extension
                 ((inst&`INST_FLW_MASK) == `INST_FLW)  ||
-                ((inst&`INST_FSW_MASK) == `INST_FSW);
+                ((inst&`INST_FSW_MASK) == `INST_FSW) || 
+                // zicbom
+                ((inst&`INST_CBO_FLUSH_MASK) == `INST_CBO_FLUSH) ||
+                ((inst&`INST_CBO_INVAL_MASK) == `INST_CBO_INVAL) || 
+                ((inst&`INST_CBO_CLEAN_MASK) == `INST_CBO_CLEAN) || 
+                ((inst&`INST_CBO_ZERO_MASK) == `INST_CBO_ZERO) ;
 
 wire freg_wr_en_w = ((inst&`INST_FMADD_MASK) == `INST_FMADD)         ||
                     ((inst&`INST_FMSUB_MASK) == `INST_FMSUB)         ||
@@ -494,6 +504,11 @@ always @(*) begin
 
         else if ((inst&`INST_FLW_MASK) == `INST_FLW) mem_ctrl_r = 4'b0100; // FLW
         else if ((inst&`INST_FSW_MASK) == `INST_FSW) mem_ctrl_r = 4'b1100; // FSW
+
+        else if ((inst&`INST_CBO_FLUSH_MASK) == `INST_CBO_FLUSH) mem_ctrl_r = 4'b0011; // cbo.flush
+        else if ((inst&`INST_CBO_INVAL_MASK) == `INST_CBO_INVAL) mem_ctrl_r = 4'b0111; // cbo.inval
+        else if ((inst&`INST_CBO_CLEAN_MASK) == `INST_CBO_CLEAN) mem_ctrl_r = 4'b1011; // cbo.clean
+        else if ((inst&`INST_CBO_ZERO_MASK) == `INST_CBO_ZERO)   mem_ctrl_r = 4'b1111; // cbo.zero
         else mem_ctrl_r = 4'b0000;                                         // undefined
     end
 

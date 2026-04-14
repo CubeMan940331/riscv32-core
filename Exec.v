@@ -321,7 +321,7 @@ assign MUL_DIV_start_o = EX_start_o && is_MUL_DIV_o;
 assign FPU_start_o = EX_start_o && is_fpu_o;
 assign LSU_start_o = EX_start_o && 
     (csr_exception_i&`EXCEPTION_TYPE_MASK)!=`EXCEPTION_EXCEPTION &&
-    (mem_wr_en_o || mem_rd_en_o);
+    (mem_wr_en_o || mem_rd_en_o || (mem_ctrl_o[1:0] == 2'b11));
 
 // ALU =========================
 wire ALU_done;

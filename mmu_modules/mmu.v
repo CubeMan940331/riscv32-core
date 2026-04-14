@@ -8,7 +8,8 @@ module mmu
 #(
      parameter  D_ADDR_MIN = 32'h60000000
     ,parameter  D_ADDR_MAX = 32'hFFFFFFFF
-    ,parameter  SUPPORT_CDMA = 1
+    ,parameter  SUPPORT_CDMA = 0
+    ,parameter  SUPPORT_ROM = 0
 )
 (
      input          clk_i
@@ -27,6 +28,7 @@ module mmu
     ,input          lsu_in_flush_i
     ,input          lsu_in_invalidate_i
     ,input          lsu_in_writeback_i
+    ,input          lsu_in_zero_i
     ,input          lsu_in_i_invalidate_i
 
     ,output [31:0]  fetch_out_value_o
@@ -46,6 +48,7 @@ module mmu
     ,output reg     dcache_flush_o     
     ,output reg     dcache_invalidate_o
     ,output reg     dcache_writeback_o 
+    ,output reg     dcache_zero_o
  
     // CDMA
     // only input, reuse dcache output
@@ -121,6 +124,11 @@ wire dcache_rd_c = (vm_enable)? vm_d_rd : req_d_rd;
 wire dcache_wr_c = (vm_enable)? vm_d_wr : req_d_wr;
 wire icache_rd_c = (vm_enable)? vm_i_rd : req_i_rd;
 
+wire d_flush     = (vm_enable)? (lsu_in_flush_i && dtlb_hit) : lsu_in_flush_i;
+wire d_invalid   = (vm_enable)? (lsu_in_invalidate_i && dtlb_hit) : lsu_in_invalidate_i;
+wire d_writeback = (vm_enable)? (lsu_in_writeback_i && dtlb_hit) : lsu_in_writeback_i;
+wire d_zero      = (vm_enable)? (lsu_in_zero_i && dtlb_hit) : lsu_in_zero_i;
+
 wire icache_valid;
 wire dcache_valid;
 
@@ -130,8 +138,17 @@ wire dcache_valid;
 
 localparam MAX_ROM_ADDR = 32'h0000_1000;
 wire [31:0] fetch_value_w;
+wire icache_valid_w;
 
-assign fetch_value_w = (icache_addr_o >= MAX_ROM_ADDR)? icache_in_value_i: bootrom_in_value_i;
+generate
+if (SUPPORT_ROM) begin : gen_rom_support
+    assign fetch_value_w = (icache_addr_o >= MAX_ROM_ADDR)? icache_in_value_i: bootrom_in_value_i;    
+    assign icache_valid_w = icache_in_valid_i || (icache_addr_o <= MAX_ROM_ADDR);
+end else begin :gen_only_icache
+    assign fetch_value_w = icache_in_value_i;
+    assign icache_valid_w = icache_in_valid_i;
+end   
+endgenerate
 
 // ============================== //
 //      Data Input Selection      //
@@ -200,6 +217,7 @@ mmu_cache_ctrl u_mmu_cache_ctrl(
     .mmu_dcache_wr_data_i(lsu_in_data_i),
     .mmu_dcache_mask_i(dcache_mask_r),
     .mmu_cachable_i  (d_cachable),
+    .mmu_d_oper_i    (d_invalid || d_writeback  || d_flush),
     .dcache_valid_o  (dcache_valid),
     .dcache_wb_data_o(dcache_wb_data_value),
 
@@ -238,9 +256,9 @@ always @(*)begin
 
     if(!vm_enable)
         dcache_addr_r = lsu_in_addr_i;
-    if(is_pte)
+    else if(is_pte)
         dcache_addr_r = ptw_pte_addr_o;
-    else if(dtlb_hit)
+    else
         dcache_addr_r = {dtlb_entry_o[29:10],lsu_in_addr_i[11:0]};
     
     if(!vm_enable)
@@ -263,12 +281,14 @@ always @(posedge clk_i or negedge rst_i) begin
         dcache_invalidate_o <= 1'b0;
         dcache_flush_o <= 1'b0;
         dcache_writeback_o <= 1'b0;
+        dcache_zero_o <= 1'b0;
         icache_invalidate_o <= 1'b0;
     end else begin
-        dcache_invalidate_o <= lsu_in_invalidate_i;
-        dcache_flush_o <= lsu_in_flush_i;
-        dcache_writeback_o <= lsu_in_writeback_i;
-        icache_invalidate_o <= lsu_in_i_invalidate_i && (icache_addr_o >= MAX_ROM_ADDR);
+        dcache_invalidate_o <= d_invalid;
+        dcache_flush_o <= d_flush;
+        dcache_writeback_o <= d_writeback;
+        dcache_zero_o <= d_zero;
+        icache_invalidate_o <= lsu_in_i_invalidate_i;
     end
 end
 

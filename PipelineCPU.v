@@ -20,6 +20,7 @@ module PipelineCPU (
     output        d_mem_writeback,
     output        d_mem_invalidate,
     output        d_mem_flush,
+    output        d_mem_zero,
     input  [31:0] d_mem_rd_data,
     input         d_mem_valid,
     input  [1:0]  d_mem_exception,
@@ -191,6 +192,7 @@ wire [ 3:0] lsu_mmu_mask;
 wire        lsu_mmu_dflush;
 wire        lsu_mmu_dinvalidafte;
 wire        lsu_mmu_dwriteback;
+wire        lsu_mmu_dzero;
 wire        lsu_mmu_iinvalidate;
 wire [31:0] lsu_writeback_value_o;
 wire        lsu_writeback_valid_o;
@@ -648,6 +650,7 @@ lsu u_lsu (
     .mmu_dflush_o      (lsu_mmu_dflush),
     .mmu_dinvalidate_o (lsu_mmu_dinvalidafte),
     .mmu_dwriteback_o  (lsu_mmu_dwriteback),
+    .mmu_dzero_o       (lsu_mmu_dzero),
     .mmu_iinvalidate_o (lsu_mmu_iinvalidate),
     .writeback_value_o (lsu_writeback_value_o),
     .writeback_valid_o (lsu_writeback_valid_o),
@@ -684,6 +687,7 @@ mmu u_mmu(
     .lsu_in_flush_i      (lsu_mmu_dflush),
     .lsu_in_invalidate_i (lsu_mmu_dinvalidafte),
     .lsu_in_writeback_i  (lsu_mmu_dwriteback),
+    .lsu_in_zero_i       (lsu_mmu_dzero),
     .lsu_in_i_invalidate_i(lsu_mmu_iinvalidate),
     
     .fetch_out_value_o   (mmu_lsu_inst),
@@ -703,6 +707,7 @@ mmu u_mmu(
     .dcache_flush_o      (d_mem_flush),
     .dcache_invalidate_o (d_mem_invalidate),
     .dcache_writeback_o  (d_mem_writeback),
+    .dcache_zero_o       (d_mem_zero),
 
     // cdma interface
     .cdma_data_i         (cdma_data_i),
