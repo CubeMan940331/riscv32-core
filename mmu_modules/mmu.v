@@ -8,8 +8,8 @@ module mmu
 #(
      parameter  D_ADDR_MIN = 32'h60000000
     ,parameter  D_ADDR_MAX = 32'hFFFFFFFF
-    ,parameter  SUPPORT_CDMA = 0
-    ,parameter  SUPPORT_ROM = 0
+    ,parameter  SUPPORT_CDMA = 1
+    ,parameter  SUPPORT_ROM = 1
 )
 (
      input          clk_i
@@ -223,6 +223,7 @@ mmu_cache_ctrl u_mmu_cache_ctrl(
 
     .mmu_icache_rd_i (icache_rd_c),
     .mmu_icache_addr_i(icache_addr_r),
+    .mmu_i_oper_i(icache_invalidate_o),
 
     // mmu dcache & cdma interface
     .mmu_dcache_rd_o (dcache_rd_o),

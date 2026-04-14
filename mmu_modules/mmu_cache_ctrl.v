@@ -33,6 +33,7 @@ module mmu_cache_ctrl (
     // mmu internal (instruction)
     ,input mmu_icache_rd_i 
     ,input [31:0] mmu_icache_addr_i
+    ,input mmu_i_oper_i
     ,output icache_valid_o
 
     // icache
@@ -95,7 +96,7 @@ assign mmu_icache_addr_o = mmu_icache_addr_i;
 reg [FSM_W-1:0] fsm_d_state_pre, fsm_d_state, fsm_d_state_next;
 reg dcache_rd_r, dcache_wr_r;
 reg cachable_r;
-reg d_oper_r;
+reg d_oper_r, i_oper_r;
 
 assign mmu_dcachable_o = cachable_r;
 
@@ -115,14 +116,16 @@ always @(*) begin
     case(fsm_d_state_next)
     FSM_IDLE:
     begin
-        if(mmu_dcache_rd_i || mmu_dcache_wr_i || mmu_d_oper_i)
+        if(mmu_dcache_rd_i || mmu_dcache_wr_i || mmu_d_oper_i || mmu_i_oper_i)
             fsm_d_state_next = FSM_MEM;
         else
             fsm_d_state_next = FSM_IDLE;
     end
     FSM_MEM:
     begin
-        if(dcache_mmu_valid_i)
+        if(i_oper_r && icache_mmu_valid_i)
+            fsm_d_state_next = FSM_WB;
+        else if(dcache_mmu_valid_i)
             fsm_d_state_next = FSM_WB;
         else
             fsm_d_state_next = FSM_MEM;
@@ -152,6 +155,7 @@ always @(posedge clk_i or negedge rst_i)begin
         mmu_dcache_mask_o <= 4'b0;
         cachable_r <= 1'b1;
         d_oper_r <= 1'b0;
+        i_oper_r <= 1'b0;
     end else begin
         dcache_rd_r <= mmu_dcache_rd_i;
         dcache_wr_r <= mmu_dcache_wr_i;
@@ -161,6 +165,7 @@ always @(posedge clk_i or negedge rst_i)begin
         mmu_dcache_mask_o <= mmu_dcache_mask_i;
         cachable_r <= mmu_cachable_i;
         d_oper_r <= mmu_d_oper_i;
+        i_oper_r <= (fsm_d_state == FSM_IDLE)? mmu_i_oper_i : i_oper_r;
     end
 end
 

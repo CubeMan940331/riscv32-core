@@ -332,7 +332,9 @@ wire is_lsu_w = ((inst&`INST_LB_MASK) == `INST_LB)   ||
                 ((inst&`INST_CBO_FLUSH_MASK) == `INST_CBO_FLUSH) ||
                 ((inst&`INST_CBO_INVAL_MASK) == `INST_CBO_INVAL) || 
                 ((inst&`INST_CBO_CLEAN_MASK) == `INST_CBO_CLEAN) || 
-                ((inst&`INST_CBO_ZERO_MASK) == `INST_CBO_ZERO) ;
+                ((inst&`INST_CBO_ZERO_MASK) == `INST_CBO_ZERO) ||
+                // fence.i
+                ((inst&`INST_IFENCE_MASK) == `INST_IFENCE);
 
 wire freg_wr_en_w = ((inst&`INST_FMADD_MASK) == `INST_FMADD)         ||
                     ((inst&`INST_FMSUB_MASK) == `INST_FMSUB)         ||
@@ -509,6 +511,7 @@ always @(*) begin
         else if ((inst&`INST_CBO_INVAL_MASK) == `INST_CBO_INVAL) mem_ctrl_r = 4'b0111; // cbo.inval
         else if ((inst&`INST_CBO_CLEAN_MASK) == `INST_CBO_CLEAN) mem_ctrl_r = 4'b1011; // cbo.clean
         else if ((inst&`INST_CBO_ZERO_MASK) == `INST_CBO_ZERO)   mem_ctrl_r = 4'b1111; // cbo.zero
+        else if ((inst&`INST_IFENCE_MASK) == `INST_IFENCE)       mem_ctrl_r = 4'b0110; // fence.i
         else mem_ctrl_r = 4'b0000;                                         // undefined
     end
 

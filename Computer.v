@@ -6,6 +6,8 @@ wire i_req, i_mem_valid;
 wire [31:0] i_mem_addr;
 wire [31:0] inst;
 wire i_mem_available;
+wire i_mem_invalidate;
+reg i_oper_resp;
 
 wire d_mem_wr_en /* verilator public */;
 wire d_mem_rd_en /* verilator public */;
@@ -51,7 +53,7 @@ PipelineCPU m_core0(
     .i_valid(i_mem_valid),
     .i_mem_exception(1'b0),
     .i_interrupt(0),
-    .i_mem_invalidate(),
+    .i_mem_invalidate(i_mem_invalidate),
     
     .d_mem_ctrl(d_mem_ctrl),
     .d_mem_wr_en(d_mem_wr_en),
@@ -79,8 +81,10 @@ PipelineCPU m_core0(
 always @(posedge clk or negedge rst_n)begin
     if(~rst_n)begin
         d_oper_resp <= 0;
+        i_oper_resp <= 0;
     end else begin
         d_oper_resp <= d_mem_flush || d_mem_invalidate || d_mem_writeback;
+        i_oper_resp <= i_mem_invalidate;
     end
 end
 

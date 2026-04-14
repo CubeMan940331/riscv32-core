@@ -143,7 +143,7 @@ assign dflush       = ((opcode_inst_i[31:20] == `CSR_DFLUSH) && csrrw_inst)     
 assign dwriteback   = ((opcode_inst_i[31:20] == `CSR_DWRITEBACK) && csrrw_inst)  || ((ex_mem_ctrl_i == 4'b1011) & opcode_valid_i);
 assign dinvalidate  = ((opcode_inst_i[31:20] == `CSR_DINVALIDATE) && csrrw_inst) || ((ex_mem_ctrl_i == 4'b0111) & opcode_valid_i);
 assign dzero        = ((ex_mem_ctrl_i == 4'b1111) & opcode_valid_i);
-assign iinvalidate  = ((opcode_inst_i & `INST_IFENCE_MASK) == `INST_IFENCE);
+assign iinvalidate  = ((opcode_inst_i & `INST_IFENCE_MASK) == `INST_IFENCE) && opcode_valid_i;
 
 // address calculation
 assign mem_addr_w = ra_data + ex_mem_imm_i;

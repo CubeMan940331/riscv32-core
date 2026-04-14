@@ -783,7 +783,7 @@ CSR m_CSR(
     ,.d_mem_wr_en_i(d_mem_wr_en)
 );
 
-assign SYS_done = SYS_start;
+assign SYS_done = SYS_start && ~LSU_start;
 
 //================================
 //write back stage
