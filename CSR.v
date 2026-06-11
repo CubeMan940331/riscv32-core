@@ -5,6 +5,7 @@ module CSR (
     input                       rst_n,
     input  [31:0]               inst,
     input                       inst_valid,
+    input                       interrupt_valid_i,
     input  [2:0]                csr_op_i,
     input                       is_csr_i,
     input                       is_csr_imm_i,
@@ -20,7 +21,9 @@ module CSR (
     input                       i_cache_exception_i,
     input  [1:0]                d_cache_exception_i,
     input  [1:0]                dma_exception_i,
-    input                       interrupt_i,
+    input                       mtip_i,
+    input                       msip_i,
+    input                       meip_i,
 
     input  [11:0]               csr_wr_addr_i,
     input  [31:0]               exception_pc_i,
@@ -51,6 +54,7 @@ module CSR (
 wire [31:0] csr_mstatus;
 wire [31:0] csr_rd_data_old;          // read from CSR file
 wire [1:0]  csr_priv;
+wire [31:0] csr_interrupt;
 
 CSRFile m_CSRFile(
     .clk(clk),
@@ -73,7 +77,10 @@ CSRFile m_CSRFile(
 
     .priv_o(csr_priv),
     .mstatus_o(csr_mstatus),
-    .interrupt_o(interrupt_o),
+    .mtip_i(mtip_i),
+    .msip_i(msip_i),
+    .meip_i(meip_i),
+    .interrupt_o(csr_interrupt),
     .satp_o(csr_satp_o)
     
     ,.d_mem_addr_i(d_mem_addr_i)
@@ -136,7 +143,7 @@ always @(*) begin
         csr_exception_r = `EXCEPTION_MISALIGNED_FETCH;
     else if (alu_exception_i)
         csr_exception_r = `EXCEPTION_ILLEGAL_INSTRUCTION;
-    else if (interrupt_i)
+    else if ((|csr_interrupt) && interrupt_valid_i)
         csr_exception_r = `EXCEPTION_INTERRUPT;
     else if (i_cache_exception_i || d_cache_exception_i[0] || dma_exception_i[0])
         csr_exception_r = `EXCEPTION_FAULT_LOAD;
@@ -174,5 +181,6 @@ end
 
 assign csr_rd_data_o    = csr_rd_data_r;
 assign csr_exception_o  = csr_exception_r;
+assign interrupt_o      = csr_interrupt;
 
 endmodule

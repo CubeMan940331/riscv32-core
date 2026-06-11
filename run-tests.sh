@@ -14,6 +14,7 @@ fi
 
 file_dir="./testing/"
 test_list="00_test_list.txt"
+local_test_list="00_local_test_list.txt"
 result_list="00_test_result.txt"
 
 # Grouping results
@@ -22,12 +23,18 @@ declare -A ext_details   # failed case logs
 
 printf '' > "$file_dir$result_list"
 
-for target in $(tail -n +2 $file_dir$test_list); do
+while read -r target; do
+    if [ -z "$target" ] || [[ "$target" == \#* ]]; then
+        continue
+    fi
+
     test_name=$(basename "$target")
     mem_file="$file_dir$test_name.mem"
 
     # Extract extension (adjust regex if needed)
-    if [[ $test_name =~ rv32u([a-z]) ]]; then
+    if [[ $test_name =~ clint ]]; then
+        ext="I"
+    elif [[ $test_name =~ rv32u([a-z]) ]]; then
         ext=${BASH_REMATCH[1]}
         ext=${ext^^}
     else
@@ -68,7 +75,12 @@ for target in $(tail -n +2 $file_dir$test_list); do
         ext_results[$ext]=0
         ext_details[$ext]+=$(printf "%-30s %s\n" "$test_name" "$output\n")
     fi
-done
+done < <(
+    tail -n +2 "$file_dir$test_list"
+    if [ -f "$file_dir$local_test_list" ]; then
+        tail -n +2 "$file_dir$local_test_list"
+    fi
+)
 
 # Print summary per extension
 supported_exts="RV32"

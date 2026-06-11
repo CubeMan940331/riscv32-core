@@ -67,6 +67,9 @@ module CSRFile (
     ,output [31:0]  mstatus_o
     ,output [31:0]  satp_o
 
+    ,input          mtip_i
+    ,input          msip_i
+    ,input          meip_i
     ,output [31:0]  interrupt_o
 
     // memory interface
@@ -104,7 +107,6 @@ reg [31:0] csr_mepc_q;
 reg [31:0] csr_mcause_q;
 reg [31:0] csr_mtval_q;
 reg [31:0] csr_mip_q;
-reg [31:0] csr_mip_next_q;
 reg [31:0] csr_mtinst_q;
 reg [31:0] csr_mtval2_q;
 
@@ -145,12 +147,20 @@ reg [31:0] csr_mhpmeventh_q   [3:31];
 reg [31:0] csr_fflags_q;
 reg [31:0] csr_frm_q;
 
-// Timer interrupts
-reg [31:0] csr_mtimecmp_q;
-reg        csr_mtime_ie_q;
-
 // CSR - Supervisor
 reg [31:0]  csr_satp_q;
+
+localparam [31:0] MIP_PLATFORM_MASK =
+    (32'b1 << `SR_IP_MSIP_R) |
+    (32'b1 << `SR_IP_MTIP_R) |
+    (32'b1 << `SR_IP_MEIP_R);
+
+wire [31:0] mip_platform_w =
+    (msip_i ? (32'b1 << `SR_IP_MSIP_R) : 32'b0) |
+    (mtip_i ? (32'b1 << `SR_IP_MTIP_R) : 32'b0) |
+    (meip_i ? (32'b1 << `SR_IP_MEIP_R) : 32'b0);
+
+wire [31:0] mip_effective_w = (csr_mip_q & ~MIP_PLATFORM_MASK) | mip_platform_w;
 
 //-----------------------------------------------------------------
 // Masked Interrupts
@@ -163,7 +173,7 @@ reg [1:0]  irq_priv_r;
 reg        m_enabled_r;
 reg [31:0] m_interrupts_r;
 always @(*) begin
-    irq_pending_r = (csr_mip_q & csr_mie_q);
+    irq_pending_r = (mip_effective_w & csr_mie_q);
     irq_masked_r  = csr_mstatus_q[`SR_MIE_R] ? irq_pending_r : 32'b0;
     irq_priv_r    = `PRIV_MACHINE;
 end
@@ -176,14 +186,6 @@ always @(posedge clk or negedge rst_n) begin
     end
 end
 assign interrupt_o = irq_masked_r;
-
-reg csr_mip_upd_q;
-always @ (posedge clk or negedge rst_n) begin
-    if (!rst_n) csr_mip_upd_q <= 1'b0;
-    else if (csr_rd_addr_i == `CSR_MIP) csr_mip_upd_q <= 1'b1;
-    else if (csr_wr_addr_i == `CSR_MIP || (|exception_i)) csr_mip_upd_q <= 1'b0;
-end
-wire buffer_mip_w = (csr_rd_addr_i == `CSR_MIP) | csr_mip_upd_q;
 
 //-----------------------------------------------------------------
 // CSR Read Port
@@ -206,21 +208,17 @@ always @(*) begin
         `CSR_MEPC:      csr_rd_data_r = csr_mepc_q & `CSR_MEPC_MASK;
         `CSR_MCAUSE:    csr_rd_data_r = csr_mcause_q & `CSR_MCAUSE_MASK;
         `CSR_MTVAL:     csr_rd_data_r = csr_mtval_q & `CSR_MTVAL_MASK;
-        `CSR_MIP:       csr_rd_data_r = csr_mip_q & `CSR_MIP_MASK;
+        `CSR_MIP:       csr_rd_data_r = mip_effective_w & `CSR_MIP_MASK;
         // Memory Protection
         `CSR_PMPCFG:    csr_rd_data_r = csr_pmpcfg_q[csr_rd_addr_i[3:0]] & `CSR_PMPCFG_MASK;
         `CSR_PMPADDR:   csr_rd_data_r = csr_pmpaddr_q[csr_rd_addr_i[5:0]];
         // Counter/Timers
-        `CSR_MCYCLE,    
-        `CSR_MTIME:     csr_rd_data_r = csr_mcycle_q;
-        `CSR_MCYCLEH,  
-        `CSR_MTIMEH:    csr_rd_data_r = csr_mcycleh_q;
+        `CSR_MCYCLE:    csr_rd_data_r = csr_mcycle_q;
+        `CSR_MCYCLEH:   csr_rd_data_r = csr_mcycleh_q;
         // Floating Point
         `CSR_FFLAGS:    csr_rd_data_r = csr_fflags_q & `CSR_FFLAGS_MASK;
         `CSR_FRM:       csr_rd_data_r = csr_frm_q & `CSR_FRM_MASK;
         `CSR_FCSR:      csr_rd_data_r = {24'b0, csr_frm_q[2:0], csr_fflags_q[4:0]} & `CSR_FCSR_MASK;
-        // Non-Standard Timer Interrupt
-        `CSR_MTIMECMP:  csr_rd_data_r = csr_mtimecmp_q;
     // CSR - Supervisor
         `CSR_SATP:      csr_rd_data_r = csr_satp_q & `CSR_SATP_MASK;
         default:        csr_rd_data_r = 32'b0;
@@ -257,7 +255,6 @@ reg [31:0] csr_mepc_r;
 reg [31:0] csr_mcause_r;
 reg [31:0] csr_mtval_r;
 reg [31:0] csr_mip_r;
-reg [31:0] csr_mip_next_r;
 reg [31:0] csr_mtinst_r;
 reg [31:0] csr_mtval2_r;
     // configuration
@@ -290,9 +287,6 @@ reg [31:0] csr_mhpmeventh_r   [3:31];
     // Floating Point
 reg [31:0] csr_fflags_r;
 reg [31:0] csr_frm_r;
-    // Timer interrupts
-reg [31:0] csr_mtimecmp_r;
-reg        csr_mtime_ie_r;
 // CSR - Supervisor
     // SATP
 reg [31:0] csr_satp_r;
@@ -314,8 +308,7 @@ always @(*) begin
     csr_mepc_r      = csr_mepc_q;
     csr_mcause_r    = csr_mcause_q;
     csr_mtval_r     = csr_mtval_q;
-    csr_mip_r       = csr_mip_q;
-    csr_mip_next_r  = csr_mip_next_q;
+    csr_mip_r       = mip_effective_w;
 
     // Memory Protection
     for (i=0; i<16; i=i+1) begin
@@ -331,10 +324,6 @@ always @(*) begin
     // Floating Point
     csr_fflags_r    = csr_fflags_q;
     csr_frm_r       = csr_frm_q;
-
-    // Non-Standard Timer Interrupt
-    csr_mtimecmp_r  = csr_mtimecmp_q;
-    csr_mtime_ie_r  = csr_mtime_ie_q;
 
     // SATP
     csr_satp_r      = csr_satp_q;
@@ -420,7 +409,7 @@ always @(*) begin
             `CSR_MEPC:    csr_mepc_r      = csr_wr_data_i & `CSR_MEPC_MASK;
             `CSR_MCAUSE:  csr_mcause_r    = csr_wr_data_i & `CSR_MCAUSE_MASK;
             `CSR_MTVAL:   csr_mtval_r     = csr_wr_data_i & `CSR_MTVAL_MASK;
-            `CSR_MIP:     csr_mip_r       = csr_wr_data_i & `CSR_MIP_MASK;
+            `CSR_MIP:     csr_mip_r       = (csr_wr_data_i & `CSR_MIP_MASK & ~MIP_PLATFORM_MASK) | mip_platform_w;
             // Memory Protection
                 // PMP Configuration
             `CSR_PMPCFG:
@@ -436,12 +425,6 @@ always @(*) begin
                 csr_fflags_r = csr_wr_data_i & `CSR_FFLAGS_MASK;
                 csr_frm_r    = (csr_wr_data_i >> 5) & `CSR_FRM_MASK;
             end
-            // Non-Standard Timer Interrupt
-            `CSR_MTIMECMP:
-            begin
-                csr_mtimecmp_r = csr_wr_data_i & `CSR_MTIMECMP_MASK;
-                csr_mtime_ie_r = 1'b1;
-            end
         // CSR - Supervisor
             // SATP
             `CSR_SATP:     csr_satp_r     = csr_wr_data_i & `CSR_SATP_MASK;
@@ -449,17 +432,7 @@ always @(*) begin
         endcase
     end
 
-    // Internal timer compare interrupt
-    if(csr_mcycle_q == csr_mtimecmp_q) begin
-        if(!csr_mtime_ie_q)
-            csr_mip_next_r[`SR_IP_MTIP_R] = 1'b0;
-        else
-            csr_mip_next_r[`SR_IP_MTIP_R] = 1'b1;
-        // TODO: need to implement s mode check
-        csr_mtime_ie_r  = 1'b0;
-    end
-
-    csr_mip_r = csr_mip_r | csr_mip_next_r;
+    csr_mip_r = (csr_mip_r & ~MIP_PLATFORM_MASK) | mip_platform_w;
 end
 
 //-----------------------------------------------------------------
@@ -484,7 +457,6 @@ always @(posedge clk or negedge rst_n) begin
         csr_mcause_q   <= 32'b0;
         csr_mtval_q    <= 32'b0;
         csr_mip_q      <= 32'b0;
-        csr_mip_next_q <= 32'b0;
             // Memory Protection
         for (i=0; i<16; i=i+1) begin
             csr_pmpcfg_q[i]  <= 32'b0;
@@ -498,10 +470,6 @@ always @(posedge clk or negedge rst_n) begin
             // Floating Point
         csr_fflags_q   <= 32'b0;
         csr_frm_q      <= 32'b0;
-            // Non-Standard Timer Interrupt
-        csr_mtimecmp_q <= 32'b0;
-        csr_mtime_ie_q <= 1'b0;
-
         // CSR - Supervisor
             // SATP
         csr_satp_q     <= 32'b0;
@@ -536,10 +504,6 @@ always @(posedge clk or negedge rst_n) begin
             // Floating Point
         csr_fflags_q   <= csr_fflags_r;
         csr_frm_q      <= csr_frm_r;
-            // Non-Standard Timer Interrupt
-        csr_mtimecmp_q <= csr_mtimecmp_r;
-        csr_mtime_ie_q <= csr_mtime_ie_r;
-        csr_mip_next_q <= buffer_mip_w ? csr_mip_next_r : 32'b0;
         // CSR - Supervisor
             // SATP
         csr_satp_q     <= csr_satp_r & `CSR_SATP_MASK;

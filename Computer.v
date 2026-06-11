@@ -10,6 +10,8 @@ wire i_mem_available;
 wire d_mem_wr_en /* verilator public */;
 wire d_mem_rd_en /* verilator public */;
 wire d_mem_available;
+wire data_mem_available;
+wire clint_available;
 wire d_mem_flush;
 wire d_mem_writeback;
 wire d_mem_invalidate;
@@ -19,6 +21,19 @@ wire [3:0] d_mem_ctrl;
 wire [31:0] d_mem_addr /* verilator public */;
 wire [31:0] d_mem_wr_data /* verilator public */;
 wire [31:0] d_mem_rd_data /* verilator public */;
+wire [31:0] data_mem_rd_data;
+wire [31:0] clint_rd_data;
+wire clint_sel = (d_mem_addr[31:12] == 20'h20000);
+wire data_mem_wr_en = d_mem_wr_en & ~clint_sel;
+wire data_mem_rd_en = d_mem_rd_en & ~clint_sel;
+wire clint_wr_en = d_mem_wr_en & clint_sel;
+wire clint_rd_en = d_mem_rd_en & clint_sel;
+wire mtip;
+wire msip;
+wire meip = 1'b0;
+
+assign d_mem_rd_data = clint_sel ? clint_rd_data : data_mem_rd_data;
+assign d_mem_available = clint_sel ? clint_available : data_mem_available;
 
 DataMemory #(.SIZE(65536))
 m_DataMemory(
@@ -30,13 +45,27 @@ m_DataMemory(
     .i_req_i(i_req),
     .i_ready_o(i_ready),
     
-    .wr_en(d_mem_wr_en),
-    .rd_en(d_mem_rd_en),
+    .wr_en(data_mem_wr_en),
+    .rd_en(data_mem_rd_en),
     .ctrl(d_mem_ctrl),
     .address(d_mem_addr),
     .data_i(d_mem_wr_data),
-    .data_o(d_mem_rd_data),
-    .available_o(d_mem_available)
+    .data_o(data_mem_rd_data),
+    .available_o(data_mem_available)
+);
+
+CLINT m_CLINT(
+    .clk(clk),
+    .rst_n(rst_n),
+    .addr_i(d_mem_addr),
+    .wr_en_i(clint_wr_en),
+    .rd_en_i(clint_rd_en),
+    .wr_mask_i(d_mem_ctrl),
+    .wr_data_i(d_mem_wr_data),
+    .rd_data_o(clint_rd_data),
+    .available_o(clint_available),
+    .mtip_o(mtip),
+    .msip_o(msip)
 );
 
 PipelineCPU m_core0(
@@ -48,7 +77,9 @@ PipelineCPU m_core0(
     .i_req(i_req),
     .i_ready(i_ready),
     .i_mem_exception(1'b0),
-    .i_interrupt(0),
+    .mtip_i(mtip),
+    .msip_i(msip),
+    .meip_i(meip),
     
     .d_mem_ctrl(d_mem_ctrl),
     .d_mem_wr_en(d_mem_wr_en),
